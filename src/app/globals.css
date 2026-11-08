@@ -1,0 +1,212 @@
+:root {
+  color-scheme: light;
+  --paper: #fbf7ef;
+  --card: #fffdf8;
+  --ink: #302627;
+  --text: #645553;
+  --berry: #6e304b;
+  --line: #d7c8bd;
+  --muted: #f1e5db;
+  --font: Geist, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+}
+.wrap {
+  max-width: 1120px;
+  margin: auto;
+  padding: 0 clamp(18px, 5vw, 64px) 64px;
+}
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 84px;
+  border-bottom: 1px solid var(--line);
+  gap: 14px;
+}
+.brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 24px;
+  font-weight: 760;
+}
+.brand img {
+  border-radius: 10px;
+}
+.intro {
+  margin: clamp(34px, 7vw, 80px) 0 28px;
+}
+.intro h1 {
+  margin: 0 0 6px;
+  font-size: clamp(36px, 6vw, 64px);
+  letter-spacing: -0.055em;
+}
+.intro p,
+.hint {
+  color: var(--text);
+  line-height: 1.6;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: clamp(18px, 4vw, 50px);
+  align-items: start;
+}
+.sheet {
+  border-top: 7px solid var(--berry);
+  background: var(--card);
+  border-radius: 5px 5px 18px 18px;
+  padding: clamp(18px, 3.5vw, 40px);
+  box-shadow: 0 8px 28px #3628260b;
+}
+.dateline {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+  font-size: 14px;
+}
+.caption {
+  margin: 32px 0 0;
+  font-size: 18px;
+}
+.big {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--berry);
+  margin: 5px 0 24px;
+  overflow-wrap: anywhere;
+}
+.big strong {
+  font-size: clamp(46px, 10vw, 94px);
+  letter-spacing: -0.07em;
+  line-height: 1.08;
+  font-variant-numeric: tabular-nums;
+}
+.big span {
+  font-size: 20px;
+}
+dl {
+  margin: 0;
+}
+dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+dd {
+  text-align: right;
+  font-weight: 700;
+  margin: 0;
+}
+small {
+  display: block;
+  font-weight: 400;
+  color: var(--text);
+  margin-top: 3px;
+}
+.settings {
+  padding: 16px 0;
+}
+.settings h2 {
+  margin: 0 0 24px;
+  font-size: 22px;
+}
+.settings label {
+  display: block;
+  margin: 18px 0 7px;
+  font-weight: 600;
+}
+.settings input,
+.settings select {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  font: inherit;
+  color: var(--ink);
+}
+.hint {
+  font-size: 14px;
+}
+.install {
+  position: relative;
+}
+button {
+  min-height: 44px;
+  background: var(--berry);
+  border: 0;
+  border-radius: 999px;
+  color: white;
+  font: inherit;
+  font-weight: 650;
+  padding: 8px 19px;
+  cursor: pointer;
+}
+.install-help {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(290px, 80vw);
+  padding: 16px;
+  line-height: 1.6;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.install-state {
+  color: var(--text);
+}
+:focus-visible {
+  outline: 3px solid var(--berry);
+  outline-offset: 3px;
+}
+.compact { max-width: 680px; }
+.compact .top { margin-bottom: 20px; min-height: 60px; }
+.compact h1 { font-size: 18px; }
+.compact .calendar-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.compact .sheet { padding: 16px 20px; }
+.compact .caption { margin-top: 16px; }
+.compact .big { margin-bottom: 12px; }
+.compact .settings h2 { margin-bottom: 8px; }
+.compact .settings label { margin-top: 10px; }
+.open-full {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--berry);
+  font-weight: 650;
+}
+@media (max-width: 680px) {
+  .calendar-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .top {
+    min-height: 68px;
+  }
+  .settings {
+    padding: 4px 0;
+  }
+  .intro {
+    margin: 32px 0 22px;
+  }
+}

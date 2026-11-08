@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.next/
+.env*
+!.env.example
+.DS_Store
+*.tsbuildinfo
+test-results/
+playwright-report/
+.vercel/
+.claude/settings.local.json
+.claude/worktrees/
+supabase/.temp/
+supabase/.branches/

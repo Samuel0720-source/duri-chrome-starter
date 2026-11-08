@@ -1,0 +1,31 @@
+:root {
+  color-scheme: light;
+  font: 15px/1.4 Geist, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  color: #302627;
+  background: #fbf7ef;
+}
+* { box-sizing: border-box; }
+body { width: 352px; margin: 0; }
+main { padding: 18px 22px; }
+header { display: flex; align-items: center; gap: 8px; font-weight: 750; }
+header img { border-radius: 7px; }
+h1 { margin: 16px 0 8px; font-size: 26px; letter-spacing: -.04em; }
+.result {
+  display: grid; min-height: 75px; align-content: center; gap: 3px; padding: 10px 14px;
+  background: #f1e5db; border-left: 4px solid #6e304b; border-radius: 3px 12px 12px 3px;
+}
+.result strong { color: #58233a; font-size: 21px; font-variant-numeric: tabular-nums; }
+.result span { color: #645553; }
+fieldset { display: grid; min-width: 0; border: 0; margin: 12px 0 0; padding: 0; gap: 5px; }
+label { font-weight: 600; }
+input[type="date"], select {
+  width: 100%; height: 38px; margin-bottom: 6px; border: 1px solid #cbbcb2;
+  border-radius: 8px; background: #fffdf8; color: inherit; padding: 4px 9px; font: inherit;
+}
+.remember { display: flex; align-items: center; min-height: 28px; gap: 5px; margin: 2px 0 7px; font-size: 13px; }
+.remember input { accent-color: #6e304b; }
+button { min-height: 42px; border: 1px solid #6e304b; border-radius: 10px; font: inherit; font-weight: 650; cursor: pointer; }
+#mini { color: white; background: #6e304b; }
+#full { color: #6e304b; background: #fffdf8; }
+:focus-visible { outline: 3px solid #89546a; outline-offset: 2px; }
+#error { color: #7b2038; margin: 8px 0 0; }
