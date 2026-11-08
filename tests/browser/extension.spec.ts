@@ -10,30 +10,38 @@ async function checkCalendarHandoff(context: BrowserContext, popupURL: string, w
   await popup.getByLabel("기준 시간대").selectOption("Asia/Seoul");
   await expect(popup.getByRole("status")).toContainText("일");
   await popup.getByLabel("이 기기에 날짜와 시간대 기억").check();
-  const [small] = await Promise.all([
-    context.waitForEvent("page"),
-    popup.getByRole("button", { name: "작은 창으로 열기" }).click(),
-  ]);
-  await expect(small).toHaveURL(/\/compact#/);
-  await expect(small.getByLabel("함께한 첫날")).toHaveValue("2024-02-29");
-  await expect(small.getByLabel("기준 시간대")).toHaveValue("Asia/Seoul");
-  await small.getByLabel("함께한 첫날").fill("2025-03-14");
+  await expect(popup.getByRole("status")).toContainText("일째");
+  await expect(popup.getByRole("button", { name: "작은 창으로 열기" })).toHaveCount(0);
+  const webRoot = (url: URL) => url.origin === new URL(web).origin && url.pathname === "/";
   const [full] = await Promise.all([
+    context.waitForEvent("page"),
+    popup.getByRole("button", { name: "전체 웹앱" }).click(),
+  ]);
+  await expect(full).toHaveURL(webRoot);
+  await expect(full.getByLabel("함께한 첫날")).toHaveValue("2024-02-29");
+  await expect(full.getByLabel("기준 시간대")).toHaveValue("Asia/Seoul");
+
+  // The compact web page still exists for the installed app and links to the full app.
+  const small = await context.newPage();
+  await small.goto(new URL("/compact#start=2024-02-29&zone=Asia%2FSeoul", web).href);
+  await small.getByLabel("함께한 첫날").fill("2025-03-14");
+  const [fromSmall] = await Promise.all([
     context.waitForEvent("page"),
     small.getByRole("link", { name: "전체 웹앱 열기" }).click(),
   ]);
-  const webRoot = (url: URL) => url.origin === new URL(web).origin && url.pathname === "/";
-  await expect(full).toHaveURL(webRoot);
-  await expect(full.getByLabel("함께한 첫날")).toHaveValue("2025-03-14");
-  await expect(full.getByLabel("기준 시간대")).toHaveValue("Asia/Seoul");
+  await expect(fromSmall).toHaveURL(webRoot);
+  await expect(fromSmall.getByLabel("함께한 첫날")).toHaveValue("2025-03-14");
 
   const reopened = await context.newPage();
   await reopened.goto(popupURL);
+  // A saved date shows the result first; settings stay folded until opened.
+  await expect(reopened.getByLabel("함께한 첫날")).toBeHidden();
+  await reopened.getByText("날짜 설정").click();
   await expect(reopened.getByLabel("함께한 첫날")).toHaveValue("2024-02-29");
   await reopened.getByLabel("이 기기에 날짜와 시간대 기억").uncheck();
   const [direct] = await Promise.all([
     context.waitForEvent("page"),
-    reopened.getByRole("button", { name: "전체 웹앱 열기" }).click(),
+    reopened.getByRole("button", { name: "전체 웹앱" }).click(),
   ]);
   await expect(direct).toHaveURL(webRoot);
   await expect(direct.getByLabel("함께한 첫날")).toHaveValue("2024-02-29");

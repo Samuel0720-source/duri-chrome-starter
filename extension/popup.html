@@ -9,21 +9,30 @@
 </head>
 <body>
   <main>
-    <header><img src="icons/48.png" width="30" height="30" alt=""><span>둘이</span></header>
-    <h1>우리 기념일</h1>
-    <div class="result" role="status">
-      <strong id="count">첫날을 골라 주세요</strong>
-      <span id="next-day"></span>
-    </div>
-    <fieldset id="controls" disabled>
-      <label for="start">함께한 첫날</label>
-      <input type="date" id="start" min="1900-01-01" max="9998-12-31">
-      <label for="zone">기준 시간대</label>
-      <select id="zone"></select>
-      <label class="remember"><input type="checkbox" id="remember"> 이 기기에 날짜와 시간대 기억</label>
-      <button type="button" id="mini">작은 창으로 열기</button>
-      <button type="button" id="full">전체 웹앱 열기 ↗</button>
-    </fieldset>
+    <header>
+      <img src="icons/48.png" width="28" height="28" alt="">
+      <span>둘이</span>
+      <button type="button" id="full" class="open-full">전체 웹앱 ↗</button>
+    </header>
+    <section class="sheet" role="status" aria-label="기념일 계산 결과">
+      <div class="dateline"><span>오늘</span><time id="today"></time></div>
+      <p class="caption" id="caption">첫날을 골라 주세요</p>
+      <div class="big" id="big" hidden><strong id="count"></strong><span id="unit">일째</span></div>
+      <dl id="rows" hidden>
+        <div><dt id="hundred-label"></dt><dd><span id="hundred-left"></span><small id="hundred-date"></small></dd></div>
+        <div><dt>연애 기념일</dt><dd><span id="annual-left"></span><small id="annual-date"></small></dd></div>
+      </dl>
+    </section>
+    <details id="settings">
+      <summary>날짜 설정</summary>
+      <fieldset id="controls" disabled>
+        <label for="start">함께한 첫날</label>
+        <input type="date" id="start" min="1900-01-01" max="9998-12-31">
+        <label for="zone">기준 시간대</label>
+        <select id="zone"></select>
+        <label class="remember"><input type="checkbox" id="remember"> 이 기기에 날짜와 시간대 기억</label>
+      </fieldset>
+    </details>
     <p role="alert" id="error" hidden></p>
   </main>
 </body>
