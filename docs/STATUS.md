@@ -17,7 +17,20 @@
 - (1)의 저장소·창 열기에는 테스트용 Chrome API를 사용했다. 같은 시나리오를 **실제 확장**으로 실행하는 추가 검사 1개는 이 환경의 Chromium 관리 정책이 로컬 확장 설치를 차단해 건너뛰었다. 맥의 툴바에서 직접 여는 과정, Mac Dock, 사용자의 Claude 로그인·개인 스킬 등록 상태도 실제 기기에서 확인할 항목이다.
 - P2 DB 테스트는 인증 ID를 테스트용으로 전달한다. Supabase 이메일 로그인·실제 Realtime·공개 도메인은 아직 연결하지 않았다.
 
-**다음 작업 하나**는 개인 Mac에서 README 3단계대로 확장을 로드해, ‘첫날 선택 → 작은 창 → 전체 웹앱’에서 같은 날짜와 시간대가 보이는지 확인하는 것이다. 그다음 P1을 프리뷰에 배포해 다른 기기로 열고, 확인된 HTTPS 주소로 확장을 다시 빌드한다.
+### 인계 기록 · 2026-11-08 · P1 배포 · 브랜치 `p1-preview-deploy` (커밋 전)
+
+- **사용자 행동·변경한 파일:** 배포 주소에서 기념일 화면이 열리고, 그 주소로 다시 빌드한 확장이 같은 날짜·시간대를 넘긴다. 바꾼 파일은 `playwright.config.ts`(`PREVIEW_URL`이 있으면 그 HTTPS 주소를 검사 대상으로 사용), `tests/browser/pwa.spec.ts`(고정 로컬 주소를 `baseURL`로 변경), `docs/ARCHITECTURE.md`, 이 파일. 패키지 변경 없음.
+- **실행한 명령:**
+  - 로컬 `npm run build` 성공.
+  - 로컬 브라우저 검사 4개 통과 (실제 확장 검사 포함, 건너뜀 0).
+  - 배포 주소 `curl` 9개 경로 모두 200. `sw.js`는 `no-store`, `offline.html`은 `no-cache`.
+  - `PREVIEW_URL=https://duri-chrome-starter.vercel.app`로 같은 브라우저 검사 4개 통과 (건너뜀 0).
+  - `npm run extension:build -- https://duri-chrome-starter.vercel.app` 후 `origin.js`가 그 주소이고 `dist/chrome-extension`에 localhost 없음.
+  - `npm run typecheck` 성공. `npm test` 전체 통과: 단위 8개, DB 3개 (단위·DB는 따로 다시 돌려 개수 확인, 실패·건너뜀 0), 브라우저 5개 통과. 브라우저 5개는 `npm test` 출력의 `5 passed`이고 건너뜀 표시는 없었다.
+- **실제 주소·확인한 기기:** https://duri-chrome-starter.vercel.app/ (Production 고정 주소). 사용자가 시크릿 창에서 로그인 없이 열리는 것을 확인했다. Deployment Protection은 끄지 않았다.
+- **미확인:** 휴대폰에서 직접 열기, 맥 Chrome 툴바에서 다시 빌드한 확장의 두 버튼 직접 누르기, 설치한 PWA가 배포 주소에서 옛 화면을 보여 주지 않는지 직접 확인.
+
+**다음 작업 하나**는 `chrome://extensions`에서 ‘둘이’를 새로고침한 뒤 ‘첫날 선택 → 작은 창으로 열기 → 전체 웹앱 열기’가 `duri-chrome-starter.vercel.app`에서 같은 날짜·시간대로 열리는지, 휴대폰에서도 같은 주소가 열리는지 확인하는 것이다. 통과하면 P1이 끝난다.
 
 ### 인계 기록 양식
 

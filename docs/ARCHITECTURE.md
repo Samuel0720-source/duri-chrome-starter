@@ -16,6 +16,9 @@
 
 **Chrome과 웹의 경계.** 웹 설치 정보는 `src/app/manifest.ts`, 확장 권한과 팝업은 `extension/manifest.json`이 담당한다. 팝업은 새 탭이나 작은 창을 직접 열고, 설치한 PWA는 루트 URL에서 시작한다. 확장 권한은 선택한 날짜를 이 기기에 기억하는 `storage` 하나다. 인증 쿠키·방 데이터·현재 보고 있는 다른 사이트는 사용하지 않는다. 확장 소스와 웹이 같은 날짜 함수를 사용하므로 윤일 규칙을 한 번만 바꾸면 된다. 공개 배포 시에는 확인된 HTTPS 주소로 확장을 다시 생성한다. [Chrome 팝업](https://developer.chrome.com/docs/extensions/develop/ui/add-popup) · [탭 권한](https://developer.chrome.com/docs/extensions/reference/api/tabs) · [PWA manifest](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable)
 
+**배포 주소 결정 (P1).** Deployment Protection은 끄지 않는다. 프리뷰 배포 주소는 배포마다 바뀌고 Vercel 로그인을 요구할 수 있어서, 확장과 휴대폰 확인에는 로그인 없이 열리는 고정 Production 주소 `https://duri-chrome-starter.vercel.app`을 쓴다.
+확장은 빌드할 때 받은 주소를 `origin.js`에 고정하므로, 주소가 바뀌면 `npm run extension:build -- <주소>`로 다시 만들어야 한다.
+
 **샷 계약.** 서버에서 코스 버전·정수 또는 고정 timestep·최대 스텝·정지 조건을 고정한다. 원본 입력과 시작 좌표, 샷 ID, 서버 시작 시각, 종료 좌표, 경과 시간, 타수를 저장한다. 샷 ID 유일 제약과 플레이어별 버전 검사를 원자적으로 처리한다. 클라이언트는 같은 물리 모듈/서버 경로로 애니메이션한다. 공끼리는 충돌하지 않는다. 동시에 끝낸 두 플레이어의 홀 완료와 기록 저장은 홀 단위 트랜잭션에서 한 번만 확정한다. 한 홀·세 홀 기록을 구별한다.
 
 ## 현재 구현과 향후 코드 위치

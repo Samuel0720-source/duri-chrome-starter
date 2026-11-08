@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("small and large windows have independent preview state and usable controls", async ({
   browser,
+  baseURL,
 }) => {
   const large = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -14,8 +15,8 @@ test("small and large windows have independent preview state and usable controls
   try {
     const [a, b] = await Promise.all([large.newPage(), small.newPage()]);
     await Promise.all([
-      a.goto("http://127.0.0.1:3189"),
-      b.goto("http://127.0.0.1:3189"),
+      a.goto(baseURL!),
+      b.goto(baseURL!),
     ]);
     await a.getByLabel("함께한 첫날").fill("2099-01-02");
     await expect(a.getByText("첫날까지")).toBeVisible();
