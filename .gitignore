@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.next/
+.env*
+!.env.example
+.DS_Store
+*.tsbuildinfo
+test-results/
+playwright-report/
+.vercel/
+supabase/.temp/
+supabase/.branches/
