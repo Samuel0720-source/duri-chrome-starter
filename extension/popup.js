@@ -5,8 +5,8 @@ import { webOrigin } from "./origin.js";
 const start = document.querySelector("#start");
 const zone = document.querySelector("#zone");
 const remember = document.querySelector("#remember");
-const count = document.querySelector("#count");
-const nextDay = document.querySelector("#next-day");
+const $ = (id) => document.querySelector("#" + id);
+const count = $("count");
 const error = document.querySelector("#error");
 
 function showError(message) {
@@ -15,18 +15,32 @@ function showError(message) {
 }
 
 function render() {
-  nextDay.textContent = "";
+  const today = roomToday(new Date(), zone.value);
+  $("today").textContent = today.replaceAll("-", ". ");
+  $("big").hidden = true;
+  $("rows").hidden = true;
   if (!isPreviewStart(start.value)) {
-    count.textContent = "첫날을 골라 주세요";
+    $("caption").textContent = "첫날을 골라 주세요";
+    $("settings").open = true;
     return;
   }
-  const result = coupleCalendar(start.value, roomToday(new Date(), zone.value));
+  const result = coupleCalendar(start.value, today);
+  $("big").hidden = false;
   if (result.status === "upcoming") {
-    count.textContent = "첫날까지 D−" + result.daysToStart;
+    $("caption").textContent = "첫날까지";
+    count.textContent = "D−" + result.daysToStart;
+    $("unit").textContent = "";
     return;
   }
-  count.textContent = result.milestoneToday ? "오늘은 우리 " + result.day + "일" : "함께한 지 " + result.day + "일째";
-  nextDay.textContent = result.nextHundred + "일까지 " + result.daysUntilHundred + "일";
+  $("caption").textContent = result.milestoneToday ? "오늘은 우리의 기념일" : "함께한 지";
+  count.textContent = result.day.toLocaleString("ko-KR");
+  $("unit").textContent = "일째";
+  $("rows").hidden = false;
+  $("hundred-label").textContent = "우리의 " + result.nextHundred + "일";
+  $("hundred-left").textContent = "D−" + result.daysUntilHundred;
+  $("hundred-date").textContent = result.hundredDate;
+  $("annual-left").textContent = result.daysUntilAnnual === 0 ? "오늘" : "D−" + result.daysUntilAnnual;
+  $("annual-date").textContent = result.annual;
 }
 
 let writes = Promise.resolve();
@@ -39,20 +53,14 @@ function saveChoice() {
   ).catch(() => showError("이 기기에 설정을 저장하지 못했어요."));
 }
 
-async function openApp(compact) {
-  const path = previewPath(compact ? "/compact" : "/", start.value, zone.value);
-  const url = new URL(path, webOrigin).href;
+async function openApp() {
+  const url = new URL(previewPath("/", start.value, zone.value), webOrigin).href;
   try {
     await writes;
-    if (compact) {
-      // "normal" keeps the window small even when the current Chrome window is full screen.
-      await chrome.windows.create({ url, type: "popup", state: "normal", focused: true, width: 420, height: 680 });
-    } else {
-      await chrome.tabs.create({ url });
-    }
+    await chrome.tabs.create({ url });
     window.close();
   } catch {
-    showError("창을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+    showError("웹앱을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.");
   }
 }
 
@@ -74,8 +82,7 @@ async function init() {
   for (const field of [start, zone, remember]) {
     field.addEventListener("change", () => { render(); saveChoice(); });
   }
-  document.querySelector("#mini").addEventListener("click", () => openApp(true));
-  document.querySelector("#full").addEventListener("click", () => openApp(false));
+  $("full").addEventListener("click", openApp);
   document.querySelector("#controls").disabled = false;
   render();
   setInterval(render, 30_000);
