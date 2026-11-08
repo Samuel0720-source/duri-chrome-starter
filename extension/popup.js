@@ -45,7 +45,8 @@ async function openApp(compact) {
   try {
     await writes;
     if (compact) {
-      await chrome.windows.create({ url, type: "popup", width: 420, height: 680 });
+      // "normal" keeps the window small even when the current Chrome window is full screen.
+      await chrome.windows.create({ url, type: "popup", state: "normal", focused: true, width: 420, height: 680 });
     } else {
       await chrome.tabs.create({ url });
     }
