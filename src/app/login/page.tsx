@@ -50,7 +50,7 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const { next, sent, error } = await searchParams;
+  const { next, sent, error, deleted } = await searchParams;
   return (
     <main className="wrap auth">
       <header className="top">
@@ -78,6 +78,7 @@ export default async function LoginPage({
           </form>
           </>
         )}
+        {deleted && <p role="status" className="notice">계정과 데이터를 모두 지웠어요.</p>}
         {error && errors[error] && <p role="alert" className="error">{errors[error]}</p>}
       </section>
     </main>
