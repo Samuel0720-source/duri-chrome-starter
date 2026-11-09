@@ -48,3 +48,13 @@
 - `/compact` 웹 페이지는 PWA·직접 접속용으로 유지한다.
 - 검사: 단위 8개 통과. Linux Chromium에서 브라우저 5개 통과(실제 확장 로드 포함, 건너뜀 0). Mac에서 패널을 직접 연 확인은 아직이다.
 - 다음 행동 하나: Mac에서 ‘둘이’를 새로고침해 패널 모양과 ‘전체 웹앱 ↗’ 이동을 확인한 뒤 main에 합친다.
+
+### P2 첫 작업 · 2026-11-08 (로그인·방·초대)
+
+- Supabase 테스트 프로젝트 `duri-dev`(us-east-1) 연결. 방 마이그레이션 적용과 RLS 4개 표 확인. URL 설정에 Site URL과 `localhost:3000/**`, 배포 주소 `/**` 등록.
+- 노출된 secret key 두 개는 폐기하고 새 키로 교체. `.env.local`은 Git 제외.
+- 추가: `/login`(이메일 링크), `/auth/callback`, `/room`(방 만들기·일수·초대 링크), `/invite/[token]`(입장), 로그아웃, `src/proxy.ts`(세션 갱신만). 패키지 `@supabase/supabase-js`, `@supabase/ssr` (사용자 허락).
+- 초대 토큰은 리디렉션 URL에 넣지 않고 화면에만 돌려준다. 로그인 후 복귀 경로는 같은 사이트 경로만 허용.
+- 검사: 단위 11개, DB 3개(비root 사용자), 브라우저 5개 통과, typecheck·build 통과. Linux 작업 환경은 Supabase에 접속할 수 없어 실제 메일 로그인은 아직 보지 못했다.
+- 남은 P2: 실제 A/B/C 세 계정 확인, 방 나가기 화면, 내 데이터·계정 삭제, 비공개 실시간 채널, Vercel 환경 변수 설정 후 배포.
+- 다음 행동 하나: Mac에서 `npm run dev` → `localhost:3000/login`으로 A 계정 로그인 → 방 만들기 → 초대 링크를 B 계정(시크릿 창)으로 열어 입장 확인.
