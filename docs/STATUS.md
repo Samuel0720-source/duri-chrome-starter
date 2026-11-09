@@ -79,3 +79,9 @@
 - `delete_my_account()` RPC(마이그레이션 `202611090001`): 방에 있으면 상대에게 안내를 남기고 방·초대·자리를 지운 뒤 `auth.users`에서 본인을 지운다. 한 트랜잭션. `/room` 아래 접힌 ‘계정 삭제’(확인 체크 필수) → `/login?deleted=1`.
 - DB 테스트 4개 통과(새 테스트: 방 있는 사람·없는 사람 삭제, anon 호출 거부). Supabase `duri-dev`에 적용 완료.
 - Security Advisor: 오류 0. 경고 중 ‘로그인 사용자가 SECURITY DEFINER 함수 실행 가능’ 5개는 의도된 API(각 함수가 `auth.uid()`와 방 멤버 여부를 직접 확인). `rls_auto_enable()`의 외부 실행 권한은 회수(`202611090002`). ‘유출 비밀번호 보호’는 비밀번호 로그인을 쓰지 않아 해당 없음.
+
+### P2 자동 흐름 테스트·배포 설정 · 2026-11-09
+
+- `/auth/callback`이 `?token_hash=`도 받는다(`verifyOtp`). PKCE 보관값이 필요 없어 다른 브라우저에서 메일 링크를 열어도 된다.
+- `npm run test:flow`(`tests/flow/two-users.spec.ts`): 관리자 키로 가짜 사용자 A·B·C를 만들고 메일 없이 로그인 → 방 만들기 → 초대 → B 입장 → C는 같은 링크 거부 → B 나가기·A 안내 → A 계정 삭제 확인 → 정리. `npm run dev`와 `.env.local`의 `SUPABASE_SECRET_KEY` 필요.
+- Vercel 환경 변수(Production·Preview, Config): `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. secret key는 Vercel에 넣지 않는다(앱 코드가 쓰지 않음).
