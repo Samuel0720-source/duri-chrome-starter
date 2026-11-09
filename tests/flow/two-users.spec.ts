@@ -66,7 +66,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   const c = await makeUser("c");
   const pageC = await signIn(browser, c.email, invitePath);
   await pageC.getByRole("button", { name: "방에 들어가기" }).click();
-  await expect(pageC.getByRole("alert")).toHaveText(/만료되었거나 이미 사용된 초대예요/);
+  // Find the message by its text: Next.js also keeps an empty role="alert" route announcer on every page.
+  await expect(pageC.getByText("만료되었거나 이미 사용된 초대예요", { exact: false })).toBeVisible();
 
   // 5. B leaves. A is told.
   await pageB.getByText("방 나가기", { exact: true }).first().click();
