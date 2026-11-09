@@ -231,3 +231,9 @@ button {
 .stack button.google { background: var(--ink); border-color: var(--ink); }
 .divider { display: flex; align-items: center; gap: 10px; margin: 16px 0 8px; color: var(--text); font-size: 13px; }
 .divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.notice { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; background: var(--muted); color: var(--ink); }
+.leave { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 12px; }
+.leave summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--text); font-weight: 600; }
+.stack .check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.stack .check input { width: 18px; height: 18px; }
+.stack button.danger { background: #7b2038; border-color: #7b2038; }

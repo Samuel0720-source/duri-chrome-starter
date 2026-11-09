@@ -47,6 +47,16 @@ export async function acceptInvite(formData: FormData) {
   redirect("/room");
 }
 
+// Leaving closes the room for both partners; the partner sees a notice next visit.
+export async function leaveRoom(formData: FormData) {
+  const room = String(formData.get("room") ?? "");
+  if (formData.get("confirm") !== "yes") redirect("/room?error=confirm");
+  const { supabase, user } = await signedIn();
+  if (!user) redirect("/login?next=/room");
+  const { error } = await supabase.rpc("leave_couple_room", { target: room });
+  redirect(error ? "/room?error=leave" : "/room?left=1");
+}
+
 export async function signOut() {
   const supabase = await serverClient();
   if (supabase) await supabase.auth.signOut();
