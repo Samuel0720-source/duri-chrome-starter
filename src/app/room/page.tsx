@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { coupleCalendar, roomToday } from "../../core/dates";
 import { defaultZone, zones } from "../../core/preview";
 import { serverClient } from "../../lib/supabase/server";
-import { createRoom, signOut } from "./actions";
+import { createRoom, leaveRoom, signOut } from "./actions";
 import { InviteBox } from "./invite-box";
 
 export const dynamic = "force-dynamic";
@@ -33,14 +33,20 @@ export default async function RoomPage({
   if (!supabase) return <main className="wrap auth"><p>로그인 설정이 아직 연결되지 않았어요.</p></main>;
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect("/login?next=/room");
-  const { error } = await searchParams;
+  const { error, left } = await searchParams;
 
   // Row level security returns only the caller's own seat and room.
   const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle();
 
   if (!seat) {
+    // Show "partner left" only for a recent notice, so an old breakup is not shown forever.
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: notice } = await supabase
+      .from("room_notices").select("id").eq("kind", "partner_left").gte("created_at", since).limit(1).maybeSingle();
     return (
       <Shell>
+        {left && <p role="status" className="notice">방에서 나왔어요.</p>}
+        {!left && notice && <p role="status" className="notice">상대가 방을 나갔어요. 새 방을 만들 수 있어요.</p>}
         <section className="sheet">
           <h1>우리 방 만들기</h1>
           <form action={createRoom} className="stack">
@@ -82,6 +88,18 @@ export default async function RoomPage({
           <InviteBox roomId={room.id} />
         </section>
       )}
+      <details className="leave" open={error === "leave" || error === "confirm"}>
+        <summary>방 나가기</summary>
+        <form action={leaveRoom} className="stack">
+          <input type="hidden" name="room" value={room.id} />
+          <p className="hint">방을 나가면 두 사람 모두 이 방에서 빠지고, 방은 닫혀요. 되돌릴 수 없어요.</p>
+          <label className="check">
+            <input type="checkbox" name="confirm" value="yes" required /> 네, 방을 닫고 나갈게요
+          </label>
+          <button type="submit" className="danger">방 나가기</button>
+        </form>
+        {(error === "leave" || error === "confirm") && <p role="alert" className="error">방을 나가지 못했어요. 다시 시도해 주세요.</p>}
+      </details>
     </Shell>
   );
 }
