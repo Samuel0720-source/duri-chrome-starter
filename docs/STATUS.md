@@ -85,3 +85,7 @@
 - `/auth/callback`이 `?token_hash=`도 받는다(`verifyOtp`). PKCE 보관값이 필요 없어 다른 브라우저에서 메일 링크를 열어도 된다.
 - `npm run test:flow`(`tests/flow/two-users.spec.ts`): 관리자 키로 가짜 사용자 A·B·C를 만들고 메일 없이 로그인 → 방 만들기 → 초대 → B 입장 → C는 같은 링크 거부 → B 나가기·A 안내 → A 계정 삭제 확인 → 정리. `npm run dev`와 `.env.local`의 `SUPABASE_SECRET_KEY` 필요.
 - Vercel 환경 변수(Production·Preview, Config): `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. secret key는 Vercel에 넣지 않는다(앱 코드가 쓰지 않음).
+- `npm run test:flow` 통과(Mac, 2026-11-09). 첫 실패는 앱이 아니라 테스트 선택자 문제: Next.js가 모든 페이지에 빈 `role="alert"` 안내 상자를 두어 `getByRole("alert")`가 2개를 찾음 → 글자로 찾도록 수정.
+- `npx vercel --prod` 배포 완료 → https://duri-chrome-starter.vercel.app . 확인: `/room` → 로그인으로 이동, Google 버튼이 배포 주소 `/auth/callback`으로 돌아오도록 설정됨.
+- 남은 P2: 비공개 실시간 채널(상대 입장·퇴장이 새로고침 없이 보이게). 출시 전: Google 동의 화면 게시, 자체 도메인 + Resend SMTP, Supabase Site URL을 배포 주소로 유지.
+- 다음 행동 하나: 비공개 실시간 채널.
