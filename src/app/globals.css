@@ -228,3 +228,6 @@ button {
 .stack button:disabled { opacity: .6; cursor: progress; }
 .auth .link { min-height: 36px; padding: 0 12px; background: transparent; color: var(--berry); }
 .auth .error { color: #7b2038; }
+.stack button.google { background: var(--ink); border-color: var(--ink); }
+.divider { display: flex; align-items: center; gap: 10px; margin: 16px 0 8px; color: var(--text); font-size: 13px; }
+.divider::before, .divider::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
