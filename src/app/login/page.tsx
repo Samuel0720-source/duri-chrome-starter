@@ -20,7 +20,11 @@ async function continueWithGoogle(formData: FormData) {
   if (!supabase) redirect("/login?error=config");
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: appOrigin() + "/auth/callback?next=" + encodeURIComponent(next) },
+    options: {
+      redirectTo: appOrigin() + "/auth/callback?next=" + encodeURIComponent(next),
+      // Always show the account picker, so two partners can share one device.
+      queryParams: { prompt: "select_account" },
+    },
   });
   if (error || !data.url) redirect("/login?error=google&next=" + encodeURIComponent(next));
   redirect(data.url);

@@ -58,3 +58,12 @@
 - 검사: 단위 11개, DB 3개(비root 사용자), 브라우저 5개 통과, typecheck·build 통과. Linux 작업 환경은 Supabase에 접속할 수 없어 실제 메일 로그인은 아직 보지 못했다.
 - 남은 P2: 실제 A/B/C 세 계정 확인, 방 나가기 화면, 내 데이터·계정 삭제, 비공개 실시간 채널, Vercel 환경 변수 설정 후 배포.
 - 다음 행동 하나: Mac에서 `npm run dev` → `localhost:3000/login`으로 A 계정 로그인 → 방 만들기 → 초대 링크를 B 계정(시크릿 창)으로 열어 입장 확인.
+
+### P2 Google 로그인·두 계정 확인 · 2026-11-09
+
+- 이메일 링크는 Supabase 기본 메일 한도(시간당 몇 통) 때문에 출시용으로 부족해 Google 로그인을 붙였다. Google Cloud 프로젝트 `duri-dev-sk0720`, 동의 화면은 테스트 모드(테스트 사용자 2명).
+- `/login`에 ‘Google로 계속하기’. `prompt=select_account`로 한 기기에서 두 사람이 번갈아 로그인할 수 있게 계정 선택을 항상 보여 준다.
+- 실제 확인: A(samuelkoo0720) Google 로그인 → 기존 이메일 계정·방에 그대로 연결. B(yeunjuji) Chrome 시크릿 창에서 Google 로그인 → 초대 수락 → `/room`에 “두 사람이 모두 들어왔어요” 표시.
+- 알려진 문제: 일부 앱의 내장 브라우저에서는 Google → Supabase 콜백이 두 번 불려 `flow_state_already_used`가 난다. Chrome에서는 재현 안 됨. 앱 코드 문제 아님.
+- 출시 전: 동의 화면 게시(Publish), 자체 도메인 + Resend SMTP.
+- 다음 행동 하나: 방 나가기 화면.
