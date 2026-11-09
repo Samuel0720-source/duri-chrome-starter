@@ -80,6 +80,15 @@ before(async () => {
       "utf8",
     ),
   );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611090001_delete_account.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 });
 after(async () => {
   admin?.release();
@@ -231,4 +240,23 @@ test("expired token fails; leaving closes access and only the other member sees 
     asUser(b, "select public.accept_couple_invite($1)", [fresh]),
     /Invite unavailable/,
   );
+});
+test("deleting an account removes the person, the shared room, and tells only the partner", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  await assert.rejects(
+    pool.query("set role anon; select public.delete_my_account()").finally(() => pool.query("reset role")),
+    /permission denied/,
+  );
+  await asUser(a, "select public.delete_my_account()");
+  assert.equal((await admin.query("select count(*)::int as n from auth.users where id=$1", [a])).rows[0].n, 0);
+  assert.equal((await admin.query("select count(*)::int as n from public.couple_rooms where id=$1", [id])).rows[0].n, 0);
+  assert.equal((await admin.query("select count(*)::int as n from duri_private.invites where room_id=$1", [id])).rows[0].n, 0);
+  assert.deepEqual(await asUser(b, "select kind from public.room_notices"), [{ kind: "partner_left" }]);
+  assert.deepEqual(await asUser(b, "select * from public.couple_members"), []);
+  // A person with no room can delete too.
+  const c = await user();
+  await asUser(c, "select public.delete_my_account()");
+  assert.equal((await admin.query("select count(*)::int as n from auth.users where id=$1", [c])).rows[0].n, 0);
 });

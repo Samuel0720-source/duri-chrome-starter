@@ -2,10 +2,26 @@ import { redirect } from "next/navigation";
 import { coupleCalendar, roomToday } from "../../core/dates";
 import { defaultZone, zones } from "../../core/preview";
 import { serverClient } from "../../lib/supabase/server";
-import { createRoom, leaveRoom, signOut } from "./actions";
+import { createRoom, deleteAccount, leaveRoom, signOut } from "./actions";
 import { InviteBox } from "./invite-box";
 
 export const dynamic = "force-dynamic";
+
+function DeleteAccount({ failed }: { failed: boolean }) {
+  return (
+    <details className="leave" open={failed}>
+      <summary>계정 삭제</summary>
+      <form action={deleteAccount} className="stack">
+        <p className="hint">내 계정과 로그인 정보, 우리 방이 모두 지워져요. 상대에게는 “상대가 방을 나갔어요”만 보여요. 되돌릴 수 없어요.</p>
+        <label className="check">
+          <input type="checkbox" name="confirm" value="yes" required /> 네, 내 계정을 지울게요
+        </label>
+        <button type="submit" className="danger">계정 삭제</button>
+      </form>
+      {failed && <p role="alert" className="error">계정을 지우지 못했어요. 다시 시도해 주세요.</p>}
+    </details>
+  );
+}
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -58,8 +74,9 @@ export default async function RoomPage({
             </select>
             <button type="submit">방 만들기</button>
           </form>
-          {error && <p role="alert" className="error">방을 만들지 못했어요. 날짜와 시간대를 확인해 주세요.</p>}
+          {(error === "create" || error === "input") && <p role="alert" className="error">방을 만들지 못했어요. 날짜와 시간대를 확인해 주세요.</p>}
         </section>
+        <DeleteAccount failed={error === "delete"} />
       </Shell>
     );
   }
@@ -100,6 +117,7 @@ export default async function RoomPage({
         </form>
         {(error === "leave" || error === "confirm") && <p role="alert" className="error">방을 나가지 못했어요. 다시 시도해 주세요.</p>}
       </details>
+      <DeleteAccount failed={error === "delete"} />
     </Shell>
   );
 }

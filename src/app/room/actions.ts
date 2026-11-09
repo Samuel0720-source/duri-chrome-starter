@@ -57,6 +57,18 @@ export async function leaveRoom(formData: FormData) {
   redirect(error ? "/room?error=leave" : "/room?left=1");
 }
 
+// Deletes the account and all of its rows in one database transaction.
+export async function deleteAccount(formData: FormData) {
+  if (formData.get("confirm") !== "yes") redirect("/room?error=delete");
+  const { supabase, user } = await signedIn();
+  if (!user) redirect("/login?next=/room");
+  const { error } = await supabase.rpc("delete_my_account");
+  if (error) redirect("/room?error=delete");
+  // The account is gone; clear this browser's session cookies too.
+  await supabase.auth.signOut({ scope: "local" });
+  redirect("/login?deleted=1");
+}
+
 export async function signOut() {
   const supabase = await serverClient();
   if (supabase) await supabase.auth.signOut();
