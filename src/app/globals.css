@@ -237,3 +237,10 @@ button {
 .stack .check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
 .stack .check input { width: 18px; height: 18px; }
 .stack button.danger { background: #7b2038; border-color: #7b2038; }
+.top-actions { display: flex; align-items: center; gap: 10px; }
+.top-actions .start {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px;
+  border: 1px solid var(--berry); border-radius: 999px; color: var(--berry);
+  font-weight: 650; text-decoration: none; white-space: nowrap;
+}
+.top-actions .start:hover { background: var(--muted); }
