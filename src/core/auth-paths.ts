@@ -35,5 +35,9 @@ export function roomErrorMessage(message: string | undefined): string {
   if (text.includes("Invalid message")) return "메시지는 1~1000자로 적어 주세요.";
   if (text.includes("Slow down")) return "너무 빨리 보내고 있어요. 잠시 뒤에 다시 보내 주세요.";
   if (text.includes("Message unavailable")) return "이미 지워졌거나 지울 수 없는 메시지예요.";
+  if (text.includes("Partner needed")) return "상대가 방에 들어와야 게임을 시작할 수 있어요.";
+  if (text.includes("Already answered")) return "이미 답한 질문이에요. 답은 바꿀 수 없어요.";
+  if (text.includes("Game unavailable")) return "끝났거나 찾을 수 없는 게임이에요.";
+  if (text.includes("Invalid answer")) return "보기에서 하나씩 골라 주세요.";
   return "잠시 문제가 생겼어요. 다시 시도해 주세요.";
 }

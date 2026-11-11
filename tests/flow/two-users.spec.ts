@@ -33,6 +33,14 @@ async function signIn(browser: Browser, email: string, next: string): Promise<Pa
   return page;
 }
 
+// Picks "my choice" and "my guess" in one round of the guess game and submits.
+async function answer(page: Page, round: number, own: number, guess: number) {
+  const card = page.locator(`.guess-round[data-round="${round}"]`);
+  await card.locator("fieldset").nth(0).locator("label.choice").nth(own).click();
+  await card.locator("fieldset").nth(1).locator("label.choice").nth(guess).click();
+  await card.getByRole("button", { name: "답 제출" }).click();
+}
+
 test.afterAll(async () => {
   // Clean up anyone the test made, even if a step failed. Already-deleted users just error.
   for (const id of made) await admin.auth.admin.deleteUser(id).catch(() => {});
@@ -95,6 +103,32 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   // A reload shows the same conversation from the server.
   await pageA.reload();
   await expect(pageA.locator(".chat-list .bubble")).toHaveCount(2);
+  // 3d. Guess game. A starts; B's page shows the rounds live.
+  await pageA.getByRole("link", { name: "게임", exact: true }).click();
+  await pageB.getByRole("link", { name: "게임", exact: true }).click();
+  await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);
+  await expect(pageB.locator("html[data-room-live=on]")).toHaveCount(1);
+  await pageA.getByRole("button", { name: "게임 시작" }).click();
+  await expect(pageB.locator(".guess-round")).toHaveCount(3, { timeout: 10_000 });
+  // A answers round 1. B is told only that A answered; nothing is revealed.
+  await answer(pageA, 1, 0, 1);
+  await expect(pageA.locator('.guess-round[data-round="1"] .waiting')).toBeVisible();
+  await expect(pageB.locator('.guess-round[data-round="1"]').getByText("상대는 이미 답했어요.")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.locator('.guess-round[data-round="1"] .round-result')).toHaveCount(0);
+  // B answers later; both see both answers at once. A guessed B's choice (option 1).
+  await answer(pageB, 1, 1, 0);
+  await expect(pageA.locator('.guess-round[data-round="1"] .hit')).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.locator('.guess-round[data-round="1"] .hit')).toBeVisible();
+  for (const r of [2, 3]) {
+    await answer(pageA, r, 2, 2);
+    await answer(pageB, r, 3, 3);
+  }
+  await expect(pageA.getByRole("heading", { name: "결과" })).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.getByRole("heading", { name: "결과" })).toBeVisible({ timeout: 10_000 });
+  // A reload shows the same finished game from the server.
+  await pageB.reload();
+  await expect(pageB.getByRole("heading", { name: "결과" })).toBeVisible();
+
   await pageA.getByRole("link", { name: "홈", exact: true }).click();
   await pageB.getByRole("link", { name: "홈", exact: true }).click();
   await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);
