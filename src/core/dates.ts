@@ -68,24 +68,40 @@ export function coupleCalendar(start: string, today: string) {
 
 export type Milestone = { label: string; date: string; daysLeft: number };
 
-// The next hundred-day marks and yearly anniversaries from today on, soonest first.
-export function upcomingMilestones(start: string, today: string, count = 6): Milestone[] {
+// Couple days that fall on the same date every year.
+export const specialDays = [
+  { label: "발렌타인데이", monthDay: "02-14" },
+  { label: "화이트데이", monthDay: "03-14" },
+  { label: "여자친구의 날", monthDay: "08-01" },
+  { label: "남자친구의 날", monthDay: "10-03" },
+  { label: "크리스마스", monthDay: "12-25" },
+] as const;
+
+// The next hundred-day mark and the next anniversary, plus any special day
+// within the next 100 days, soonest first.
+export function upcomingMilestones(start: string, today: string): Milestone[] {
   const s = dayNumber(start);
   const t = dayNumber(today);
   const items: Milestone[] = [];
   // Day 1 is the first day, so day k falls on s + k - 1.
-  const firstHundred = Math.max(1, Math.ceil((t - s + 1) / 100)) * 100;
-  for (let k = firstHundred; items.length < count; k += 100) {
-    items.push({ label: k.toLocaleString("ko-KR") + "일", date: dateAt(s + k - 1), daysLeft: s + k - 1 - t });
-  }
+  const k = Math.max(1, Math.ceil((t - s + 1) / 100)) * 100;
+  items.push({ label: k.toLocaleString("ko-KR") + "일", date: dateAt(s + k - 1), daysLeft: s + k - 1 - t });
   const startYear = Number(start.slice(0, 4));
-  for (let n = 1, added = 0; added < count; n++) {
+  for (let n = 1; ; n++) {
     const date = annualOccurrence(start, startYear + n);
     if (dayNumber(date) < t) continue;
     items.push({ label: n + "주년", date, daysLeft: dayNumber(date) - t });
-    added++;
+    break;
   }
-  return items.sort((a, b) => a.daysLeft - b.daysLeft).slice(0, count);
+  const year = Number(today.slice(0, 4));
+  for (const day of specialDays) {
+    for (const y of [year, year + 1]) {
+      const date = y + "-" + day.monthDay;
+      const left = dayNumber(date) - t;
+      if (left >= 0 && left <= 100) items.push({ label: day.label, date, daysLeft: left });
+    }
+  }
+  return items.sort((a, b) => a.daysLeft - b.daysLeft);
 }
 
 // Whole calendar days from today to date (negative when date is past).
