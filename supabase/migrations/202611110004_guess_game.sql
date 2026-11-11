@@ -28,6 +28,8 @@ create table duri_private.guess_answers (
   created_at timestamptz not null default now(),
   primary key (game_id, round, player)
 );
+-- Two locks: no grants at all, and RLS on with no policy. Only the definer functions read it.
+alter table duri_private.guess_answers enable row level security;
 revoke all on duri_private.guess_answers from public, anon, authenticated;
 
 -- The question bank lives in src/core/guess.ts and has exactly 12 questions of 4 options.
