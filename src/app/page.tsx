@@ -12,7 +12,10 @@ export default function Home() {
           <img alt="" width="36" height="36" src="/icons/icon-192.png" />
           둘이
         </div>
-        <InstallControl />
+        <nav className="top-actions" aria-label="계정">
+          <a className="start" href="/room">로그인 · 우리 방</a>
+          <InstallControl />
+        </nav>
       </header>
       <div className="intro">
         <h1>우리 기념일</h1>
