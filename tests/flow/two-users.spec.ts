@@ -56,6 +56,9 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await pageA.getByLabel("함께한 첫날").fill("2026-06-23");
   await pageA.getByRole("button", { name: "방 만들기" }).click();
   await expect(pageA.getByText("아직 상대가 들어오지 않았어요.")).toBeVisible();
+  // The room shows the same upcoming days as the public home, from the saved first day.
+  await expect(pageA.locator(".room-milestones .rail li").first()).toBeVisible();
+  expect(await pageA.locator(".room-milestones .rail li").count()).toBeGreaterThanOrEqual(2);
 
   // 2. A makes an invite link.
   await pageA.getByRole("button", { name: "초대 링크 만들기" }).click();

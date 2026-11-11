@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { coupleCalendar, daysFrom, roomToday } from "../../core/dates";
+import { coupleCalendar, daysFrom, roomToday, upcomingMilestones } from "../../core/dates";
+import { MilestoneRail } from "../milestone-rail";
 import { isMood } from "../../core/moods";
 import { defaultZone, zones } from "../../core/preview";
 import { serverClient } from "../../lib/supabase/server";
@@ -187,6 +188,10 @@ export default async function RoomPage({
           )}
         </section>
       </div>
+      <section className="room-milestones" aria-labelledby="room-milestones-head">
+        <h2 id="room-milestones-head">다가오는 기념일</h2>
+        <MilestoneRail milestones={upcomingMilestones(room.start_date, today)} />
+      </section>
       {!full && (
         <section className="settings">
           <h2>상대 초대하기</h2>
