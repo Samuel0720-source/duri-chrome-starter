@@ -128,5 +128,6 @@
 ### 자동 배포·자동 검사 · 2026-11-11
 
 - Vercel 프로젝트를 GitHub `Samuel0720-source/duri-chrome-starter`에 연결: `main`에 push하면 Production 자동 배포(87c39f9부터 확인).
+- Vercel Git 설정의 ‘deployment_status Events’를 켜야 GitHub가 배포 완료를 알 수 있다(켜 둠).
 - GitHub Actions: `check.yml`(push마다 단위·DB·빌드·브라우저 전체), `live-flow.yml`(Production 배포 성공 뒤 실제 사이트에서 `tests/flow` 두 사람 흐름). 저장소 secret `SUPABASE_SECRET_KEY` 사용자 등록.
 - 로그인한 방 홈에도 ‘다가오는 기념일’ 표시(`src/app/milestone-rail.tsx`를 공개 홈과 공유).
