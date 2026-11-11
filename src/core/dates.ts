@@ -65,3 +65,25 @@ export function coupleCalendar(start: string, today: string) {
     daysUntilAnnual: dayNumber(annual) - t,
   };
 }
+
+export type Milestone = { label: string; date: string; daysLeft: number };
+
+// The next hundred-day marks and yearly anniversaries from today on, soonest first.
+export function upcomingMilestones(start: string, today: string, count = 6): Milestone[] {
+  const s = dayNumber(start);
+  const t = dayNumber(today);
+  const items: Milestone[] = [];
+  // Day 1 is the first day, so day k falls on s + k - 1.
+  const firstHundred = Math.max(1, Math.ceil((t - s + 1) / 100)) * 100;
+  for (let k = firstHundred; items.length < count; k += 100) {
+    items.push({ label: k.toLocaleString("ko-KR") + "일", date: dateAt(s + k - 1), daysLeft: s + k - 1 - t });
+  }
+  const startYear = Number(start.slice(0, 4));
+  for (let n = 1, added = 0; added < count; n++) {
+    const date = annualOccurrence(start, startYear + n);
+    if (dayNumber(date) < t) continue;
+    items.push({ label: n + "주년", date, daysLeft: dayNumber(date) - t });
+    added++;
+  }
+  return items.sort((a, b) => a.daysLeft - b.daysLeft).slice(0, count);
+}
