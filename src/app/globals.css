@@ -244,3 +244,9 @@ button {
   font-weight: 650; text-decoration: none; white-space: nowrap;
 }
 .top-actions .start:hover { background: var(--muted); }
+.legal-links { display: flex; gap: 20px; margin-top: 40px; font-size: 14px; }
+.legal-links a { color: var(--text); }
+.legal .sheet h2 { font-size: 18px; margin: 28px 0 8px; }
+.legal .sheet p, .legal .sheet li { line-height: 1.7; }
+.legal .sheet ul { padding-left: 20px; margin: 0; }
+a.brand { color: inherit; text-decoration: none; }
