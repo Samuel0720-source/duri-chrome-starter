@@ -1,18 +1,17 @@
-# After Vercel reports a successful production deploy, run the two-person flow test
-# (tests/flow) against the live site on GitHub's servers.
+# After each push to main, wait until Vercel has put that commit live, then run the
+# two-person flow test (tests/flow) against the real site on GitHub's servers.
 # Every-push checks (unit, database, build, browser) live in check.yml.
 name: live flow
 
 on:
-  deployment_status:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   live-flow:
-    if: >-
-      github.event.deployment_status.state == 'success' &&
-      github.event.deployment.environment == 'Production'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       FLOW_URL: https://duri-chrome-starter.vercel.app
       # Public project address (it ships to every browser); only the secret key is a secret.
@@ -20,8 +19,15 @@ jobs:
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.deployment.sha }}
+      - name: Wait for this commit to be live
+        run: |
+          for i in $(seq 1 60); do
+            live=$(curl -fsS "$FLOW_URL/api/version" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).commit||""))' || true)
+            echo "live: ${live:-unknown}  wanted: $GITHUB_SHA"
+            [ "$live" = "$GITHUB_SHA" ] && exit 0
+            sleep 10
+          done
+          echo "The site did not show this commit within 10 minutes." && exit 1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
