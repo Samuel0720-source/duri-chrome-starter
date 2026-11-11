@@ -134,7 +134,7 @@ export function HomeLive({ initialToday, children }: { initialToday: string; chi
   const p = usePreview(initialToday);
   let milestones: ReturnType<typeof upcomingMilestones> = [];
   try {
-    milestones = upcomingMilestones(p.start, p.today, 6);
+    milestones = upcomingMilestones(p.start, p.today);
   } catch {
     /* Same as above: wait for a complete date. */
   }
@@ -154,7 +154,7 @@ export function HomeLive({ initialToday, children }: { initialToday: string; chi
         <div className="container">
           <div className="head-split">
             <h2 id="milestones-head">다가오는 기념일</h2>
-            <p className="lead">위에서 고른 첫날로 바로 계산해요.</p>
+            <p className="lead">다음 n00일과 주년, 100일 안에 오는 커플 데이를 보여요.</p>
           </div>
           {milestones.length > 0 && (
             <ol className="rail" tabIndex={0} aria-label="다가오는 기념일 목록">
