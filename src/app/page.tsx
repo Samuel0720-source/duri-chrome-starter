@@ -1,5 +1,6 @@
 import { CalendarPreview } from "./preview";
 import { InstallControl } from "./install";
+import { LegalLinks } from "./legal/legal-page";
 import { roomToday } from "../core/dates";
 import { defaultZone } from "../core/preview";
 
@@ -24,6 +25,7 @@ export default function Home() {
       <CalendarPreview
         initialToday={roomToday(new Date(), defaultZone)}
       />
+      <LegalLinks />
     </main>
   );
 }

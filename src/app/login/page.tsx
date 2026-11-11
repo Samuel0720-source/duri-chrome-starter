@@ -1,3 +1,4 @@
+import { LegalLinks } from "../legal/legal-page";
 import { redirect } from "next/navigation";
 import { isEmail, safeNext } from "../../core/auth-paths";
 import { appOrigin, serverClient } from "../../lib/supabase/server";
@@ -81,6 +82,7 @@ export default async function LoginPage({
         {deleted && <p role="status" className="notice">계정과 데이터를 모두 지웠어요.</p>}
         {error && errors[error] && <p role="alert" className="error">{errors[error]}</p>}
       </section>
+      <LegalLinks />
     </main>
   );
 }
