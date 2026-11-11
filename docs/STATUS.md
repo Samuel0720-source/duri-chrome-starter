@@ -97,3 +97,6 @@
 - `/room`의 `RoomLive`가 신호를 받으면 `router.refresh()`로 화면을 다시 그린다. 연결되면 `<html data-room-live="on">`.
 - 검사: DB 5개 통과(새: 들어옴·나감 신호, 멤버만 청취, 잘못된 주제 거부, 나간 뒤 청취 불가). 단위 11개 통과. typecheck 통과. 흐름 테스트는 새로고침 없이 A 화면이 바뀌는지 확인하도록 강화.
 - 다음 행동 하나: 배포 후 `FLOW_URL=https://duri-chrome-starter.vercel.app npm run test:flow`.
+- 배포 후 `FLOW_URL=https://duri-chrome-starter.vercel.app npm run test:flow` 통과(1 passed, 18.9s): 실제 사이트에서 새로고침 없이 A 화면이 바뀜.
+- `/privacy`, `/terms` 배포. Google 동의 화면 브랜딩(홈페이지·개인정보·약관 주소, 승인 도메인 `duri-chrome-starter.vercel.app`) 저장 후 **프로덕션 단계로 게시** → 모든 Google 계정 로그인 가능.
+- **P2 완료.** 다음: P3 첫 커플 베타. 남은 출시 전 항목: 자체 도메인 + Resend SMTP(이메일 로그인 한도), 화면 디자인 개편.
