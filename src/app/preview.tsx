@@ -2,6 +2,7 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { coupleCalendar, roomToday, upcomingMilestones } from "../core/dates";
 import { defaultZone, exampleStart, previewPath, readSelection, zones } from "../core/preview";
+import { MilestoneRail } from "./milestone-rail";
 
 // The public calculator's state: first day, time zone and "today" in that zone.
 function usePreview(initialToday: string) {
@@ -125,10 +126,6 @@ export function CalendarPreview({ initialToday, compact = false }: { initialToda
   );
 }
 
-function dLabel(daysLeft: number) {
-  return daysLeft === 0 ? "오늘" : "D−" + daysLeft.toLocaleString("ko-KR");
-}
-
 // The home page: the hero's live counter, then the next anniversaries from the same date.
 export function HomeLive({ initialToday, children }: { initialToday: string; children: ReactNode }) {
   const p = usePreview(initialToday);
@@ -156,17 +153,7 @@ export function HomeLive({ initialToday, children }: { initialToday: string; chi
             <h2 id="milestones-head">다가오는 기념일</h2>
             <p className="lead">다음 n00일과 주년, 100일 안에 오는 커플 데이를 보여요.</p>
           </div>
-          {milestones.length > 0 && (
-            <ol className="rail" tabIndex={0} aria-label="다가오는 기념일 목록">
-              {milestones.map((m) => (
-                <li key={m.label} className={m.daysLeft === 0 ? "is-today" : undefined}>
-                  <span className="rail-name">{m.label}</span>
-                  <strong className="rail-d">{dLabel(m.daysLeft)}</strong>
-                  <time dateTime={m.date}>{m.date.replaceAll("-", ". ")}</time>
-                </li>
-              ))}
-            </ol>
-          )}
+          <MilestoneRail milestones={milestones} />
         </div>
       </section>
     </>
