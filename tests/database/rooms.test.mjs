@@ -65,6 +65,11 @@ before(async () => {
     password,
     database: "postgres",
   });
+  // Teardown stops PostgreSQL. A pooled connection that has not closed yet then reports
+  // "terminating connection due to administrator command" (57P01); only that one is ignored.
+  pool.on("error", (error) => {
+    if (error.code !== "57P01") throw error;
+  });
   admin = await pool.connect();
   await admin.query(`create role authenticated nologin; create role anon nologin;
     create schema auth; create table auth.users(id uuid primary key);
@@ -118,6 +123,15 @@ before(async () => {
     await readFile(
       new URL(
         "../../supabase/migrations/202611110003_room_chat.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611110004_guess_game.sql",
         import.meta.url,
       ),
       "utf8",
@@ -382,4 +396,55 @@ test("chat: members send and read, a retried send does not double, spam and stra
   await asUser(a, "select public.leave_couple_room($1)", [id]);
   await assert.rejects(asUser(a, "select public.send_room_message($1,$2,'안녕?')", [id, randomUUID()]), /Room unavailable/);
   assert.deepEqual(await asUser(a, "select * from public.room_messages where room_id=$1", [id]), []);
+});
+test("guess game: a partner's answer stays hidden until both answer, answers cannot change, strangers see nothing", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user(),
+    c = await user();
+  await assert.rejects(asUser(a, "select public.start_guess_game($1)", [id]), /Partner needed/);
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const [{ game }] = await asUser(a, "select public.start_guess_game($1) as game", [id]);
+  const [{ same }] = await asUser(b, "select public.start_guess_game($1) as same", [id]);
+  assert.equal(same, game, "one open game per room");
+  const state = async (who) => (await asUser(who, "select public.guess_state($1) as s", [id]))[0].s;
+  const s0 = await state(a);
+  assert.equal(s0.rounds.length, 3);
+  assert.equal(new Set(s0.rounds.map((r) => r.question)).size, 3, "three different questions");
+  assert.ok(s0.rounds.every((r) => r.question >= 0 && r.question <= 11));
+
+  // A answers round 1. B learns only that A answered, never what.
+  await asUser(a, "select public.answer_guess($1,1::smallint,2::smallint,0::smallint)", [game]);
+  const b1 = await state(b);
+  assert.equal(b1.rounds[0].partnerAnswered, true);
+  assert.equal(b1.rounds[0].partner, null);
+  assert.ok(!JSON.stringify(b1).includes('"own":2'), "A's choice is nowhere in B's state");
+  await assert.rejects(asUser(b, "select * from duri_private.guess_answers"), /permission denied/);
+  const signal = (await admin.query("select payload from realtime.sent where topic=$1 and event='guess' order by ctid desc limit 1", ["room:" + id])).rows[0].payload;
+  assert.deepEqual(signal, { change: "answer" }, "the live signal carries no answers");
+
+  // Resending the same answer is fine; changing it is refused.
+  await asUser(a, "select public.answer_guess($1,1::smallint,2::smallint,0::smallint)", [game]);
+  await assert.rejects(asUser(a, "select public.answer_guess($1,1::smallint,3::smallint,0::smallint)", [game]), /Already answered/);
+  await assert.rejects(asUser(a, "select public.answer_guess($1,4::smallint,0::smallint,0::smallint)", [game]), /Invalid answer/);
+  await assert.rejects(asUser(c, "select public.answer_guess($1,1::smallint,0::smallint,0::smallint)", [game]), /Game unavailable/);
+  await assert.rejects(asUser(c, "select public.guess_state($1)", [id]), /Room unavailable/);
+  assert.deepEqual(await asUser(c, "select * from public.guess_games where id=$1", [game]), []);
+
+  // B answers round 1 later: now both see both, and the guesses score.
+  await asUser(b, "select public.answer_guess($1,1::smallint,0::smallint,2::smallint)", [game]);
+  const a1 = await state(a);
+  assert.deepEqual(a1.rounds[0].partner, { own: 0, guess: 2 });
+  assert.deepEqual(a1.score, { me: 1, partner: 1 });
+  assert.equal(a1.finished, false);
+
+  for (const r of [2, 3]) {
+    await asUser(a, "select public.answer_guess($1,$2::smallint,1::smallint,1::smallint)", [game, r]);
+    await asUser(b, "select public.answer_guess($1,$2::smallint,3::smallint,0::smallint)", [game, r]);
+  }
+  const done = await state(b);
+  assert.equal(done.finished, true);
+  assert.deepEqual(done.score, { me: 1, partner: 1 });
+  await assert.rejects(asUser(a, "select public.answer_guess($1,1::smallint,2::smallint,0::smallint)", [game]), /Game unavailable/);
+  const [{ next }] = await asUser(b, "select public.start_guess_game($1) as next", [id]);
+  assert.notEqual(next, game, "a finished game makes room for a new one");
 });

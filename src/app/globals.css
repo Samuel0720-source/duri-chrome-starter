@@ -288,3 +288,33 @@ small { display: block; margin-top: var(--space-3xs); font-weight: 400; color: v
 .chat-form button:active { transform: translateY(1px); }
 .chat-form button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
 .chat-form button:disabled { background: var(--color-rule); border-color: var(--color-rule); color: var(--color-ink-2); cursor: default; transform: none; }
+
+/* ---------- Guess game ---------- */
+.guess { display: grid; gap: var(--space-lg); max-width: 760px; }
+.guess-intro { display: grid; gap: var(--space-md); justify-items: start; max-width: 640px; }
+.guess-intro h2, .guess-score h2 { margin: 0; }
+.guess-rounds { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-lg); }
+.guess-round { display: grid; gap: var(--space-md); }
+.round-no { color: var(--color-ink-2); font-size: var(--text-sm); }
+.guess-round h3 { font-size: var(--text-2xl); }
+.round-form { display: grid; gap: var(--space-lg); justify-items: start; }
+.round-form fieldset { border: 0; margin: 0; padding: 0; width: 100%; }
+.round-form legend { font-weight: 700; margin-bottom: var(--space-sm); }
+.choice-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-sm); }
+.choice { position: relative; display: flex; align-items: center; justify-content: center; min-height: 52px; padding: var(--space-xs) var(--space-sm);
+  border: 2px solid var(--color-rule); border-radius: var(--radius-field); background: var(--color-paper); color: var(--color-ink);
+  font-weight: 650; text-align: center; cursor: pointer; }
+.choice:hover { border-color: var(--color-muted); }
+.choice:has(input:checked) { border-color: var(--color-accent); background: var(--color-accent-wash); color: var(--color-accent); }
+.choice:has(input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.choice input { position: absolute; opacity: 0; width: 1px; min-height: 1px; }
+.round-result { display: grid; gap: var(--space-xs); }
+.round-result strong { color: var(--color-accent); margin-left: var(--space-xs); }
+.round-result .hit { font-family: var(--font-display); font-size: var(--text-xl); color: var(--color-accent); }
+.round-result .miss { font-family: var(--font-display); font-size: var(--text-xl); color: var(--color-ink-2); }
+.waiting { color: var(--color-ink-2); }
+.guess-score { display: grid; gap: var(--space-md); justify-items: start; }
+.score-line { display: grid; grid-template-columns: auto auto; gap: var(--space-xs) var(--space-lg); align-items: baseline; }
+.score-line strong { font-family: var(--font-display); font-weight: 400; font-size: var(--text-display-s); color: var(--color-accent); line-height: 1; }
+.button:disabled { background: var(--color-rule); border-color: var(--color-rule); color: var(--color-ink-2); cursor: default; transform: none; }
+@media (max-width: 40rem) { .choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
