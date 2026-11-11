@@ -114,6 +114,15 @@ before(async () => {
       "utf8",
     ),
   );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611110003_room_chat.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 });
 after(async () => {
   admin?.release();
@@ -342,4 +351,35 @@ test("room home: members change mood, first day and plans; outsiders and bad inp
   await asUser(a, "select public.leave_couple_room($1)", [id]);
   await assert.rejects(asUser(a, "select public.set_room_mood($1,'berry')", [id]), /Room unavailable/);
   assert.deepEqual(await asUser(b, "select * from public.room_plans where room_id=$1", [id]), []);
+});
+test("chat: members send and read, a retried send does not double, spam and strangers are refused, only the sender deletes", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user(),
+    c = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const req = randomUUID();
+  const [{ m1 }] = await asUser(a, "select public.send_room_message($1,$2,'  안녕  ') as m1", [id, req]);
+  const [{ again }] = await asUser(a, "select public.send_room_message($1,$2,'안녕') as again", [id, req]);
+  assert.equal(again, m1, "the same request id returns the same message");
+  assert.deepEqual(await asUser(b, "select body from public.room_messages where room_id=$1", [id]), [{ body: "안녕" }]);
+  assert.deepEqual(await asUser(c, "select * from public.room_messages where room_id=$1", [id]), []);
+  await assert.rejects(asUser(c, "select public.send_room_message($1,$2,'몰래')", [id, randomUUID()]), /Room unavailable/);
+  await assert.rejects(asUser(a, "select public.send_room_message($1,$2,'   ')", [id, randomUUID()]), /Invalid message/);
+  await assert.rejects(asUser(a, "select public.send_room_message($1,$2,$3)", [id, randomUUID(), "가".repeat(1001)]), /Invalid message/);
+  await assert.rejects(asUser(a, "insert into public.room_messages(room_id,sender,client_id,body) values($1,$2,$3,'직접')", [id, a, randomUUID()]), /permission denied/);
+
+  // Ten in ten seconds is the limit per sender.
+  for (let i = 0; i < 9; i++) await asUser(b, "select public.send_room_message($1,$2,$3)", [id, randomUUID(), "메시지 " + i]);
+  await asUser(b, "select public.send_room_message($1,$2,'열 번째')", [id, randomUUID()]);
+  await assert.rejects(asUser(b, "select public.send_room_message($1,$2,'열한 번째')", [id, randomUUID()]), /Slow down/);
+
+  await assert.rejects(asUser(b, "select public.delete_my_message($1)", [m1]), /Message unavailable/);
+  await asUser(a, "select public.delete_my_message($1)", [m1]);
+  assert.equal((await asUser(b, "select count(*)::int as n from public.room_messages where room_id=$1", [id]))[0].n, 10);
+  const sent = (await admin.query("select count(*)::int as n from realtime.sent where topic=$1 and event='messages'", ["room:" + id])).rows[0].n;
+  assert.equal(sent, 12, "11 sends and 1 delete, each heard on the room topic");
+
+  await asUser(a, "select public.leave_couple_room($1)", [id]);
+  await assert.rejects(asUser(a, "select public.send_room_message($1,$2,'안녕?')", [id, randomUUID()]), /Room unavailable/);
+  assert.deepEqual(await asUser(a, "select * from public.room_messages where room_id=$1", [id]), []);
 });

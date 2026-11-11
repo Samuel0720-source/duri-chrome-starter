@@ -32,5 +32,8 @@ export function roomErrorMessage(message: string | undefined): string {
   if (text.includes("Too many plans")) return "약속은 한 방에 200개까지 저장할 수 있어요.";
   if (text.includes("Plan unavailable")) return "이미 지워졌거나 찾을 수 없는 약속이에요.";
   if (text.includes("Invalid mood")) return "고를 수 없는 무드예요.";
+  if (text.includes("Invalid message")) return "메시지는 1~1000자로 적어 주세요.";
+  if (text.includes("Slow down")) return "너무 빨리 보내고 있어요. 잠시 뒤에 다시 보내 주세요.";
+  if (text.includes("Message unavailable")) return "이미 지워졌거나 지울 수 없는 메시지예요.";
   return "잠시 문제가 생겼어요. 다시 시도해 주세요.";
 }
