@@ -5,6 +5,7 @@ import { defaultZone, zones } from "../../core/preview";
 import { serverClient } from "../../lib/supabase/server";
 import { addPlan, createRoom, deleteAccount, leaveRoom, removePlan, setStart, signOut } from "./actions";
 import { MoodPicker } from "./mood-picker";
+import { RoomTabs } from "./room-tabs";
 import { InviteBox } from "./invite-box";
 import { RoomLive } from "./room-live";
 
@@ -106,6 +107,7 @@ export default async function RoomPage({
     <Shell wide>
       <div className="room" data-mood={mood}>
       <RoomLive roomId={room.id} />
+      <RoomTabs active="home" />
       <div className="room-grid">
         <section className="sheet room-count" aria-label="우리 방">
           <div className="dateline">

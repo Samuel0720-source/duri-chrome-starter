@@ -80,6 +80,25 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageB.locator('.room[data-mood="night"]')).toHaveCount(1);
   await expect(pageA.locator('.room[data-mood="night"]')).toHaveCount(1, { timeout: 10_000 });
 
+  // 3c. Chat. Both open it; each sees the other's message without reloading.
+  await pageA.getByRole("link", { name: "대화", exact: true }).click();
+  await pageB.getByRole("link", { name: "대화", exact: true }).click();
+  await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);
+  await expect(pageB.locator("html[data-room-live=on]")).toHaveCount(1);
+  await pageA.getByLabel("메시지").fill("안녕, 오늘 저녁 뭐 먹을까?");
+  await pageA.getByRole("button", { name: "보내기" }).click();
+  await expect(pageA.locator(".mine .bubble", { hasText: "오늘 저녁" })).toBeVisible();
+  await expect(pageB.locator(".theirs .bubble", { hasText: "오늘 저녁" })).toBeVisible({ timeout: 10_000 });
+  await pageB.getByLabel("메시지").fill("떡볶이!");
+  await pageB.getByRole("button", { name: "보내기" }).click();
+  await expect(pageA.locator(".theirs .bubble", { hasText: "떡볶이" })).toBeVisible({ timeout: 10_000 });
+  // A reload shows the same conversation from the server.
+  await pageA.reload();
+  await expect(pageA.locator(".chat-list .bubble")).toHaveCount(2);
+  await pageA.getByRole("link", { name: "홈", exact: true }).click();
+  await pageB.getByRole("link", { name: "홈", exact: true }).click();
+  await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);
+
   // 4. The same link cannot be used again by a third person.
   const c = await makeUser("c");
   const pageC = await signIn(browser, c.email, invitePath);
