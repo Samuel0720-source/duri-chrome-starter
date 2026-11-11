@@ -1,0 +1,31 @@
+# After Vercel reports a successful production deploy, run the two-person flow test
+# (tests/flow) against the live site on GitHub's servers.
+# Every-push checks (unit, database, build, browser) live in check.yml.
+name: live flow
+
+on:
+  deployment_status:
+
+jobs:
+  live-flow:
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FLOW_URL: https://duri-chrome-starter.vercel.app
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # The test skips itself until the repository secret SUPABASE_SECRET_KEY exists.
+      - run: npm run test:flow
