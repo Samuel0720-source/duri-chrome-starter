@@ -100,3 +100,10 @@
 - 배포 후 `FLOW_URL=https://duri-chrome-starter.vercel.app npm run test:flow` 통과(1 passed, 18.9s): 실제 사이트에서 새로고침 없이 A 화면이 바뀜.
 - `/privacy`, `/terms` 배포. Google 동의 화면 브랜딩(홈페이지·개인정보·약관 주소, 승인 도메인 `duri-chrome-starter.vercel.app`) 저장 후 **프로덕션 단계로 게시** → 모든 Google 계정 로그인 가능.
 - **P2 완료.** 다음: P3 첫 커플 베타. 남은 출시 전 항목: 자체 도메인 + Resend SMTP(이메일 로그인 한도), 화면 디자인 개편.
+
+### 디자인 개편·GitHub · 2026-11-11
+
+- 홈 전면 개편(Hallmark full, 브랜드 berry·cream 유지): 첫 화면에 실시간 일수 카드(날짜 입력이 카드 안), 다가오는 기념일 6개 레일(`upcomingMilestones`, 단위 테스트 4개), 3단계 설명, 앱 설치 띠, 큰 워드마크 바닥글. 제목·숫자 글꼴 Jua(`next/font/google`), 한국어 줄바꿈 `keep-all`. 로그인·방·초대·정책·작은 창도 같은 토큰과 버튼. 파일: `src/app/{page,preview,layout}.tsx`, `src/app/{globals,tokens,base}.css`, `src/core/dates.ts`.
+- 검사: sloplint 렌더 0 FAIL(이전 10 FAIL), 단위 15개 통과, typecheck 통과. 1440·1280·1920·375 스크린샷 확인. 미확인: Jua가 적용된 실제 화면(작업 환경에서 Google Fonts 차단), 브라우저 e2e 전체.
+- GitHub 비공개 저장소 생성·연결: https://github.com/Samuel0720-source/duri-chrome-starter (`main` 푸시). 비밀키는 이력에 없음을 확인.
+- 다음 행동 하나: `npx vercel --prod`로 새 디자인 배포 후 실제 화면 확인.
