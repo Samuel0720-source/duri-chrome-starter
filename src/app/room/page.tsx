@@ -4,6 +4,7 @@ import { defaultZone, zones } from "../../core/preview";
 import { serverClient } from "../../lib/supabase/server";
 import { createRoom, deleteAccount, leaveRoom, signOut } from "./actions";
 import { InviteBox } from "./invite-box";
+import { RoomLive } from "./room-live";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,7 @@ export default async function RoomPage({
 
   return (
     <Shell>
+      <RoomLive roomId={room.id} />
       <section className="sheet" aria-label="우리 방">
         <p className="caption">{calendar.status === "active" ? "함께한 지" : "첫날까지"}</p>
         <div className="big">
