@@ -15,7 +15,8 @@ jobs:
     timeout-minutes: 15
     env:
       FLOW_URL: https://duri-chrome-starter.vercel.app
-      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      # Public project address (it ships to every browser); only the secret key is a secret.
+      NEXT_PUBLIC_SUPABASE_URL: https://phzvtiymcvczepukpbfu.supabase.co
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
