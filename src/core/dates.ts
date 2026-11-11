@@ -87,3 +87,8 @@ export function upcomingMilestones(start: string, today: string, count = 6): Mil
   }
   return items.sort((a, b) => a.daysLeft - b.daysLeft).slice(0, count);
 }
+
+// Whole calendar days from today to date (negative when date is past).
+export function daysFrom(today: string, date: string): number {
+  return dayNumber(date) - dayNumber(today);
+}

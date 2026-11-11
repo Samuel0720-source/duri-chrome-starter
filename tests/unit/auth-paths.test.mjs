@@ -26,4 +26,6 @@ test("emails are checked loosely and database errors become short Korean message
   assert.match(roomErrorMessage("Invite unavailable"), /새 초대/);
   assert.match(roomErrorMessage('duplicate key value violates unique constraint "couple_members_pkey"'), /다른 방/);
   assert.doesNotMatch(roomErrorMessage("internal: relation secret_table"), /secret_table/);
+  assert.match(roomErrorMessage("Invalid plan"), /1~60자/);
+  assert.match(roomErrorMessage("Plan unavailable"), /약속/);
 });

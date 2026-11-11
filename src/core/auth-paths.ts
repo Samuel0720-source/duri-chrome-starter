@@ -28,5 +28,9 @@ export function roomErrorMessage(message: string | undefined): string {
   if (text.includes("Sign in required")) return "먼저 로그인해 주세요.";
   if (text.includes("duplicate key") || text.includes("couple_members_pkey")) return "이미 다른 방에 들어가 있어요.";
   if (text.includes("Invalid account, date or timezone")) return "날짜와 시간대를 다시 확인해 주세요.";
+  if (text.includes("Invalid plan")) return "약속 이름은 1~60자로 적어 주세요.";
+  if (text.includes("Too many plans")) return "약속은 한 방에 200개까지 저장할 수 있어요.";
+  if (text.includes("Plan unavailable")) return "이미 지워졌거나 찾을 수 없는 약속이에요.";
+  if (text.includes("Invalid mood")) return "고를 수 없는 무드예요.";
   return "잠시 문제가 생겼어요. 다시 시도해 주세요.";
 }

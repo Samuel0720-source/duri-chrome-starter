@@ -105,6 +105,15 @@ before(async () => {
       "utf8",
     ),
   );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611110002_room_home.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 });
 after(async () => {
   admin?.release();
@@ -297,4 +306,40 @@ test("joining and leaving broadcast on the room's private topic, which only memb
   assert.equal((await sent()).filter((r) => r.change === "delete").length, 2);
   // After leaving, nobody may listen to the closed room.
   assert.equal(await can(a, topic), false);
+});
+test("room home: members change mood, first day and plans; outsiders and bad input are refused; both hear it", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user(),
+    c = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const events = async (event) =>
+    (await admin.query("select count(*)::int as n from realtime.sent where topic=$1 and event=$2", ["room:" + id, event])).rows[0].n;
+
+  await asUser(b, "select public.set_room_mood($1,'night')", [id]);
+  assert.deepEqual(await asUser(a, "select mood from public.couple_rooms where id=$1", [id]), [{ mood: "night" }]);
+  await assert.rejects(asUser(a, "select public.set_room_mood($1,'neon')", [id]), /Invalid mood/);
+  await assert.rejects(asUser(c, "select public.set_room_mood($1,'cafe')", [id]), /Room unavailable/);
+
+  await asUser(a, "select public.set_room_start($1,'2026-08-01','Asia/Seoul')", [id]);
+  const [room] = await asUser(b, "select start_date::text as d, timezone from public.couple_rooms where id=$1", [id]);
+  assert.deepEqual(room, { d: "2026-08-01", timezone: "Asia/Seoul" });
+  await assert.rejects(asUser(a, "select public.set_room_start($1,'2026-08-01','Mars/Base')", [id]), /Invalid account, date or timezone/);
+  assert.equal(await events("room"), 2);
+
+  const [{ pid }] = await asUser(a, "select public.add_room_plan($1,'2026-12-24','  크리스마스 저녁  ') as pid", [id]);
+  assert.deepEqual(await asUser(b, "select title from public.room_plans where room_id=$1", [id]), [{ title: "크리스마스 저녁" }]);
+  await assert.rejects(asUser(a, "select public.add_room_plan($1,'2026-12-24','   ')", [id]), /Invalid plan/);
+  await assert.rejects(asUser(a, "select public.add_room_plan($1,'2026-12-24',$2)", [id, "가".repeat(61)]), /Invalid plan/);
+  await assert.rejects(asUser(c, "select public.add_room_plan($1,'2026-12-24','몰래')", [id]), /Room unavailable/);
+  assert.deepEqual(await asUser(c, "select * from public.room_plans where room_id=$1", [id]), []);
+  await assert.rejects(asUser(c, "select public.remove_room_plan($1)", [pid]), /Plan unavailable/);
+  await assert.rejects(asUser(a, "insert into public.room_plans(room_id,on_date,title) values($1,'2026-12-25','직접')", [id]), /permission denied/);
+  await asUser(b, "select public.remove_room_plan($1)", [pid]);
+  assert.equal(await events("plans"), 2);
+
+  // After leaving, nobody can change the closed room and the plans go with the members' access.
+  await asUser(a, "select public.add_room_plan($1,'2027-01-01','새해')", [id]);
+  await asUser(a, "select public.leave_couple_room($1)", [id]);
+  await assert.rejects(asUser(a, "select public.set_room_mood($1,'berry')", [id]), /Room unavailable/);
+  assert.deepEqual(await asUser(b, "select * from public.room_plans where room_id=$1", [id]), []);
 });
