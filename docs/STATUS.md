@@ -131,3 +131,7 @@
 - Vercel Git 설정의 ‘deployment_status Events’를 켜야 GitHub가 배포 완료를 알 수 있다(켜 둠).
 - GitHub Actions: `check.yml`(push마다 단위·DB·빌드·브라우저 전체), `live-flow.yml`(Production 배포 성공 뒤 실제 사이트에서 `tests/flow` 두 사람 흐름). 저장소 secret `SUPABASE_SECRET_KEY` 사용자 등록.
 - 로그인한 방 홈에도 ‘다가오는 기념일’ 표시(`src/app/milestone-rail.tsx`를 공개 홈과 공유).
+- 배포 완료 신호(deployment_status)가 GitHub에 오지 않아 방식을 바꿈: `live-flow.yml`이 push마다 실행 → `/api/version`이 새 커밋을 보일 때까지 기다림 → `tests/flow` 실행.
+- **GitHub Actions에서 실제 사이트 흐름 테스트 통과(b598e8c, 1 passed, 21.6s):** 방 만들기·기념일 표시·초대·입장·약속·무드·대화·게임(답 숨김→동시 공개→결과)·제3자 거부·나가기·계정 삭제.
+- **P3 자동 검사 완료.** 남은 P3 통과 기준: 실제 커플 한 쌍이 초대부터 다음 날 재방문까지 써 보기(사람 확인).
+- 다음 행동 하나: P4-1 ‘100초 그림 퀴즈’.
