@@ -10,7 +10,8 @@ const secret = process.env.SUPABASE_SECRET_KEY;
 test.skip(!url || !secret, "Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY in .env.local");
 
 // The admin client makes throwaway users, so no Google and no real mailbox are needed.
-const admin: SupabaseClient = createClient(url ?? "http://x", secret ?? "x", {
+// `||` (not `??`): an empty string from an unset CI secret must also fall back, so the skip above applies.
+const admin: SupabaseClient = createClient(url || "http://x", secret || "x", {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 const made: string[] = [];
