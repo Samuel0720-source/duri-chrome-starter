@@ -124,3 +124,9 @@
 - 답은 `duri_private.guess_answers`(권한 없음 + RLS 켬). 화면은 `guess_state()`만 읽는다: 상대 답은 그 라운드를 둘 다 답한 뒤에만 들어온다. 실시간 신호에는 `{change:'answer'}`만. 같은 답 재전송은 그대로, 답 바꾸기는 거부. 방마다 진행 중 게임 하나.
 - 검사: DB 8개 통과(새: 답 숨김·재전송·변경 거부·제3자 거부·신호에 답 없음·점수·새 게임). 10번 연속 실행 실패 0(PostgreSQL 종료 알림 57P01 처리로 간헐 실패 해결). 단위 20개, typecheck 통과. Supabase 적용 확인(RLS 표 2·함수 3·트리거 1). 흐름 테스트에 게임 단계 추가(A 답 → B 화면에 결과 없음 → B 답 → 둘 다 공개 → 3라운드 결과 → 새로고침 복원).
 - 다음 행동 하나: 배포 후 흐름 테스트. 통과하면 P3 완료 → 첫 커플 베타(초대부터 다음 날 재방문까지 실제 확인).
+
+### 자동 배포·자동 검사 · 2026-11-11
+
+- Vercel 프로젝트를 GitHub `Samuel0720-source/duri-chrome-starter`에 연결: `main`에 push하면 Production 자동 배포(87c39f9부터 확인).
+- GitHub Actions: `check.yml`(push마다 단위·DB·빌드·브라우저 전체), `live-flow.yml`(Production 배포 성공 뒤 실제 사이트에서 `tests/flow` 두 사람 흐름). 저장소 secret `SUPABASE_SECRET_KEY` 사용자 등록.
+- 로그인한 방 홈에도 ‘다가오는 기념일’ 표시(`src/app/milestone-rail.tsx`를 공개 홈과 공유).
