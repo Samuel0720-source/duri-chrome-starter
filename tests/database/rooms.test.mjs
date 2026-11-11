@@ -70,7 +70,14 @@ before(async () => {
     create schema auth; create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql stable as $$
       select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
-    grant usage on schema auth to authenticated,anon;`);
+    grant usage on schema auth to authenticated,anon;
+    -- Stand-in for Supabase Realtime: records what would be broadcast.
+    create schema realtime; grant usage on schema realtime to authenticated,anon;
+    create table realtime.messages(extension text, topic text);
+    create table realtime.sent(payload jsonb, event text, topic text, private boolean);
+    create function realtime.send(payload jsonb, event text, topic text, private boolean) returns void
+      language sql as $$ insert into realtime.sent values(payload,event,topic,private) $$;
+    create function realtime.topic() returns text language sql stable as $$ select current_setting('realtime.topic',true) $$;`);
   await admin.query(
     await readFile(
       new URL(
@@ -84,6 +91,15 @@ before(async () => {
     await readFile(
       new URL(
         "../../supabase/migrations/202611090001_delete_account.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611110001_room_realtime.sql",
         import.meta.url,
       ),
       "utf8",
@@ -259,4 +275,26 @@ test("deleting an account removes the person, the shared room, and tells only th
   const c = await user();
   await asUser(c, "select public.delete_my_account()");
   assert.equal((await admin.query("select count(*)::int as n from auth.users where id=$1", [c])).rows[0].n, 0);
+});
+test("joining and leaving broadcast on the room's private topic, which only members may listen to", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user(),
+    c = await user();
+  const topic = "room:" + id;
+  const sent = async () =>
+    (await admin.query("select payload->>'change' as change, event, private from realtime.sent where topic=$1", [topic])).rows;
+  // Creating the room seats A: one insert broadcast.
+  assert.deepEqual(await sent(), [{ change: "insert", event: "members", private: true }]);
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  assert.equal((await sent()).filter((r) => r.change === "insert").length, 2);
+  const can = async (who, t) => (await asUser(who, "select duri_private.can_listen($1) as ok", [t]))[0].ok;
+  assert.equal(await can(a, topic), true);
+  assert.equal(await can(b, topic), true);
+  assert.equal(await can(c, topic), false);
+  assert.equal(await can(a, "room:not-a-uuid"), false);
+  assert.equal(await can(a, "other:" + id), false);
+  await asUser(b, "select public.leave_couple_room($1)", [id]);
+  assert.equal((await sent()).filter((r) => r.change === "delete").length, 2);
+  // After leaving, nobody may listen to the closed room.
+  assert.equal(await can(a, topic), false);
 });

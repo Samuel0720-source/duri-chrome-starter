@@ -55,12 +55,16 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   const invitePath = new URL(link).pathname;
   expect(invitePath).toMatch(/^\/invite\/[0-9a-f]{64}$/);
 
+  // A's page listens on the room's private channel.
+  await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);
+
   // 3. B opens the invite (sign-in first), then joins.
   const pageB = await signIn(browser, b.email, invitePath);
   await pageB.getByRole("button", { name: "방에 들어가기" }).click();
   await expect(pageB.getByText("두 사람이 모두 들어왔어요.")).toBeVisible();
-  await pageA.reload();
-  await expect(pageA.getByText("두 사람이 모두 들어왔어요.")).toBeVisible();
+  // A sees it without reloading: the realtime message refreshes the page.
+  await expect(pageA.getByText("두 사람이 모두 들어왔어요.")).toBeVisible({ timeout: 10_000 });
+  await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);
 
   // 4. The same link cannot be used again by a third person.
   const c = await makeUser("c");
@@ -74,8 +78,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await pageB.getByLabel("네, 방을 닫고 나갈게요").check();
   await pageB.getByRole("button", { name: "방 나가기" }).click();
   await expect(pageB.getByText("방에서 나왔어요.")).toBeVisible();
-  await pageA.reload();
-  await expect(pageA.getByText("상대가 방을 나갔어요. 새 방을 만들 수 있어요.")).toBeVisible();
+  // Again no reload: A is moved to the "partner left" view live.
+  await expect(pageA.getByText("상대가 방을 나갔어요. 새 방을 만들 수 있어요.")).toBeVisible({ timeout: 10_000 });
 
   // 6. A deletes the account. Supabase no longer has the user.
   await pageA.getByText("계정 삭제", { exact: true }).first().click();

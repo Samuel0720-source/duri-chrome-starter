@@ -89,3 +89,11 @@
 - `npx vercel --prod` 배포 완료 → https://duri-chrome-starter.vercel.app . 확인: `/room` → 로그인으로 이동, Google 버튼이 배포 주소 `/auth/callback`으로 돌아오도록 설정됨.
 - 남은 P2: 비공개 실시간 채널(상대 입장·퇴장이 새로고침 없이 보이게). 출시 전: Google 동의 화면 게시, 자체 도메인 + Resend SMTP, Supabase Site URL을 배포 주소로 유지.
 - 다음 행동 하나: 비공개 실시간 채널.
+
+### P2 실시간 반영 · 2026-11-11
+
+- 홈 오른쪽 위에 ‘로그인 · 우리 방’ 링크 추가(배포 완료). 전에는 홈에서 로그인으로 가는 길이 없었다.
+- 비공개 Realtime Broadcast(마이그레이션 `202611110001`): `couple_members`에 들어오거나 나가면 트리거가 `room:<방 id>` 주제로 신호를 보낸다. `realtime.messages` 정책 `room_members_listen`이 그 방 멤버만 듣게 한다. 신호에는 개인 정보 없이 `insert`/`delete`만 담긴다. Supabase `duri-dev`에 적용·확인(트리거·정책·함수 각 1).
+- `/room`의 `RoomLive`가 신호를 받으면 `router.refresh()`로 화면을 다시 그린다. 연결되면 `<html data-room-live="on">`.
+- 검사: DB 5개 통과(새: 들어옴·나감 신호, 멤버만 청취, 잘못된 주제 거부, 나간 뒤 청취 불가). 단위 11개 통과. typecheck 통과. 흐름 테스트는 새로고침 없이 A 화면이 바뀌는지 확인하도록 강화.
+- 다음 행동 하나: 배포 후 `FLOW_URL=https://duri-chrome-starter.vercel.app npm run test:flow`.
