@@ -187,3 +187,63 @@ small { display: block; margin-top: var(--space-3xs); font-weight: 400; color: v
   .rail { grid-auto-columns: 72%; }
   .rail li { min-height: 200px; }
 }
+
+/* ---------- Room home ---------- */
+.room-wrap { max-width: var(--container); }
+.room { color: var(--color-ink); }
+.room-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-xl); align-items: start; }
+.room-count { display: grid; gap: var(--space-sm); }
+.room-count .big { margin-bottom: var(--space-xs); }
+.room h2 { font-size: var(--text-2xl); margin-bottom: var(--space-md); }
+.plans { display: grid; gap: var(--space-md); }
+.plan-form { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) auto; gap: var(--space-sm); align-items: end; }
+.plan-form button { min-height: 48px; padding: 0 var(--space-lg); border: 2px solid var(--color-accent); border-radius: var(--radius-pill); background: var(--color-accent); color: var(--color-accent-ink); font-weight: 700; white-space: nowrap; cursor: pointer; transition: transform var(--dur-micro) var(--ease-out), background-color var(--dur-short) var(--ease-out); }
+.plan-form button:hover { background: var(--color-accent-2); border-color: var(--color-accent-2); }
+.plan-form button:active { transform: translateY(1px) scale(0.98); }
+.plan-form button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.plan-list { list-style: none; margin: 0; padding: 0; }
+.plan-list li { display: grid; grid-template-columns: 6rem minmax(0, 1fr) auto auto; gap: var(--space-md); align-items: center; padding: var(--space-md) 0; border-top: var(--rule-hair) solid var(--color-rule); }
+.plan-list li:last-child { border-bottom: var(--rule-hair) solid var(--color-rule); }
+.plan-d { font-family: var(--font-display); font-weight: 400; font-size: var(--text-xl); color: var(--color-accent); font-variant-numeric: tabular-nums; }
+.plan-name { font-weight: 650; min-width: 0; overflow-wrap: break-word; }
+.plan-list time { color: var(--color-ink-2); font-size: var(--text-sm); white-space: nowrap; }
+.plan-remove { min-height: 40px; padding: 0 var(--space-sm); border: var(--rule-hair) solid var(--color-rule); border-radius: var(--radius-pill); background: transparent; color: var(--color-ink-2); cursor: pointer; }
+.plan-remove:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.plan-remove:active { transform: translateY(1px); }
+.plan-remove:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.past-plans summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--color-ink-2); }
+.past-plans summary:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.past-plans .plan-list li { grid-template-columns: minmax(0, 1fr) auto; }
+
+.room-settings { display: grid; gap: var(--space-lg); }
+.mood-form { display: grid; gap: var(--space-md); margin-top: var(--space-md); justify-items: start; }
+.mood-form fieldset { border: 0; margin: 0; padding: 0; width: 100%; }
+.mood-form legend { font-weight: 700; margin-bottom: var(--space-sm); }
+.mood-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-sm); }
+.mood-option {
+  display: grid; gap: var(--space-xs); justify-items: center; padding: var(--space-md) var(--space-xs);
+  border: 2px solid var(--color-rule); border-radius: var(--radius-field); background: var(--color-paper); color: var(--color-ink);
+  font-weight: 600; font-size: var(--text-sm); text-align: center; cursor: pointer;
+}
+.mood-option:hover { border-color: var(--color-muted); }
+.mood-option:has(input:checked) { border-color: var(--color-accent); box-shadow: 0 0 0 2px var(--color-accent); }
+.mood-option:has(input:focus-visible) { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.mood-option input { position: absolute; opacity: 0; width: 1px; min-height: 1px; }
+.mood-swatch { width: 44px; height: 44px; border-radius: var(--radius-pill); background: linear-gradient(135deg, var(--color-paper-2) 0 50%, var(--color-accent) 50% 100%); border: 2px solid var(--color-paper-3); }
+.mood-form button { min-height: 48px; padding: 0 var(--space-lg); border: 2px solid var(--color-accent); border-radius: var(--radius-pill); background: var(--color-accent); color: var(--color-accent-ink); font-weight: 700; cursor: pointer; }
+.mood-form button:hover { background: var(--color-accent-2); border-color: var(--color-accent-2); }
+.mood-form button:active { transform: translateY(1px); }
+.mood-form button:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.mood-form button:disabled { background: var(--color-rule); border-color: var(--color-rule); color: var(--color-ink-2); cursor: default; transform: none; }
+.start-form .fields { border-top: 0; padding-top: 0; }
+
+@media (max-width: 60rem) {
+  .room-grid { grid-template-columns: minmax(0, 1fr); }
+  .mood-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 40rem) {
+  .plan-form { grid-template-columns: minmax(0, 1fr); }
+  .plan-list li { grid-template-columns: 4.5rem minmax(0, 1fr) auto; }
+  .plan-list li time { grid-column: 2; grid-row: 2; }
+  .plan-list li form { grid-column: 3; grid-row: 1 / span 2; }
+}

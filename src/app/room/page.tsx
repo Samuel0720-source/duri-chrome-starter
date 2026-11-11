@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
-import { coupleCalendar, roomToday } from "../../core/dates";
+import { coupleCalendar, daysFrom, roomToday } from "../../core/dates";
+import { isMood } from "../../core/moods";
 import { defaultZone, zones } from "../../core/preview";
 import { serverClient } from "../../lib/supabase/server";
-import { createRoom, deleteAccount, leaveRoom, signOut } from "./actions";
+import { addPlan, createRoom, deleteAccount, leaveRoom, removePlan, setStart, signOut } from "./actions";
+import { MoodPicker } from "./mood-picker";
 import { InviteBox } from "./invite-box";
 import { RoomLive } from "./room-live";
 
@@ -24,9 +26,9 @@ function DeleteAccount({ failed }: { failed: boolean }) {
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
   return (
-    <main className="wrap auth">
+    <main className={wide ? "wrap room-wrap" : "wrap auth"}>
       <header className="top">
         <div className="brand">
           <img alt="" width="32" height="32" src="/icons/icon-192.png" />
@@ -82,31 +84,134 @@ export default async function RoomPage({
     );
   }
 
-  const [{ data: room }, { count }] = await Promise.all([
-    supabase.from("couple_rooms").select("id, start_date, timezone").eq("id", seat.room_id).maybeSingle(),
+  const [{ data: room }, { count }, { data: plans }] = await Promise.all([
+    supabase.from("couple_rooms").select("id, start_date, timezone, mood").eq("id", seat.room_id).maybeSingle(),
     supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
+    supabase.from("room_plans").select("id, on_date, title").eq("room_id", seat.room_id).order("on_date").order("created_at").limit(200),
   ]);
   if (!room) redirect("/room?error=closed");
-  const calendar = coupleCalendar(room.start_date, roomToday(new Date(), room.timezone));
+  const today = roomToday(new Date(), room.timezone);
+  const calendar = coupleCalendar(room.start_date, today);
   const full = (count ?? 0) >= 2;
+  const mood = isMood(room.mood) ? room.mood : "berry";
+  const upcoming = (plans ?? []).filter((p) => p.on_date >= today);
+  const past = (plans ?? []).filter((p) => p.on_date < today).reverse();
+  const next = upcoming[0];
+  const dLabel = (date: string) => {
+    const d = daysFrom(today, date);
+    return d === 0 ? "오늘" : "D−" + d.toLocaleString("ko-KR");
+  };
 
   return (
-    <Shell>
+    <Shell wide>
+      <div className="room" data-mood={mood}>
       <RoomLive roomId={room.id} />
-      <section className="sheet" aria-label="우리 방">
-        <p className="caption">{calendar.status === "active" ? "함께한 지" : "첫날까지"}</p>
-        <div className="big">
-          <strong>{calendar.status === "active" ? calendar.day.toLocaleString("ko-KR") : "D−" + calendar.daysToStart}</strong>
-          {calendar.status === "active" && <span>일째</span>}
-        </div>
-        <p className="hint">{full ? "두 사람이 모두 들어왔어요." : "아직 상대가 들어오지 않았어요."}</p>
-      </section>
+      <div className="room-grid">
+        <section className="sheet room-count" aria-label="우리 방">
+          <div className="dateline">
+            <span>오늘</span>
+            <time dateTime={today}>{today.replaceAll("-", ". ")}</time>
+          </div>
+          <p className="caption">{calendar.status === "active" ? (calendar.milestoneToday ? "오늘은 우리의 기념일" : "함께한 지") : "첫날까지"}</p>
+          <div className="big">
+            <strong>{calendar.status === "active" ? calendar.day.toLocaleString("ko-KR") : "D−" + calendar.daysToStart}</strong>
+            {calendar.status === "active" && <span>일째</span>}
+          </div>
+          <dl>
+            <div>
+              <dt>다음 만남</dt>
+              <dd>
+                {next ? dLabel(next.on_date) : "아직 없어요"}
+                <small>{next ? next.title : "아래에 약속을 적어 보세요"}</small>
+              </dd>
+            </div>
+            {calendar.status === "active" && (
+              <div>
+                <dt>우리의 {calendar.nextHundred}일</dt>
+                <dd>
+                  D−{calendar.daysUntilHundred}
+                  <small>{calendar.hundredDate}</small>
+                </dd>
+              </div>
+            )}
+          </dl>
+          <p className="hint">{full ? "두 사람이 모두 들어왔어요." : "아직 상대가 들어오지 않았어요."}</p>
+        </section>
+
+        <section className="plans" id="plans" aria-labelledby="plans-head">
+          <h2 id="plans-head">우리 약속</h2>
+          <form action={addPlan} className="plan-form">
+            <input type="hidden" name="room" value={room.id} />
+            <div className="field">
+              <label htmlFor="plan-date">날짜</label>
+              <input id="plan-date" name="date" type="date" min="1900-01-01" max="9998-12-31" defaultValue={today} required />
+            </div>
+            <div className="field plan-title">
+              <label htmlFor="plan-title">무엇을 할까요</label>
+              <input id="plan-title" name="title" type="text" maxLength={60} required placeholder="예: 한강 피크닉" />
+            </div>
+            <button type="submit">약속 추가</button>
+          </form>
+          {error === "plan" && <p role="alert" className="error">약속을 저장하지 못했어요. 날짜와 1~60자 이름을 확인해 주세요.</p>}
+          {upcoming.length > 0 ? (
+            <ol className="plan-list">
+              {upcoming.map((p) => (
+                <li key={p.id}>
+                  <strong className="plan-d">{dLabel(p.on_date)}</strong>
+                  <span className="plan-name">{p.title}</span>
+                  <time dateTime={p.on_date}>{p.on_date.replaceAll("-", ". ")}</time>
+                  <form action={removePlan}>
+                    <input type="hidden" name="plan" value={p.id} />
+                    <button type="submit" className="plan-remove" aria-label={p.title + " 약속 지우기"}>지우기</button>
+                  </form>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="hint">다가오는 약속이 없어요. 두 사람 모두에게 바로 보여요.</p>
+          )}
+          {past.length > 0 && (
+            <details className="past-plans">
+              <summary>지난 약속 {past.length}개</summary>
+              <ol className="plan-list">
+                {past.map((p) => (
+                  <li key={p.id}>
+                    <span className="plan-name">{p.title}</span>
+                    <time dateTime={p.on_date}>{p.on_date.replaceAll("-", ". ")}</time>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          )}
+        </section>
+      </div>
       {!full && (
         <section className="settings">
           <h2>상대 초대하기</h2>
           <InviteBox roomId={room.id} />
         </section>
       )}
+      <details className="leave room-settings" open={error === "mood" || error === "start"}>
+        <summary>방 설정</summary>
+        <MoodPicker key={mood} roomId={room.id} current={mood} />
+        <form action={setStart} className="stack start-form">
+          <input type="hidden" name="room" value={room.id} />
+          <div className="fields">
+            <div className="field">
+              <label htmlFor="room-start">함께한 첫날</label>
+              <input id="room-start" name="start" type="date" min="1900-01-01" max="9998-12-31" defaultValue={room.start_date} required />
+            </div>
+            <div className="field">
+              <label htmlFor="room-zone">기준 시간대</label>
+              <select id="room-zone" name="zone" defaultValue={room.timezone}>
+                {zones.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+          </div>
+          <button type="submit" className="secondary">날짜 저장</button>
+        </form>
+        {(error === "mood" || error === "start") && <p role="alert" className="error">저장하지 못했어요. 다시 시도해 주세요.</p>}
+      </details>
       <details className="leave" open={error === "leave" || error === "confirm"}>
         <summary>방 나가기</summary>
         <form action={leaveRoom} className="stack">
@@ -120,6 +225,7 @@ export default async function RoomPage({
         {(error === "leave" || error === "confirm") && <p role="alert" className="error">방을 나가지 못했어요. 다시 시도해 주세요.</p>}
       </details>
       <DeleteAccount failed={error === "delete"} />
+      </div>
     </Shell>
   );
 }

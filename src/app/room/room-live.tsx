@@ -19,6 +19,8 @@ export function RoomLive({ roomId }: { roomId: string }) {
       channel = supabase
         .channel("room:" + roomId, { config: { private: true } })
         .on("broadcast", { event: "members" }, () => router.refresh())
+        .on("broadcast", { event: "room" }, () => router.refresh())
+        .on("broadcast", { event: "plans" }, () => router.refresh())
         // The data attribute lets tests (and debugging) see the channel is live.
         .subscribe((status) => {
           document.documentElement.dataset.roomLive = status === "SUBSCRIBED" ? "on" : "off";

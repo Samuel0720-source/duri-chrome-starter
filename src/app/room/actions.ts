@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { invitePath, isInviteToken, roomErrorMessage } from "../../core/auth-paths";
 import { isPreviewStart, zones } from "../../core/preview";
+import { isMood } from "../../core/moods";
 import { appOrigin, serverClient } from "../../lib/supabase/server";
 
 async function signedIn() {
@@ -67,6 +68,47 @@ export async function deleteAccount(formData: FormData) {
   // The account is gone; clear this browser's session cookies too.
   await supabase.auth.signOut({ scope: "local" });
   redirect("/login?deleted=1");
+}
+
+// Room home: shared mood, first day and time zone, and plans. The RPCs check membership.
+export async function setMood(formData: FormData) {
+  const room = String(formData.get("room") ?? "");
+  const mood = formData.get("mood");
+  if (!isMood(mood)) redirect("/room?error=mood");
+  const { supabase, user } = await signedIn();
+  if (!user) redirect("/login?next=/room");
+  const { error } = await supabase.rpc("set_room_mood", { target: room, new_mood: mood });
+  redirect(error ? "/room?error=mood" : "/room");
+}
+
+export async function setStart(formData: FormData) {
+  const room = String(formData.get("room") ?? "");
+  const start = String(formData.get("start") ?? "");
+  const zone = String(formData.get("zone") ?? "");
+  if (!isPreviewStart(start) || !zones.some((item) => item.value === zone)) redirect("/room?error=start");
+  const { supabase, user } = await signedIn();
+  if (!user) redirect("/login?next=/room");
+  const { error } = await supabase.rpc("set_room_start", { target: room, first_day: start, zone });
+  redirect(error ? "/room?error=start" : "/room");
+}
+
+export async function addPlan(formData: FormData) {
+  const room = String(formData.get("room") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  if (!isPreviewStart(date) || title.length < 1 || title.length > 60) redirect("/room?error=plan#plans");
+  const { supabase, user } = await signedIn();
+  if (!user) redirect("/login?next=/room");
+  const { error } = await supabase.rpc("add_room_plan", { target: room, plan_date: date, plan_title: title });
+  redirect(error ? "/room?error=plan#plans" : "/room#plans");
+}
+
+export async function removePlan(formData: FormData) {
+  const plan = String(formData.get("plan") ?? "");
+  const { supabase, user } = await signedIn();
+  if (!user) redirect("/login?next=/room");
+  const { error } = await supabase.rpc("remove_room_plan", { plan });
+  redirect(error ? "/room?error=plan#plans" : "/room#plans");
 }
 
 export async function signOut() {

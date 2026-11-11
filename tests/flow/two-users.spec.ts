@@ -66,6 +66,20 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageA.getByText("두 사람이 모두 들어왔어요.")).toBeVisible({ timeout: 10_000 });
   await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);
 
+  // 3b. Room home. A adds a plan; B sees it without reloading.
+  await pageA.getByLabel("날짜", { exact: true }).fill("2027-01-01");
+  await pageA.getByLabel("무엇을 할까요").fill("새해 일출 보기");
+  await pageA.getByRole("button", { name: "약속 추가" }).click();
+  await expect(pageA.locator(".plan-list").getByText("새해 일출 보기")).toBeVisible();
+  await expect(pageB.locator(".plan-list").getByText("새해 일출 보기")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.locator(".room-count").getByText("새해 일출 보기")).toBeVisible();
+  // B switches the shared mood; A's page takes it live.
+  await pageB.getByText("방 설정", { exact: true }).click();
+  await pageB.locator('label.mood-option[data-mood="night"]').click();
+  await pageB.getByRole("button", { name: "이 무드로 바꾸기" }).click();
+  await expect(pageB.locator('.room[data-mood="night"]')).toHaveCount(1);
+  await expect(pageA.locator('.room[data-mood="night"]')).toHaveCount(1, { timeout: 10_000 });
+
   // 4. The same link cannot be used again by a third person.
   const c = await makeUser("c");
   const pageC = await signIn(browser, c.email, invitePath);
