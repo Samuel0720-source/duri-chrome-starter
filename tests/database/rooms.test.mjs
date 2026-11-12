@@ -137,6 +137,15 @@ before(async () => {
       "utf8",
     ),
   );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611120001_draw_quiz.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 });
 after(async () => {
   admin?.release();
@@ -447,4 +456,165 @@ test("guess game: a partner's answer stays hidden until both answer, answers can
   await assert.rejects(asUser(a, "select public.answer_guess($1,1::smallint,2::smallint,0::smallint)", [game]), /Game unavailable/);
   const [{ next }] = await asUser(b, "select public.start_guess_game($1) as next", [id]);
   assert.notEqual(next, game, "a finished game makes room for a new one");
+});
+test("draw quiz: the guesser never gets the word, the database sets the deadline, a round ends once, strangers are refused", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user(),
+    c = await user();
+  const state = async (who) => (await asUser(who, "select public.draw_state($1) as s", [id]))[0].s;
+  const wordOf = async (game) => (await admin.query("select word from duri_private.draw_words where game_id=$1", [game])).rows[0].word;
+  const stroke = (who, game, seg = randomUUID(), pts = [[10, 10], [200, 300]], color = "#ff0000") =>
+    asUser(who, "select public.add_draw_stroke($1,$2,$3,$4,4::smallint,$5::jsonb) as ok", [game, randomUUID(), seg, color, JSON.stringify(pts)]);
+  const ready = async (game) => {
+    await asUser(a, "select public.ready_draw_game($1)", [game]);
+    await asUser(b, "select public.ready_draw_game($1)", [game]);
+  };
+
+  // Setup rules.
+  await assert.rejects(asUser(a, "select public.start_draw_game($1,'food')", [id]), /Partner needed/);
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  await assert.rejects(asUser(a, "select public.start_draw_game($1,'cars')", [id]), /Invalid category/);
+  await assert.rejects(asUser(c, "select public.start_draw_game($1,'food')", [id]), /Room unavailable/);
+  const bank = (await admin.query("select category, count(*)::int n from duri_private.draw_word_bank group by 1")).rows;
+  assert.equal(bank.length, 5, "five categories");
+  assert.ok(bank.every((r) => r.n >= 20), "at least 20 words each");
+
+  // Round 1: A draws (the starter draws first), B guesses.
+  const [{ game }] = await asUser(a, "select public.start_draw_game($1,'food') as game", [id]);
+  const [{ same }] = await asUser(b, "select public.start_draw_game($1,'animal') as same", [id]);
+  assert.equal(same, game, "one open round per room");
+  const lobbyA = await state(a), lobbyB = await state(b);
+  assert.deepEqual([lobbyA.role, lobbyA.phase, lobbyB.role], ["drawer", "lobby", "guesser"]);
+  assert.equal(lobbyA.word, null, "no word before the round starts");
+  await assert.rejects(stroke(a, game), /Game unavailable/);
+  await asUser(a, "select public.ready_draw_game($1)", [game]);
+  assert.equal((await state(b)).phase, "lobby");
+  assert.equal((await state(b)).partnerReady, true);
+  await asUser(a, "select public.ready_draw_game($1)", [game]);
+  await asUser(b, "select public.ready_draw_game($1)", [game]);
+  const live = await state(b);
+  assert.equal(live.phase, "live");
+  assert.ok(Math.abs(live.deadlineMs - live.startedMs - 100_000) <= 5, "the database sets a 100 second deadline");
+  assert.ok(live.deadlineMs > live.nowMs && live.deadlineMs - live.nowMs <= 100_000);
+
+  // The word: the drawer sees it, the guesser's state, rows and signals never contain it.
+  const word = await wordOf(game);
+  const sa = await state(a), sb = await state(b);
+  assert.equal(sa.word, word);
+  assert.equal(sb.word, null);
+  assert.ok(!JSON.stringify(sb).includes(word));
+  await assert.rejects(asUser(b, "select * from duri_private.draw_words"), /permission denied/);
+  await assert.rejects(asUser(b, "select * from duri_private.draw_word_bank"), /permission denied/);
+  assert.ok(!JSON.stringify(await asUser(b, "select * from public.draw_games")).includes(word));
+
+  // Drawing: only the drawer draws; the guesser reads; resends do not double; bad input is refused.
+  const seg = randomUUID();
+  assert.equal((await stroke(a, game, seg))[0].ok, true);
+  assert.equal((await stroke(a, game, seg))[0].ok, true, "a resent segment is accepted");
+  assert.equal((await asUser(b, "select count(*)::int n from public.draw_strokes where game_id=$1", [game]))[0].n, 1, "…but stored once");
+  await assert.rejects(stroke(b, game), /Game unavailable/);
+  await assert.rejects(stroke(a, game, randomUUID(), [[10, 2000]]), /Invalid stroke/);
+  await assert.rejects(stroke(a, game, randomUUID(), [["x", 1]]), /Invalid stroke/);
+  await assert.rejects(stroke(a, game, randomUUID(), []), /Invalid stroke/);
+  await assert.rejects(stroke(a, game, randomUUID(), [[1, 1]], "red"), /Invalid stroke/);
+  const twoSegments = randomUUID();
+  await asUser(a, "select public.add_draw_stroke($1,$2,$3,'#00aa00',6::smallint,'[[1,1],[2,2]]'::jsonb)", [game, twoSegments, randomUUID()]);
+  await asUser(a, "select public.add_draw_stroke($1,$2,$3,'#00aa00',6::smallint,'[[2,2],[3,3]]'::jsonb)", [game, twoSegments, randomUUID()]);
+  await asUser(a, "select public.undo_draw_stroke($1)", [game]);
+  assert.equal((await asUser(b, "select count(*)::int n from public.draw_strokes where game_id=$1", [game]))[0].n, 1, "undo removes the whole last stroke");
+  await assert.rejects(asUser(b, "select public.undo_draw_stroke($1)", [game]), /Game unavailable/);
+  await assert.rejects(asUser(b, "select public.clear_draw_strokes($1)", [game]), /Game unavailable/);
+
+  // Guessing: only the guesser; a wrong guess retries freely; spaces and case do not matter.
+  await assert.rejects(asUser(a, "select public.guess_draw($1,$2)", [game, word]), /Game unavailable/);
+  await assert.rejects(asUser(b, "select public.guess_draw($1,'   ')", [game]), /Invalid guess/);
+  assert.equal((await asUser(b, "select public.guess_draw($1,'ㅋㅋㅋ아님') as r", [game]))[0].r, "wrong");
+  assert.equal((await asUser(b, "select public.guess_draw($1,'또 아님') as r", [game]))[0].r, "wrong");
+  assert.equal((await state(b)).phase, "live");
+  // Every signal so far is just an event name.
+  const signals = (await admin.query("select payload, event from realtime.sent where topic=$1 and event='draw'", ["room:" + id])).rows;
+  assert.ok(signals.length > 5);
+  assert.ok(signals.every((s) => Object.keys(s.payload).join() === "change"), "signals carry only a change kind");
+  assert.ok(!JSON.stringify(signals).includes(word));
+
+  // A correct guess, even spaced out, ends the round once. A second correct guess at the same
+  // moment cannot end it again.
+  const spaced = " " + word.split("").join(" ") + " ";
+  const race = await Promise.all([
+    asUser(b, "select public.guess_draw($1,$2) as r", [game, spaced]),
+    asUser(b, "select public.guess_draw($1,$2) as r", [game, word]),
+  ]);
+  assert.deepEqual(race.map((r) => r[0].r).sort(), ["closed", "correct"], "exactly one guess wins");
+  const won = await state(b);
+  assert.equal(won.phase, "done");
+  assert.equal(won.result, "won");
+  assert.equal(won.word, word, "the word is shown to the guesser once the round is over");
+  assert.ok(won.seconds >= 0 && won.seconds < 100);
+  assert.equal(won.records.food, won.seconds, "the pair's best time is recorded");
+  assert.equal((await admin.query("select count(*)::int n from public.draw_records where room_id=$1", [id])).rows[0].n, 1);
+  assert.equal((await stroke(a, game))[0].ok, false, "no drawing after the round ended");
+  assert.equal((await asUser(b, "select public.guess_draw($1,$2) as r", [game, word]))[0].r, "closed");
+
+  // Round 2: roles swap. B draws, A guesses. A better time is kept; a worse one is not.
+  const [{ game: g2 }] = await asUser(a, "select public.start_draw_game($1,'animal') as game", [id]);
+  assert.notEqual(g2, game);
+  assert.equal((await state(b)).role, "drawer", "the guesser of the last round draws now");
+  assert.equal((await state(a)).role, "guesser");
+  await ready(g2);
+  const w2 = await wordOf(g2);
+  assert.notEqual(w2, word);
+  assert.equal((await asUser(a, "select public.guess_draw($1,$2) as r", [g2, w2]))[0].r, "correct");
+  const best = (await state(a)).records.animal;
+  await admin.query("update public.draw_records set best_seconds=0.01 where room_id=$1 and category='animal'", [id]);
+
+  // A lobby can be cancelled to pick another category, and cancelled rounds do not show up.
+  const [{ game: g3 }] = await asUser(a, "select public.start_draw_game($1,'place') as game", [id]);
+  await assert.rejects(asUser(c, "select public.cancel_draw_game($1)", [g3]), /Game unavailable/);
+  await asUser(b, "select public.cancel_draw_game($1)", [g3]);
+  assert.equal((await state(a)).game, g2, "the last real round is shown again");
+
+  // Round 3: time runs out. The late correct answer is refused and the round ends as a timeout.
+  const [{ game: g4 }] = await asUser(a, "select public.start_draw_game($1,'animal') as game", [id]);
+  assert.equal((await state(a)).role, "drawer");
+  await ready(g4);
+  const w4 = await wordOf(g4);
+  await admin.query("update public.draw_games set started_at=started_at-interval '101 seconds', deadline_at=deadline_at-interval '101 seconds' where id=$1", [g4]);
+  assert.equal((await asUser(b, "select public.guess_draw($1,$2) as r", [g4, w4]))[0].r, "closed", "an answer after the deadline is refused");
+  const over = await state(a);
+  assert.equal(over.phase, "done");
+  assert.equal(over.result, "timeout");
+  assert.equal((await state(b)).word, w4, "the word is revealed when time is up");
+  assert.equal((await stroke(a, g4))[0].ok, false);
+  assert.equal((await state(a)).records.animal, 0.01, "a timeout changes no record");
+  // The state call alone also ends an overdue round once, without anyone guessing.
+  const [{ game: g5 }] = await asUser(b, "select public.start_draw_game($1,'thing') as game", [id]);
+  await ready(g5);
+  await admin.query("update public.draw_games set deadline_at=clock_timestamp()-interval '1 second', started_at=clock_timestamp()-interval '101 seconds' where id=$1", [g5]);
+  const [s1, s2] = await Promise.all([state(a), state(b)]);
+  assert.equal(s1.result, "timeout");
+  assert.equal(s2.result, "timeout");
+  assert.equal((await admin.query("select count(*)::int n from public.draw_games where id=$1 and result='timeout' and finished_at is not null", [g5])).rows[0].n, 1);
+  // A slower win than the best time does not replace it.
+  await admin.query("update public.draw_records set best_seconds=0 where room_id=$1 and category='animal'", [id]);
+  const [{ game: g6 }] = await asUser(a, "select public.start_draw_game($1,'animal') as game", [id]);
+  await ready(g6);
+  const drawerOf6 = (await state(a)).role === "drawer" ? a : b;
+  const guesserOf6 = drawerOf6 === a ? b : a;
+  await asUser(guesserOf6, "select public.guess_draw($1,$2)", [g6, await wordOf(g6)]);
+  assert.equal((await state(a)).records.animal, 0, "only a better time replaces the record");
+  assert.ok(best >= 0);
+
+  // Strangers see nothing and change nothing.
+  for (const sql of [
+    "select public.draw_state($1)",
+  ]) await assert.rejects(asUser(c, sql, [id]), /Room unavailable/);
+  for (const sql of ["select public.ready_draw_game($1)", "select public.guess_draw($1,'아무거나')", "select public.undo_draw_stroke($1)", "select public.clear_draw_strokes($1)"])
+    await assert.rejects(asUser(c, sql, [game]), /Game unavailable/);
+  await assert.rejects(stroke(c, game), /Game unavailable/);
+  for (const t of ["draw_games", "draw_strokes", "draw_guesses", "draw_records"])
+    assert.deepEqual(await asUser(c, `select * from public.${t}`), [], t + " is empty for an outsider");
+
+  // Leaving closes the room: nobody can draw or guess any more.
+  await asUser(a, "select public.leave_couple_room($1)", [id]);
+  await assert.rejects(asUser(b, "select public.draw_state($1)", [id]), /Room unavailable/);
 });

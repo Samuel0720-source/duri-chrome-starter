@@ -319,3 +319,49 @@ small { display: block; margin-top: var(--space-3xs); font-weight: 400; color: v
 .button:disabled { background: var(--color-rule); border-color: var(--color-rule); color: var(--color-ink-2); cursor: default; transform: none; }
 @media (max-width: 40rem) { .choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .room-milestones { margin-top: var(--space-2xl); }
+
+/* ---------- Game switch and 100-second drawing quiz ---------- */
+.game-switch { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-bottom: var(--space-lg); }
+.game-switch a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-md); border: 2px solid var(--color-rule); border-radius: var(--radius-pill);
+  background: var(--color-paper); color: var(--color-ink); font-weight: 650; text-decoration: none; }
+.game-switch a:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.game-switch a[aria-current="page"] { background: var(--color-accent-wash); border-color: var(--color-accent); color: var(--color-accent); }
+.game-switch a:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.draw { display: grid; gap: var(--space-lg); max-width: 760px; }
+.draw-intro, .draw-lobby, .draw-again { display: grid; gap: var(--space-md); justify-items: start; }
+.draw-intro h2, .draw-result h2 { margin: 0; }
+.draw-head { display: grid; gap: var(--space-sm); }
+.draw-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.draw-word { font-size: var(--text-lg); }
+.draw-word strong { font-family: var(--font-display); font-weight: 400; font-size: var(--text-display-s); color: var(--color-accent); margin-left: var(--space-xs); }
+.draw-timer { font-size: var(--text-lg); }
+.draw-timer strong { font-family: var(--font-display); font-weight: 400; font-size: var(--text-display-s); color: var(--color-accent); line-height: 1; margin-right: var(--space-2xs); }
+.draw-bar { height: 8px; border-radius: var(--radius-pill); background: var(--color-rule); overflow: hidden; }
+.draw-bar span { display: block; height: 100%; background: var(--color-accent); transform-origin: left center; }
+.draw-stage { display: grid; gap: var(--space-md); }
+.draw-canvas { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; background: var(--color-paper); border: 2px solid var(--color-rule); border-radius: var(--radius-field); touch-action: none; }
+.draw-canvas[data-role="drawer"] { cursor: crosshair; }
+.draw-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm) var(--space-md); }
+.swatches, .widths { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.swatch { width: 36px; height: 36px; min-height: 36px; padding: 0; border: 3px solid var(--color-paper-3); border-radius: var(--radius-pill); box-shadow: 0 0 0 2px var(--color-rule); cursor: pointer; }
+.swatch[data-on="true"] { box-shadow: 0 0 0 3px var(--color-ink); }
+.swatch:focus-visible, .width:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.width { min-height: 36px; padding: 0 var(--space-sm); border: 2px solid var(--color-rule); border-radius: var(--radius-pill); background: var(--color-paper); color: var(--color-ink); font-weight: 650; cursor: pointer; }
+.width[data-on="true"] { border-color: var(--color-accent); background: var(--color-accent-wash); color: var(--color-accent); }
+.draw-guess { display: grid; gap: var(--space-xs); }
+.draw-guess label { font-weight: 700; }
+.draw-guesses { list-style: none; margin: var(--space-sm) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.draw-guesses li { padding: var(--space-2xs) var(--space-sm); border-radius: var(--radius-pill); background: var(--color-paper-2); }
+.draw-guesses li span { color: var(--color-ink-2); font-size: var(--text-sm); margin-left: var(--space-2xs); }
+.draw-guesses li[data-correct="true"] { background: var(--color-accent-wash); color: var(--color-accent); font-weight: 700; }
+.draw-records dl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-sm); margin: var(--space-sm) 0 0; }
+.draw-records dt { color: var(--color-ink-2); font-size: var(--text-sm); }
+.draw-records dd { margin: 0; font-weight: 700; }
+.draw-cats { border: 0; margin: 0; padding: 0; width: 100%; }
+.draw-cats legend { font-weight: 700; margin-bottom: var(--space-sm); }
+.choice-grid.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.draw-total { text-align: right; }
+@media (max-width: 40rem) {
+  .choice-grid.five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .draw-records dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

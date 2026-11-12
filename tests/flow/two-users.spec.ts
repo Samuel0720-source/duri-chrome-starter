@@ -133,6 +133,68 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await pageB.reload();
   await expect(pageB.getByRole("heading", { name: "결과" })).toBeVisible();
 
+  // 3e. Drawing quiz. A draws, B guesses. B's browser must never receive the word before the end.
+  const bTraffic: string[] = [];
+  pageB.on("response", async (res) => {
+    if (!res.url().includes("supabase.co")) return;
+    try { bTraffic.push(await res.text()); } catch { /* redirects and aborted calls have no body */ }
+  });
+  await pageA.getByRole("link", { name: "100초 그림 퀴즈" }).click();
+  await pageB.getByRole("link", { name: "100초 그림 퀴즈" }).click();
+  await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);
+  await expect(pageB.locator("html[data-room-live=on]")).toHaveCount(1);
+  await pageA.getByRole("button", { name: "게임 시작" }).click();
+  await expect(pageA.getByText("나는 그리는 사람")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.getByText("나는 맞히는 사람")).toBeVisible({ timeout: 10_000 });
+  await pageA.getByRole("button", { name: "준비", exact: true }).click();
+  await expect(pageB.getByText("상대는 준비했어요.")).toBeVisible({ timeout: 10_000 });
+  await pageB.getByRole("button", { name: "준비", exact: true }).click();
+  // The 100 seconds start for both. Only the drawer is shown the word.
+  await expect(pageA.locator(".draw-word strong")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.locator(".draw-timer strong")).toBeVisible({ timeout: 10_000 });
+  const word = (await pageA.locator(".draw-word strong").innerText()).trim();
+  expect(word.length).toBeGreaterThan(0);
+  await expect(pageB.locator("body")).not.toContainText(word);
+  const inkPixels = (page: Page) =>
+    page.evaluate(() => {
+      const c = document.querySelector<HTMLCanvasElement>(".draw-canvas")!;
+      const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+      let n = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+      return n;
+    });
+  expect(await inkPixels(pageB)).toBe(0);
+  // A draws one line; B sees it appear without reloading.
+  const board = (await pageA.locator(".draw-canvas").boundingBox())!;
+  await pageA.mouse.move(board.x + board.width * 0.2, board.y + board.height * 0.3);
+  await pageA.mouse.down();
+  await pageA.mouse.move(board.x + board.width * 0.7, board.y + board.height * 0.6, { steps: 12 });
+  await pageA.mouse.up();
+  await expect.poll(() => inkPixels(pageB), { timeout: 10_000 }).toBeGreaterThan(200);
+  // A reload keeps the drawing and the same running clock.
+  await pageB.reload();
+  await expect.poll(() => inkPixels(pageB), { timeout: 10_000 }).toBeGreaterThan(200);
+  const secondsB = Number(await pageB.locator(".draw-timer strong").innerText());
+  expect(secondsB).toBeGreaterThan(0);
+  expect(secondsB).toBeLessThan(100);
+  // The word is nowhere in anything B's browser has received so far.
+  expect(bTraffic.join("\n")).not.toContain(word);
+  // A wrong answer can be retried; both see the attempt.
+  await pageB.getByLabel("정답", { exact: true }).fill("아님아님아님");
+  await pageB.getByRole("button", { name: "제출" }).click();
+  await expect(pageB.getByText("아니에요. 다시 도전해 보세요!")).toBeVisible({ timeout: 10_000 });
+  await expect(pageA.locator(".draw-guesses li", { hasText: "아님아님아님" })).toBeVisible({ timeout: 10_000 });
+  // The right answer ends the round for both.
+  await pageB.getByLabel("정답", { exact: true }).fill(word);
+  await pageB.getByRole("button", { name: "제출" }).click();
+  await expect(pageB.getByRole("heading", { name: "정답!" })).toBeVisible({ timeout: 10_000 });
+  await expect(pageA.getByRole("heading", { name: "정답!" })).toBeVisible({ timeout: 10_000 });
+  await expect(pageA.locator(".draw-records")).toContainText("초");
+  // One more round: the roles swap.
+  await pageA.getByRole("button", { name: "한 판 더" }).click();
+  await expect(pageA.getByText("나는 맞히는 사람")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.getByText("나는 그리는 사람")).toBeVisible({ timeout: 10_000 });
+
   await pageA.getByRole("link", { name: "홈", exact: true }).click();
   await pageB.getByRole("link", { name: "홈", exact: true }).click();
   await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);

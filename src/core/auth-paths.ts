@@ -39,5 +39,10 @@ export function roomErrorMessage(message: string | undefined): string {
   if (text.includes("Already answered")) return "이미 답한 질문이에요. 답은 바꿀 수 없어요.";
   if (text.includes("Game unavailable")) return "끝났거나 찾을 수 없는 게임이에요.";
   if (text.includes("Invalid answer")) return "보기에서 하나씩 골라 주세요.";
+  if (text.includes("Invalid category")) return "고를 수 없는 카테고리예요.";
+  if (text.includes("Invalid guess")) return "정답은 1~30자로 적어 주세요.";
+  if (text.includes("Too many guesses")) return "이번 판에서 시도할 수 있는 횟수를 모두 썼어요.";
+  if (text.includes("Too many strokes")) return "한 판에 그릴 수 있는 선을 모두 썼어요. 전체 지우기를 눌러 보세요.";
+  if (text.includes("Invalid stroke")) return "이 선은 보낼 수 없어요. 다시 그려 주세요.";
   return "잠시 문제가 생겼어요. 다시 시도해 주세요.";
 }
