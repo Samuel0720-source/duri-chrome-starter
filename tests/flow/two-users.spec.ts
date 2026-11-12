@@ -165,6 +165,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
     });
   expect(await inkPixels(pageB)).toBe(0);
   // A draws one line; B sees it appear without reloading.
+  // The board sits below the word and the clock; mouse events outside the window never reach the page.
+  await pageA.locator(".draw-canvas").scrollIntoViewIfNeeded();
   const board = (await pageA.locator(".draw-canvas").boundingBox())!;
   const sent = pageA.waitForResponse((r) => r.url().includes("add_draw_stroke"), { timeout: 10_000 });
   await pageA.mouse.move(board.x + board.width * 0.2, board.y + board.height * 0.3);
