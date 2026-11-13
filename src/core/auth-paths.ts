@@ -48,5 +48,9 @@ export function roomErrorMessage(message: string | undefined): string {
   if (text.includes("No video")) return "먼저 영상 링크를 넣어 주세요.";
   if (text.includes("Too many commands")) return "너무 빨라요. 잠깐 뒤에 다시 눌러 주세요.";
   if (text.includes("Invalid command") || text.includes("Invalid position")) return "이 조작은 보낼 수 없어요.";
+  if (text.includes("Not your turn")) return "지금은 상대 차례예요.";
+  if (text.includes("Occupied")) return "이미 돌이 있는 자리예요. 다른 곳을 골라 주세요.";
+  if (text.includes("Game over")) return "이미 끝난 판이에요. 새 게임을 시작해 주세요.";
+  if (text.includes("Invalid move")) return "그 자리에는 놓을 수 없어요.";
   return "잠시 문제가 생겼어요. 다시 시도해 주세요.";
 }
