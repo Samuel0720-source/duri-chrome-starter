@@ -7,5 +7,5 @@ export default defineConfig({
   workers: 1,
   timeout: 180_000,
   reporter: "list",
-  use: { baseURL: process.env.FLOW_URL ?? "http://localhost:3000", headless: true },
+  use: { actionTimeout: 20_000, navigationTimeout: 30_000, baseURL: process.env.FLOW_URL ?? "http://localhost:3000", headless: true },
 });
