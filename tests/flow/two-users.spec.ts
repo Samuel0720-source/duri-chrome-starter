@@ -90,6 +90,9 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
 
   // 1. A signs in and creates a room.
   const pageA = await signIn(browser, a.email, "/room");
+  pageA.on("pageerror", (e) => console.log("pageA pageerror:", e.message.slice(0, 300)));
+  pageA.on("console", (m) => { if (m.type() === "error") console.log("pageA console error:", m.text().slice(0, 300)); });
+  pageA.on("requestfailed", (r) => console.log("pageA request failed:", r.url().slice(0, 160)));
   await expect(pageA.getByRole("heading", { name: "우리 방 만들기" })).toBeVisible();
   await pageA.getByLabel("함께한 첫날").fill("2026-06-23");
   await pageA.getByRole("button", { name: "방 만들기" }).click();
