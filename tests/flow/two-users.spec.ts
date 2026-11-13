@@ -327,6 +327,43 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await pageA.getByRole("link", { name: "이 활동 열기" }).click();
   await expect(pageA).toHaveURL(/\/room\/game/);
 
+  // Gomoku: A starts, they alternate taps (preview, then confirm); A gets five in a row; the score shows; the rematch swaps who goes first.
+  await pageA.goto("/room/game?g=gomoku");
+  await pageB.goto("/room/game?g=gomoku");
+  await pageA.waitForTimeout(3000); // let the pages finish starting
+  await expect(async () => {
+    await pageA.getByRole("button", { name: "게임 시작" }).click({ timeout: 3000 });
+    await expect(pageA.locator(".gomoku[data-status=open]")).toBeVisible({ timeout: 3000 });
+  }).toPass({ timeout: 25_000 });
+  await expect(pageB.locator(".gomoku[data-status=open][data-turn=partner]")).toBeVisible({ timeout: 10_000 });
+  const stone = async (page: Page, x: number, y: number) => {
+    await page.locator(`.cell[data-x="${x}"][data-y="${y}"]`).click();
+    await page.getByRole("button", { name: "여기에 놓기" }).click();
+  };
+  for (let i = 0; i < 5; i++) {
+    await expect(pageA.locator(".gomoku[data-turn=me]")).toBeVisible({ timeout: 10_000 });
+    await stone(pageA, 3 + i, 5);
+    await expect(pageB.locator(`.cell[data-x="${3 + i}"][data-y="5"][data-stone="black"]`)).toBeVisible({ timeout: 10_000 });
+    if (i < 4) {
+      await expect(pageB.locator(".gomoku[data-turn=me]")).toBeVisible({ timeout: 10_000 });
+      await stone(pageB, i, 10);
+      await expect(pageA.locator(`.cell[data-x="${i}"][data-y="10"][data-stone="white"]`)).toBeVisible({ timeout: 10_000 });
+    }
+  }
+  await expect(pageA.getByText("이겼어요!")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.getByText("졌어요.")).toBeVisible({ timeout: 10_000 });
+  await expect(pageA.locator('.cell[data-win="true"]')).toHaveCount(5);
+  await expect(pageA.getByText("나 1승 · 상대 0승 · 무승부 0")).toBeVisible();
+  await expect(pageB.getByText("나 0승 · 상대 1승 · 무승부 0")).toBeVisible({ timeout: 10_000 });
+  await pageB.reload();
+  await expect(pageB.locator('.cell[data-win="true"]')).toHaveCount(5, { timeout: 10_000 });
+  await pageB.waitForTimeout(3000);
+  await expect(async () => {
+    await pageB.getByRole("button", { name: "재대결 (선공 교대)" }).click({ timeout: 3000 });
+    await expect(pageB.locator(".gomoku[data-status=open][data-turn=me]")).toBeVisible({ timeout: 3000 });
+  }).toPass({ timeout: 25_000 });
+  await expect(pageA.locator(".gomoku[data-status=open][data-turn=partner]")).toBeVisible({ timeout: 10_000 });
+
   await pageA.getByRole("link", { name: "홈", exact: true }).click();
   await pageB.getByRole("link", { name: "홈", exact: true }).click();
   await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);

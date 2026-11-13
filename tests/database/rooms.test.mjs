@@ -164,6 +164,15 @@ before(async () => {
       "utf8",
     ),
   );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611130002_gomoku.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 });
 after(async () => {
   admin?.release();
@@ -857,4 +866,135 @@ test("cost gate: closed by default, room/day and project/month limits, replay is
   await set("paid_enabled = false");
   assert.deepEqual(await reserve(id, "ai", "key-off-00001", 2), { ok: false, reason: "disabled" });
   await set("paid_enabled = false, monthly_budget_cents = 0, price_ai_cents = null, price_places_cents = null");
+});
+
+test("gomoku: turns, occupied cells, resent taps, all four winning directions, six in a row, draw, resign, swap of first move, strangers", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user(),
+    c = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const state = async (who) => (await asUser(who, "select public.gomoku_state($1) as s", [id]))[0].s;
+  const play = (who, game, x, y, req = randomUUID()) =>
+    asUser(who, "select public.play_gomoku($1,$2,$3,$4) as r", [game, x, y, req]).then((r) => r[0].r);
+  const start = async (who) => (await asUser(who, "select public.start_gomoku($1) as g", [id]))[0].g;
+  // Plays black cells in order; white answers on harmless far-away cells (row 14, never five in a row).
+  const run = async (game, black, white, blackCells) => {
+    let w = 0, last;
+    for (let i = 0; i < blackCells.length; i++) {
+      last = await play(black, game, blackCells[i][0], blackCells[i][1]);
+      if (last !== "ok") return { last, at: i };
+      if (i < blackCells.length - 1) await play(white, game, (w * 2) % 15, 14 - (w >= 8 ? 1 : 0)), w++;
+    }
+    return { last, at: blackCells.length - 1 };
+  };
+
+  // Nothing yet; strangers and a lonely room are refused.
+  assert.equal((await state(a)).game, null);
+  await assert.rejects(asUser(c, "select public.gomoku_state($1)", [id]), /Room unavailable/);
+  await assert.rejects(asUser(c, "select public.start_gomoku($1)", [id]), /Room unavailable/);
+  await assert.rejects(asUser(a, "select * from public.gomoku_moves"), /permission denied/);
+  await assert.rejects(asUser(a, "select public.play_gomoku($1,0,0,$2)", [randomUUID(), randomUUID()]), /Room unavailable/);
+
+  // Game 1: the starter is black. Starting twice gives the same game.
+  const g1 = await start(a);
+  assert.equal(await start(b), g1, "both pressing start opens one game");
+  const s0 = await state(b);
+  assert.deepEqual([s0.me, s0.turn, s0.status], ["white", "partner", "open"]);
+  assert.equal((await state(a)).turn, "me");
+
+  // Turns, occupied cell, range, resent tap.
+  await assert.rejects(play(b, g1, 7, 7), /Not your turn/);
+  await assert.rejects(play(a, g1, 15, 0), /Invalid move/);
+  await assert.rejects(play(a, g1, 0, -1), /Invalid move/);
+  const req = randomUUID();
+  assert.equal(await play(a, g1, 7, 7, req), "ok");
+  assert.equal(await play(a, g1, 7, 7, req), "duplicate", "the same tap again places nothing");
+  assert.equal((await state(a)).moves.length, 1);
+  await assert.rejects(play(a, g1, 8, 8), /Not your turn/);
+  await assert.rejects(play(b, g1, 7, 7), /Occupied/);
+  const mid = await state(b);
+  assert.deepEqual(mid.moves, [{ n: 1, x: 7, y: 7, by: "partner" }]);
+  assert.equal(mid.turn, "me");
+
+  // Two taps at the same instant from the player whose turn it is: one lands, the other is refused.
+  const same = await Promise.allSettled([play(b, g1, 1, 1), play(b, g1, 2, 2)]);
+  assert.equal(same.filter((r) => r.status === "fulfilled").length, 1);
+  assert.equal(same.filter((r) => r.status === "rejected").length, 1);
+  assert.match(String(same.find((r) => r.status === "rejected").reason), /Not your turn/);
+
+  // Four in a row is not a win; the fifth is. (g1 now holds 3 stones, so resign to start clean games.)
+  assert.equal(await asUser(a, "select public.resign_gomoku($1) as r", [g1]).then((r) => r[0].r), "ok");
+  const afterResign = await state(a);
+  assert.deepEqual([afterResign.status, afterResign.winner, afterResign.myWins, afterResign.partnerWins], ["won", "partner", 0, 1]);
+  assert.equal(await asUser(a, "select public.resign_gomoku($1) as r", [g1]).then((r) => r[0].r), "closed");
+  await assert.rejects(play(b, g1, 10, 10), /Game over/);
+
+  // Game 2: black swaps to B. Each winning direction, in its own game (the loser resigns nothing, the game just ends).
+  const lines = {
+    horizontal: [[3, 5], [4, 5], [5, 5], [6, 5], [7, 5]],
+    vertical: [[5, 3], [5, 4], [5, 5], [5, 6], [5, 7]],
+    diagonal: [[3, 3], [4, 4], [5, 5], [6, 6], [7, 7]],
+    anti: [[7, 3], [6, 4], [5, 5], [4, 6], [3, 7]],
+  };
+  let blackUser = b, whiteUser = a, game = await start(b);
+  assert.equal((await state(b)).me, "black", "first move swaps to the other player");
+  for (const [name, cells] of Object.entries(lines)) {
+    // four stones: no win yet
+    const four = await run(game, blackUser, whiteUser, cells.slice(0, 4));
+    assert.equal(four.last, "ok", name + " four in a row is not a win");
+    const winner = await play(whiteUser, game, 14, 13).then(() => play(blackUser, game, cells[4][0], cells[4][1]));
+    assert.equal(winner, "won", name);
+    const done = await state(blackUser);
+    assert.deepEqual([done.status, done.winner], ["won", "me"]);
+    assert.equal(done.winLine.length, 5, name + " winning line is highlighted");
+    await assert.rejects(play(whiteUser, game, 0, 0), /Game over/);
+    [blackUser, whiteUser] = [whiteUser, blackUser];
+    game = await start(blackUser === a ? a : b);
+    assert.equal((await state(blackUser)).me, "black", "black swaps every game");
+  }
+
+  // Six in a row (free rules): filling the gap between 4 and 2 stones makes six, and six wins.
+  const six = await run(game, blackUser, whiteUser, [[0, 0], [1, 0], [2, 0], [3, 0], [5, 0]]);
+  assert.equal(six.last, "ok");
+  await play(whiteUser, game, 14, 12);
+  assert.equal(await play(blackUser, game, 4, 0), "won");
+  assert.equal((await state(blackUser)).winLine.length, 6, "overline counts and is shown whole");
+  [blackUser, whiteUser] = [whiteUser, blackUser];
+
+  // Draw: a full board with no five. The board is filled by the pattern, the last stone goes through the function.
+  game = await start(blackUser);
+  const color = (x, y) => (Math.floor(x / 2) + y) % 2;
+  const cells = [];
+  for (let y = 0; y < 15; y++) for (let x = 0; x < 15; x++) cells.push([x, y]);
+  const class0 = cells.filter(([x, y]) => color(x, y) === 0), class1 = cells.filter(([x, y]) => color(x, y) === 1);
+  const [blackCells, whiteCells] = class0.length === 113 ? [class0, class1] : [class1, class0];
+  assert.equal(blackCells.length, 113);
+  const lastCell = blackCells[blackCells.length - 1];
+  let n = 0;
+  const rows = [];
+  for (let i = 0; i < 112; i++) {
+    rows.push([game, ++n, blackCells[i][0], blackCells[i][1], blackUser, randomUUID()]);
+    rows.push([game, ++n, whiteCells[i][0], whiteCells[i][1], whiteUser, randomUUID()]);
+  }
+  for (const r of rows) await admin.query("insert into public.gomoku_moves(game_id,n,x,y,user_id,request_id) values($1,$2,$3,$4,$5,$6)", r);
+  await admin.query("update public.gomoku_games set move_count = 224 where id=$1", [game]);
+  assert.equal(await play(blackUser, game, lastCell[0], lastCell[1]), "draw");
+  const drawn = await state(a);
+  assert.deepEqual([drawn.status, drawn.winner, drawn.draws], ["draw", null, 1]);
+  assert.equal(drawn.moves.length, 225);
+  await assert.rejects(play(whiteUser, game, 0, 0), /Game over/);
+
+  // Score: every win was counted once.
+  const total = (await admin.query("select coalesce(sum(wins),0)::int s from public.gomoku_scores where room_id=$1", [id])).rows[0].s;
+  assert.equal(total, 1 + 4 + 1, "1 resign win + 4 lines + 1 six");
+
+  // Signals carry no coordinates.
+  const signals = (await admin.query("select payload from realtime.sent where topic=$1 and event='gomoku'", ["room:" + id])).rows;
+  assert.ok(signals.length > 10);
+  assert.ok(signals.every((s) => Object.keys(s.payload).join() === "change"));
+
+  // A stranger cannot play a move even with the game id.
+  const g = await start(a);
+  await assert.rejects(play(c, g, 0, 0), /Room unavailable/);
+  await assert.rejects(asUser(c, "select public.resign_gomoku($1)", [g]), /Room unavailable/);
 });
