@@ -276,9 +276,12 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await pageA.getByRole("button", { name: "같이 재생" }).click();
   await expect(pageB.locator(".watch[data-watch=playing]")).toBeVisible({ timeout: 10_000 });
   // Someone presses pause on the video itself (not our button): the partner follows.
+  // (A moment after a partner's change the screen ignores its own player events, so wait that out first.)
+  await pageB.waitForTimeout(1600);
   await pageB.evaluate(() => (window as any).__yt.userPause());
   await expect(pageA.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
   // …and drags its progress bar: the partner follows to the same spot.
+  await pageA.waitForTimeout(1600);
   await pageA.evaluate(() => (window as any).__yt.userSeek(100));
   await expect.poll(async () => Math.abs((await playerTime(pageB)) - 100), { timeout: 10_000 }).toBeLessThan(1.5);
   // A reload comes back to the saved spot, paused; then playing, it comes back to the live spot.
