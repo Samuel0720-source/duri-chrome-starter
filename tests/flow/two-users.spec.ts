@@ -295,6 +295,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect.poll(() => playerState(pageB), { timeout: 10_000 }).toBe(1);
   await expect.poll(async () => Math.abs((await playerTime(pageA)) - (await playerTime(pageB))), { timeout: 10_000 }).toBeLessThan(2.5);
   // An embed-restricted video: a clear message and a way forward (another link).
+  await pageA.getByRole("button", { name: "준비 취소" }).click();
+  await expect(pageA.getByRole("button", { name: "준비됐어요" })).toBeEnabled({ timeout: 10_000 });
   await pageA.evaluate(() => (window as any).__yt.fail(150));
   await expect(pageA.getByText("퍼가기가 막혀 있어서")).toBeVisible();
   await expect(pageA.getByRole("link", { name: "유튜브에서 열기" })).toBeVisible();
