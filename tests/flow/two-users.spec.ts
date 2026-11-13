@@ -314,25 +314,12 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   // Helper: conditions in Korean give only activities that fit, and the AI switch is honestly off.
   await pageA.getByRole("link", { name: "도우미", exact: true }).click();
   await expect(pageA.getByText("AI 연결은 꺼져 있어요")).toBeVisible({ timeout: 10_000 });
-  await pageA.waitForTimeout(3000);
-  console.log("DIAG", JSON.stringify(await pageA.evaluate(() => {
-    const el = document.querySelector("#helper-text") as HTMLElement | null;
-    const scripts = [...document.scripts].map((s) => s.src.split("/").slice(-1)[0].slice(0, 40));
-    return {
-      url: location.href,
-      hasInput: !!el,
-      fiber: el ? Object.keys(el).filter((k) => k.startsWith("__react")) : null,
-      nextData: typeof (window as any).next,
-      scripts: scripts.length,
-      failedRes: performance.getEntriesByType("resource").filter((r: any) => r.responseStatus >= 400).map((r) => r.name.slice(-60)),
-      htmlLen: document.documentElement.outerHTML.length,
-    };
-  })));
+  await pageA.waitForTimeout(3000); // let the page finish starting before typing
   // The page may still be starting up; typing before that is lost, so type again until the button wakes up.
   await expect(async () => {
     await pageA.getByLabel("원하는 조건").fill("10분, 경쟁은 싫어");
     await expect(pageA.getByRole("button", { name: "추천받기" })).toBeEnabled({ timeout: 1000 });
-  }).toPass({ timeout: 15_000 });
+  }).toPass({ timeout: 25_000 });
   await pageA.getByRole("button", { name: "추천받기" }).click();
   await expect(pageA.getByRole("heading", { name: "상대 선택 맞히기" })).toBeVisible();
   await expect(pageA.getByRole("heading", { name: "100초 그림 퀴즈" })).toHaveCount(0);
