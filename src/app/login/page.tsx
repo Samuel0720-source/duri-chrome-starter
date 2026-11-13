@@ -52,6 +52,12 @@ export default async function LoginPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const { next, sent, error, deleted } = await searchParams;
+  // Already signed in on this device: no second sign-in.
+  if (!deleted) {
+    const supabase = await serverClient();
+    const user = supabase ? (await supabase.auth.getUser()).data.user : null;
+    if (user) redirect(safeNext(next));
+  }
   return (
     <main className="wrap auth">
       <header className="top">

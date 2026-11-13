@@ -94,6 +94,16 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   pageA.on("console", (m) => { if (m.type() === "error") console.log("pageA console error:", m.text().slice(0, 300)); });
   pageA.on("requestfailed", (r) => console.log("pageA request failed:", r.url().slice(0, 160)));
   await expect(pageA.getByRole("heading", { name: "우리 방 만들기" })).toBeVisible();
+  // Staying signed in: the sign-in cookie is not a session cookie (it outlives closing the browser),
+  // and the home page and the login page send a signed-in person straight to the room.
+  const authCookies = (await pageA.context().cookies()).filter((c) => c.name.includes("auth-token"));
+  expect(authCookies.length).toBeGreaterThan(0);
+  for (const c of authCookies) expect(c.expires).toBeGreaterThan(Date.now() / 1000 + 300 * 24 * 3600);
+  await pageA.goto("/");
+  await expect(pageA).toHaveURL(/\/room$/);
+  await pageA.goto("/login?next=/room");
+  await expect(pageA).toHaveURL(/\/room$/);
+  await expect(pageA.getByRole("heading", { name: "우리 방 만들기" })).toBeVisible();
   await pageA.getByLabel("함께한 첫날").fill("2026-06-23");
   await pageA.getByRole("button", { name: "방 만들기" }).click();
   await expect(pageA.getByText("아직 상대가 들어오지 않았어요.")).toBeVisible();
@@ -231,13 +241,34 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await pageB.getByRole("button", { name: "제출" }).click();
   await expect(pageB.getByText("아니에요. 다시 도전해 보세요!")).toBeVisible({ timeout: 10_000 });
   await expect(pageA.locator(".draw-guesses li", { hasText: "아님아님아님" })).toBeVisible({ timeout: 10_000 });
-  // The right answer ends the round for both.
+  // The right answer scores 1 on both screens, and the next word starts on a clean board.
   await pageB.getByLabel("정답", { exact: true }).fill(word);
   await pageB.getByRole("button", { name: "제출" }).click();
-  await expect(pageB.getByRole("heading", { name: "정답!" })).toBeVisible({ timeout: 10_000 });
-  await expect(pageA.getByRole("heading", { name: "정답!" })).toBeVisible({ timeout: 10_000 });
-  await expect(pageA.locator(".draw-records")).toContainText("초");
-  // One more round: the roles swap.
+  await expect(pageB.getByText("정답! 다음 문제예요.")).toBeVisible({ timeout: 10_000 });
+  await expect(pageA.getByTestId("draw-score")).toHaveText("1", { timeout: 10_000 });
+  await expect(pageB.getByTestId("draw-score")).toHaveText("1");
+  await expect(pageA.locator(".draw-word strong")).not.toHaveText(word, { timeout: 10_000 });
+  const word2 = (await pageA.locator(".draw-word strong").innerText()).trim();
+  await expect.poll(() => inkPixels(pageB), { timeout: 10_000 }).toBe(0);
+  await expect(pageB.locator(".draw-word-list li", { hasText: word })).toBeVisible();
+  // Pass: a new word, the score stays.
+  await pageA.getByRole("button", { name: "패스" }).click();
+  await expect(pageA.locator(".draw-word strong")).not.toHaveText(word2, { timeout: 10_000 });
+  await expect(pageB.locator(".draw-word-list li", { hasText: word2 })).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.getByTestId("draw-score")).toHaveText("1");
+  const word3 = (await pageA.locator(".draw-word strong").innerText()).trim();
+  await pageB.waitForTimeout(1500);
+  expect(bTraffic.join("\n")).not.toContain(word3);
+  // Time up (moved by the test instead of waiting 100 s): both see the count, the record is 1.
+  const { data: open } = await admin.from("draw_games").select("id").is("result", null).eq("drawer", a.id);
+  for (const row of open ?? [])
+    await admin.from("draw_games").update({ started_at: new Date(Date.now() - 101_000).toISOString(), deadline_at: new Date(Date.now() - 1000).toISOString() }).eq("id", row.id);
+  await pageA.reload();
+  await expect(pageA.getByTestId("draw-final")).toHaveText("1개", { timeout: 10_000 });
+  await expect(pageB.getByTestId("draw-final")).toHaveText("1개", { timeout: 15_000 });
+  await expect(pageA.locator(".draw-records")).toContainText("1개");
+  // One more round where A chooses that B draws.
+  await pageA.getByText("상대가 그려요").click();
   await pageA.getByRole("button", { name: "한 판 더" }).click();
   await expect(pageA.getByText("나는 맞히는 사람")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.getByText("나는 그리는 사람")).toBeVisible({ timeout: 10_000 });
@@ -364,42 +395,46 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   }).toPass({ timeout: 25_000 });
   await expect(pageA.locator(".gomoku[data-status=open][data-turn=partner]")).toBeVisible({ timeout: 10_000 });
 
-  // Mini golf: A drags the ball with the mouse, B uses the buttons, both at the same time; both screens see both balls roll and stop.
+  // Mini golf: both drag at the same time; each screen shows both live counters going up and both balls stopping.
   await pageA.goto("/room/game?g=golf");
   await pageB.goto("/room/game?g=golf");
   await pageA.waitForTimeout(3000);
   await expect(async () => {
-    await pageA.getByRole("button", { name: "1홀 시작" }).click({ timeout: 3000 });
+    await pageA.getByRole("button", { name: "3홀 시작" }).click({ timeout: 3000 });
     await expect(pageA.locator(".golf[data-status=open]")).toBeVisible({ timeout: 3000 });
   }).toPass({ timeout: 25_000 });
   await expect(pageB.locator(".golf[data-status=open]")).toBeVisible({ timeout: 10_000 });
-  const canvasA = pageA.getByTestId("golf-canvas");
-  await expect(canvasA).toHaveAttribute("data-can-shoot", "true", { timeout: 10_000 });
-  await expect(pageB.getByTestId("golf-canvas")).toHaveAttribute("data-can-shoot", "true", { timeout: 10_000 });
-  await canvasA.scrollIntoViewIfNeeded();
-  await pageA.evaluate(() => window.scrollBy(0, 150)); // keep the whole course inside the window
-  const box = (await canvasA.boundingBox())!;
-  expect(box.y).toBeGreaterThan(0);
-  expect(box.y + box.height).toBeLessThan(pageA.viewportSize()!.height);
-  const at = (lx: number, ly: number) => ({ x: box.x + (lx / 1000) * box.width, y: box.y + (ly / 600) * box.height });
-  // Ball starts at the tee (120, 300): pull left to (30, 300) and let go, the ball flies right.
-  await pageA.mouse.move(at(120, 300).x, at(120, 300).y);
-  await pageA.mouse.down();
-  await pageA.mouse.move(at(70, 300).x, at(70, 300).y, { steps: 4 });
-  await pageA.mouse.move(at(30, 300).x, at(30, 300).y, { steps: 4 });
-  await pageA.mouse.up();
-  await pageB.locator(".golf details summary").click();
-  await pageB.getByRole("button", { name: "치기" }).click();
-  await expect(pageA.locator(".golf .hint").first()).toContainText("나 1타", { timeout: 10_000 });
-  await expect(pageA.locator(".golf .hint").first()).toContainText("상대 1타", { timeout: 10_000 });
-  await expect(pageB.locator(".golf .hint").first()).toContainText("나 1타", { timeout: 10_000 });
-  // Both balls come to rest on both screens, and a refresh shows the same strokes.
+  await expect(pageA.getByRole("button", { name: "치기" })).toHaveCount(0);
+  await expect(pageA.getByTestId("golf-count-me")).toHaveText("0");
+  // Drag anywhere on the course: press, pull back to the left, let go -> the ball flies right.
+  const drag = async (page: Page) => {
+    const canvas = page.getByTestId("golf-canvas");
+    await expect(canvas).toHaveAttribute("data-can-shoot", "true", { timeout: 10_000 });
+    await canvas.scrollIntoViewIfNeeded();
+    await page.evaluate(() => window.scrollBy(0, 120));
+    const box = (await canvas.boundingBox())!;
+    expect(box.y + box.height).toBeLessThan(page.viewportSize()!.height + 1);
+    const y = box.y + box.height * 0.5;
+    await page.mouse.move(box.x + box.width * 0.5, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.45, y, { steps: 4 });
+    await page.mouse.move(box.x + box.width * 0.4, y, { steps: 4 });
+    await page.mouse.up();
+  };
+  await Promise.all([drag(pageA), drag(pageB)]);
+  await expect(pageA.getByTestId("golf-count-me")).toHaveText("1", { timeout: 10_000 });
+  await expect(pageA.getByTestId("golf-count-partner")).toHaveText("1", { timeout: 10_000 });
+  await expect(pageB.getByTestId("golf-count-me")).toHaveText("1", { timeout: 10_000 });
+  await expect(pageB.getByTestId("golf-count-partner")).toHaveText("1", { timeout: 10_000 });
+  // Both balls come to rest on both screens; A hits again and B's screen counts it live.
   await expect(pageA.getByTestId("golf-canvas")).toHaveAttribute("data-me-moving", "false", { timeout: 15_000 });
   await expect(pageA.getByTestId("golf-canvas")).toHaveAttribute("data-partner-moving", "false", { timeout: 15_000 });
   await expect(pageB.getByTestId("golf-canvas")).toHaveAttribute("data-me-moving", "false", { timeout: 15_000 });
+  await drag(pageA);
+  await expect(pageB.getByTestId("golf-count-partner")).toHaveText("2", { timeout: 10_000 });
   await pageB.reload();
-  await expect(pageB.locator(".golf .hint").first()).toContainText("나 1타", { timeout: 10_000 });
-  await expect(pageB.locator(".golf .hint").first()).toContainText("상대 1타");
+  await expect(pageB.getByTestId("golf-count-me")).toHaveText("1", { timeout: 10_000 });
+  await expect(pageB.getByTestId("golf-count-partner")).toHaveText("2");
   // Giving up ends the game for both; no record is written.
   await pageA.getByRole("button", { name: "이 판 그만두기" }).click();
   await pageA.getByRole("button", { name: "그만둘게요" }).click();
