@@ -1,22 +1,44 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ballAt, aimFromDrag, aimFromButtons, bestLine, ballLine, MAX_PULL } from "../../src/core/golf.ts";
+import { ballAt, aimFromDrag, bestLine, runningStrokes, updateClock, replayDelay, MAX_PULL, TICK_MS } from "../../src/core/golf.ts";
 
-const ball = (o = {}) => ({ x: 300, y: 100, strokes: 1, total: 0, holed: false, shotNo: 1, startedMs: 1000, untilMs: 2000, path: [[100, 100], [200, 100], [300, 100]], ...o });
+// A path with one point per tick: 3 ticks long, 100 px per tick.
+const ball = (o = {}) => ({ x: 400, y: 100, strokes: 1, total: 0, holed: false, water: false, shotNo: 1, startedMs: 1000, untilMs: 1000 + 3 * TICK_MS, path: [[100, 100], [200, 100], [300, 100], [400, 100]], ...o });
 
 test("a ball at rest stays at its stored place", () => {
-  assert.deepEqual(ballAt(ball({ path: null, startedMs: null }), 5000), { x: 300, y: 100, moving: false });
-  assert.deepEqual(ballAt(ball(), 2000), { x: 300, y: 100, moving: false });
+  assert.deepEqual(ballAt(ball({ path: null, startedMs: null }), 5000), { x: 400, y: 100, moving: false });
+  assert.deepEqual(ballAt(ball(), 3 * TICK_MS), { x: 400, y: 100, moving: false });
 });
 
-test("replay walks the stored path on the shared clock", () => {
-  assert.deepEqual(ballAt(ball(), 500), { x: 100, y: 100, moving: true }, "before the start: at the first point");
-  assert.deepEqual(ballAt(ball(), 1500), { x: 200, y: 100, moving: true }, "halfway: middle point");
-  assert.deepEqual(ballAt(ball(), 1250), { x: 150, y: 100, moving: true }, "quarter: between points");
+test("replay: path[i] is the place after i ticks", () => {
+  assert.deepEqual(ballAt(ball(), -50), { x: 100, y: 100, moving: true });
+  assert.deepEqual(ballAt(ball(), TICK_MS), { x: 200, y: 100, moving: true });
+  const half = ballAt(ball(), 1.5 * TICK_MS);
+  assert.ok(Math.abs(half.x - 250) < 1e-9);
 });
 
-test("two screens with the same data and clock agree to the pixel", () => {
-  for (let t = 900; t <= 2100; t += 37) assert.deepEqual(ballAt(ball(), t), ballAt(ball(), t));
+test("water: during the roll it goes into the lake, at the end it is back at the start", () => {
+  const wet = ball({ x: 100, y: 100, water: true });
+  assert.equal(ballAt(wet, 2 * TICK_MS).x, 300);
+  assert.deepEqual(ballAt(wet, 10 * TICK_MS), { x: 100, y: 100, moving: false });
+});
+
+test("clock: the shortest round trip wins, so a slow reply cannot shift the ball", () => {
+  let c = updateClock(null, 10_100, 0, 200); // rtt 200 -> offset 10_000
+  assert.equal(c.offset, 10_000);
+  c = updateClock(c, 10_900, 500, 1300); // rtt 800, would say 10_000 too, but is ignored anyway
+  assert.equal(c.rtt, 200);
+  c = updateClock(c, 12_040, 2000, 2060); // rtt 60 replaces it
+  assert.equal(c.rtt, 60);
+  assert.equal(c.offset, 10_010);
+  const stale = updateClock(c, 80_000, 70_000, 70_900); // a minute later any reading is fine
+  assert.equal(stale.rtt, 900);
+});
+
+test("a late replay starts from the beginning instead of jumping", () => {
+  assert.equal(replayDelay(1300, 1000), 300);
+  assert.equal(replayDelay(900, 1000), 0, "early: nothing to absorb");
+  assert.equal(replayDelay(4000, 1000), 0, "very late (a refresh): show where it is");
 });
 
 test("slingshot flies opposite to the pull; tiny pulls do nothing; power caps at 1", () => {
@@ -30,13 +52,8 @@ test("slingshot flies opposite to the pull; tiny pulls do nothing; power caps at
   assert.equal(aimFromDrag(b, { x: -500, y: 100 }).power, 1);
 });
 
-test("button aim and texts", () => {
-  assert.deepEqual(aimFromButtons(90, 50), { angle: Math.PI / 2, power: 0.5 });
-  assert.equal(aimFromButtons(0, 1).power, 0.05);
-  assert.equal(aimFromButtons(0, 500).power, 1);
+test("live counter adds finished holes; records text", () => {
+  assert.equal(runningStrokes(ball({ total: 3, strokes: 2 })), 5);
   assert.match(bestLine({}), /아직 기록이 없어요/);
-  assert.equal(bestLine({ 1: 2, 3: 15 }), "우리의 기록: 1홀 최고 2타, 3홀 최고 15타");
-  assert.equal(ballLine(ball({ holed: true, strokes: 3 }), 0), "3타로 컵인");
-  assert.equal(ballLine(ball(), 1500), "1타, 굴러가는 중");
-  assert.equal(ballLine(ball({ path: null, startedMs: null, strokes: 0 }), 0), "0타");
+  assert.equal(bestLine({ 3: 12, 9: 45 }), "우리 최고 기록 (둘이 합친 타수): 3홀 12타 · 9홀 45타");
 });

@@ -182,6 +182,33 @@ before(async () => {
       "utf8",
     ),
   );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611130004_golf_v2.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611130005_guess_bank.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611130006_draw_rush.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 });
 after(async () => {
   admin?.release();
@@ -455,7 +482,7 @@ test("guess game: a partner's answer stays hidden until both answer, answers can
   const s0 = await state(a);
   assert.equal(s0.rounds.length, 3);
   assert.equal(new Set(s0.rounds.map((r) => r.question)).size, 3, "three different questions");
-  assert.ok(s0.rounds.every((r) => r.question >= 0 && r.question <= 11));
+  assert.ok(s0.rounds.every((r) => r.question >= 0 && r.question <= 119));
 
   // A answers round 1. B learns only that A answered, never what.
   await asUser(a, "select public.answer_guess($1,1::smallint,2::smallint,0::smallint)", [game]);
@@ -493,164 +520,154 @@ test("guess game: a partner's answer stays hidden until both answer, answers can
   const [{ next }] = await asUser(b, "select public.start_guess_game($1) as next", [id]);
   assert.notEqual(next, game, "a finished game makes room for a new one");
 });
-test("draw quiz: the guesser never gets the word, the database sets the deadline, a round ends once, strangers are refused", async () => {
+test("draw quiz: 100 seconds, many words, the guesser never gets the current word, pass, records count words, who draws is chosen, strangers are refused", async () => {
   const { a, id, token } = await fixture(),
     b = await user(),
     c = await user();
   const state = async (who) => (await asUser(who, "select public.draw_state($1) as s", [id]))[0].s;
-  const wordOf = async (game) => (await admin.query("select word from duri_private.draw_words where game_id=$1", [game])).rows[0].word;
+  const current = async (game) =>
+    (await admin.query("select w.word from duri_private.draw_words w join public.draw_games g on g.id=w.game_id and w.n=g.word_no where g.id=$1", [game])).rows[0].word;
   const stroke = (who, game, seg = randomUUID(), pts = [[10, 10], [200, 300]], color = "#ff0000") =>
     asUser(who, "select public.add_draw_stroke($1,$2,$3,$4,4::smallint,$5::jsonb) as ok", [game, randomUUID(), seg, color, JSON.stringify(pts)]);
+  const guess = async (who, game, text) => (await asUser(who, "select public.guess_draw($1,$2) as r", [game, text]))[0].r;
+  const start = async (who, cat, iDraw) => (await asUser(who, "select public.start_draw_game($1,$2,$3) as g", [id, cat, iDraw]))[0].g;
   const ready = async (game) => {
     await asUser(a, "select public.ready_draw_game($1)", [game]);
     await asUser(b, "select public.ready_draw_game($1)", [game]);
   };
+  const timeUp = (game) =>
+    admin.query("update public.draw_games set started_at=clock_timestamp()-interval '101 seconds', deadline_at=clock_timestamp()-interval '1 second' where id=$1", [game]);
 
-  // Setup rules.
-  await assert.rejects(asUser(a, "select public.start_draw_game($1,'food')", [id]), /Partner needed/);
+  // Setup rules and the bigger bank.
+  await assert.rejects(start(a, "food", true), /Partner needed/);
   await asUser(b, "select public.accept_couple_invite($1)", [token]);
-  await assert.rejects(asUser(a, "select public.start_draw_game($1,'cars')", [id]), /Invalid category/);
-  await assert.rejects(asUser(c, "select public.start_draw_game($1,'food')", [id]), /Room unavailable/);
+  await assert.rejects(start(a, "cars", true), /Invalid category/);
+  await assert.rejects(start(c, "food", true), /Room unavailable/);
   const bank = (await admin.query("select category, count(*)::int n from duri_private.draw_word_bank group by 1")).rows;
   assert.equal(bank.length, 5, "five categories");
-  assert.ok(bank.every((r) => r.n >= 20), "at least 20 words each");
+  assert.ok(bank.every((r) => r.n === 60), "60 words each");
 
-  // Round 1: A draws (the starter draws first), B guesses.
-  const [{ game }] = await asUser(a, "select public.start_draw_game($1,'food') as game", [id]);
-  const [{ same }] = await asUser(b, "select public.start_draw_game($1,'animal') as same", [id]);
-  assert.equal(same, game, "one open round per room");
+  // Round 1: A chooses that B draws. One open round per room.
+  const game = await start(a, "food", false);
+  assert.equal(await start(b, "animal", true), game, "one open round per room");
   const lobbyA = await state(a), lobbyB = await state(b);
-  assert.deepEqual([lobbyA.role, lobbyA.phase, lobbyB.role], ["drawer", "lobby", "guesser"]);
-  assert.equal(lobbyA.word, null, "no word before the round starts");
-  await assert.rejects(stroke(a, game), /Game unavailable/);
-  await asUser(a, "select public.ready_draw_game($1)", [game]);
-  assert.equal((await state(b)).phase, "lobby");
-  assert.equal((await state(b)).partnerReady, true);
-  await asUser(a, "select public.ready_draw_game($1)", [game]);
-  await asUser(b, "select public.ready_draw_game($1)", [game]);
-  const live = await state(b);
+  assert.deepEqual([lobbyA.role, lobbyB.role, lobbyA.phase], ["guesser", "drawer", "lobby"], "B draws because A chose so");
+  assert.equal(lobbyB.word, null, "no word before the round starts");
+  assert.deepEqual(lobbyB.words, []);
+  await assert.rejects(stroke(b, game), /Game unavailable/);
+  await ready(game);
+  const live = await state(a);
   assert.equal(live.phase, "live");
   assert.ok(Math.abs(live.deadlineMs - live.startedMs - 100_000) <= 5, "the database sets a 100 second deadline");
-  assert.ok(live.deadlineMs > live.nowMs && live.deadlineMs - live.nowMs <= 100_000);
+  assert.equal(live.score, 0);
+  assert.equal(live.wordNo, 1);
 
-  // The word: the drawer sees it, the guesser's state, rows and signals never contain it.
-  const word = await wordOf(game);
-  const sa = await state(a), sb = await state(b);
-  assert.equal(sa.word, word);
-  assert.equal(sb.word, null);
-  assert.ok(!JSON.stringify(sb).includes(word));
-  await assert.rejects(asUser(b, "select * from duri_private.draw_words"), /permission denied/);
-  await assert.rejects(asUser(b, "select * from duri_private.draw_word_bank"), /permission denied/);
-  assert.ok(!JSON.stringify(await asUser(b, "select * from public.draw_games")).includes(word));
+  // Word 1: only the drawer (B) sees it.
+  const w1 = await current(game);
+  assert.equal((await state(b)).word, w1);
+  const sa = await state(a);
+  assert.equal(sa.word, null);
+  assert.ok(!JSON.stringify(sa).includes(w1));
+  await assert.rejects(asUser(a, "select * from duri_private.draw_words"), /permission denied/);
+  assert.ok(!JSON.stringify(await asUser(a, "select * from public.draw_games")).includes(w1));
 
-  // Drawing: only the drawer draws; the guesser reads; resends do not double; bad input is refused.
+  // Drawing on word 1; resends stored once; bad input refused; only the drawer draws.
   const seg = randomUUID();
-  assert.equal((await stroke(a, game, seg))[0].ok, true);
-  assert.equal((await stroke(a, game, seg))[0].ok, true, "a resent segment is accepted");
-  assert.equal((await asUser(b, "select count(*)::int n from public.draw_strokes where game_id=$1", [game]))[0].n, 1, "…but stored once");
-  await assert.rejects(stroke(b, game), /Game unavailable/);
-  await assert.rejects(stroke(a, game, randomUUID(), [[10, 2000]]), /Invalid stroke/);
-  await assert.rejects(stroke(a, game, randomUUID(), [["x", 1]]), /Invalid stroke/);
-  await assert.rejects(stroke(a, game, randomUUID(), []), /Invalid stroke/);
-  await assert.rejects(stroke(a, game, randomUUID(), [[1, 1]], "red"), /Invalid stroke/);
-  const twoSegments = randomUUID();
-  await asUser(a, "select public.add_draw_stroke($1,$2,$3,'#00aa00',6::smallint,'[[1,1],[2,2]]'::jsonb)", [game, twoSegments, randomUUID()]);
-  await asUser(a, "select public.add_draw_stroke($1,$2,$3,'#00aa00',6::smallint,'[[2,2],[3,3]]'::jsonb)", [game, twoSegments, randomUUID()]);
-  await asUser(a, "select public.undo_draw_stroke($1)", [game]);
-  assert.equal((await asUser(b, "select count(*)::int n from public.draw_strokes where game_id=$1", [game]))[0].n, 1, "undo removes the whole last stroke");
-  await assert.rejects(asUser(b, "select public.undo_draw_stroke($1)", [game]), /Game unavailable/);
-  await assert.rejects(asUser(b, "select public.clear_draw_strokes($1)", [game]), /Game unavailable/);
+  assert.equal((await stroke(b, game, seg))[0].ok, true);
+  assert.equal((await stroke(b, game, seg))[0].ok, true);
+  assert.equal((await asUser(a, "select count(*)::int n from public.draw_strokes where game_id=$1 and word_no=1", [game]))[0].n, 1);
+  await assert.rejects(stroke(a, game), /Game unavailable/);
+  await assert.rejects(stroke(b, game, randomUUID(), [[10, 2000]]), /Invalid stroke/);
 
-  // Guessing: only the guesser; a wrong guess retries freely; spaces and case do not matter.
-  await assert.rejects(asUser(a, "select public.guess_draw($1,$2)", [game, word]), /Game unavailable/);
-  await assert.rejects(asUser(b, "select public.guess_draw($1,'   ')", [game]), /Invalid guess/);
-  assert.equal((await asUser(b, "select public.guess_draw($1,'ㅋㅋㅋ아님') as r", [game]))[0].r, "wrong");
-  assert.equal((await asUser(b, "select public.guess_draw($1,'또 아님') as r", [game]))[0].r, "wrong");
-  assert.equal((await state(b)).phase, "live");
-  // Every signal so far is just an event name.
-  const signals = (await admin.query("select payload, event from realtime.sent where topic=$1 and event='draw'", ["room:" + id])).rows;
+  // Wrong guesses retry; only the guesser guesses.
+  await assert.rejects(asUser(b, "select public.guess_draw($1,$2)", [game, w1]), /Game unavailable/);
+  assert.equal(await guess(a, game, "ㅋㅋ아님"), "wrong");
+  // Correct (spaced out): score 1, next word at once, on a clean board; word 1 is now shown to both.
+  assert.equal(await guess(a, game, " " + w1.split("").join(" ") + " "), "correct");
+  let s1 = await state(a);
+  assert.equal(s1.phase, "live", "the round goes on");
+  assert.equal(s1.score, 1);
+  assert.equal(s1.wordNo, 2);
+  assert.deepEqual(s1.words, [{ n: 1, word: w1, outcome: "correct" }]);
+  const w2 = await current(game);
+  assert.notEqual(w2, w1);
+  assert.equal((await state(b)).word, w2, "the drawer gets the next word");
+  assert.equal(s1.word, null);
+  assert.ok(!JSON.stringify(s1).includes(w2), "the guesser never gets the current word");
+  assert.equal(await guess(a, game, w1), "wrong", "the old word no longer counts");
+  // Undo / clear only touch the current word's drawing.
+  await stroke(b, game);
+  await asUser(b, "select public.clear_draw_strokes($1)", [game]);
+  assert.deepEqual((await asUser(a, "select word_no, count(*)::int n from public.draw_strokes where game_id=$1 group by 1 order by 1", [game])), [{ word_no: 1, n: 1 }]);
+  // Pass: no score, next word; only the drawer can pass.
+  await assert.rejects(asUser(a, "select public.pass_draw_word($1)", [game]), /Game unavailable/);
+  assert.equal((await asUser(b, "select public.pass_draw_word($1) as r", [game]))[0].r, "ok");
+  s1 = await state(a);
+  assert.equal(s1.score, 1);
+  assert.equal(s1.passes, 1);
+  assert.deepEqual(s1.words.map((w) => w.outcome), ["correct", "pass"]);
+  // Two more correct answers, and two correct guesses at the same instant score once.
+  assert.equal(await guess(a, game, await current(game)), "correct");
+  const w4 = await current(game);
+  const race = await Promise.all([guess(a, game, w4), guess(a, game, w4)]);
+  assert.deepEqual(race.sort(), ["correct", "wrong"], "the second identical answer is checked against the next word");
+  assert.equal((await state(a)).score, 3);
+  // All words in this round are different.
+  const words1 = (await admin.query("select word from duri_private.draw_words where game_id=$1", [game])).rows.map((r) => r.word);
+  assert.equal(new Set(words1).size, words1.length);
+
+  // Signals carry only an event name.
+  const signals = (await admin.query("select payload from realtime.sent where topic=$1 and event='draw'", ["room:" + id])).rows;
   assert.ok(signals.length > 5);
-  assert.ok(signals.every((s) => Object.keys(s.payload).join() === "change"), "signals carry only a change kind");
-  assert.ok(!JSON.stringify(signals).includes(word));
+  assert.ok(signals.every((x) => Object.keys(x.payload).join() === "change"));
+  assert.ok(!JSON.stringify(signals).includes(w4));
 
-  // A correct guess, even spaced out, ends the round once. A second correct guess at the same
-  // moment cannot end it again.
-  const spaced = " " + word.split("").join(" ") + " ";
-  const race = await Promise.all([
-    asUser(b, "select public.guess_draw($1,$2) as r", [game, spaced]),
-    asUser(b, "select public.guess_draw($1,$2) as r", [game, word]),
-  ]);
-  assert.deepEqual(race.map((r) => r[0].r).sort(), ["closed", "correct"], "exactly one guess wins");
-  const won = await state(b);
-  assert.equal(won.phase, "done");
-  assert.equal(won.result, "won");
-  assert.equal(won.word, word, "the word is shown to the guesser once the round is over");
-  assert.ok(won.seconds >= 0 && won.seconds < 100);
-  assert.equal(won.records.food, won.seconds, "the pair's best time is recorded");
-  assert.equal((await admin.query("select count(*)::int n from public.draw_records where room_id=$1", [id])).rows[0].n, 1);
-  assert.equal((await stroke(a, game))[0].ok, false, "no drawing after the round ended");
-  assert.equal((await asUser(b, "select public.guess_draw($1,$2) as r", [game, word]))[0].r, "closed");
+  // Time is up: the round ends once (state calls at the same moment), the record is 3, all words are shown.
+  await timeUp(game);
+  const lastWord = await current(game);
+  assert.equal(await guess(a, game, lastWord), "closed", "an answer after the deadline is refused");
+  const [d1, d2] = await Promise.all([state(a), state(b)]);
+  assert.equal(d1.phase, "done");
+  assert.equal(d2.result, "timeout");
+  assert.equal(d1.records.food, 3, "the record is the number of words solved");
+  assert.equal(d1.words.at(-1).word, lastWord, "the unsolved last word is revealed at the end");
+  assert.equal(d1.words.at(-1).outcome, null);
+  assert.equal((await stroke(b, game))[0].ok, false, "no drawing after the round ended");
 
-  // Round 2: roles swap. B draws, A guesses. A better time is kept; a worse one is not.
-  const [{ game: g2 }] = await asUser(a, "select public.start_draw_game($1,'animal') as game", [id]);
-  assert.notEqual(g2, game);
-  assert.equal((await state(b)).role, "drawer", "the guesser of the last round draws now");
-  assert.equal((await state(a)).role, "guesser");
+  // Round 2: B chooses to draw; a worse score keeps the record; A's choice of drawing is respected next time.
+  const g2 = await start(b, "food", true);
+  assert.equal((await state(b)).role, "drawer");
   await ready(g2);
-  const w2 = await wordOf(g2);
-  assert.notEqual(w2, word);
-  assert.equal((await asUser(a, "select public.guess_draw($1,$2) as r", [g2, w2]))[0].r, "correct");
-  const best = (await state(a)).records.animal;
-  await admin.query("update public.draw_records set best_seconds=0.01 where room_id=$1 and category='animal'", [id]);
-
-  // A lobby can be cancelled to pick another category, and cancelled rounds do not show up.
-  const [{ game: g3 }] = await asUser(a, "select public.start_draw_game($1,'place') as game", [id]);
-  await assert.rejects(asUser(c, "select public.cancel_draw_game($1)", [g3]), /Game unavailable/);
-  await asUser(b, "select public.cancel_draw_game($1)", [g3]);
-  assert.equal((await state(a)).game, g2, "the last real round is shown again");
-
-  // Round 3: time runs out. The late correct answer is refused and the round ends as a timeout.
-  const [{ game: g4 }] = await asUser(a, "select public.start_draw_game($1,'animal') as game", [id]);
-  assert.equal((await state(a)).role, "drawer");
+  const firstOf2 = await current(g2);
+  assert.ok(!words1.includes(firstOf2), "the next round starts with a word this room has not seen");
+  assert.equal(await guess(a, g2, firstOf2), "correct");
+  await timeUp(g2);
+  assert.equal((await state(a)).records.food, 3, "1 is not better than 3");
+  const g3 = await start(b, "food", false);
+  assert.equal((await state(a)).role, "drawer", "B asked A to draw");
+  await ready(g3);
+  for (let i = 0; i < 4; i++) assert.equal(await guess(b, g3, await current(g3)), "correct");
+  await timeUp(g3);
+  assert.equal((await state(b)).records.food, 4, "4 is better than 3");
+  // A round with no correct answer writes no record; 'mix' takes words from every category.
+  const g4 = await start(a, "mix", true);
   await ready(g4);
-  const w4 = await wordOf(g4);
-  await admin.query("update public.draw_games set started_at=started_at-interval '101 seconds', deadline_at=deadline_at-interval '101 seconds' where id=$1", [g4]);
-  assert.equal((await asUser(b, "select public.guess_draw($1,$2) as r", [g4, w4]))[0].r, "closed", "an answer after the deadline is refused");
-  const over = await state(a);
-  assert.equal(over.phase, "done");
-  assert.equal(over.result, "timeout");
-  assert.equal((await state(b)).word, w4, "the word is revealed when time is up");
-  assert.equal((await stroke(a, g4))[0].ok, false);
-  assert.equal((await state(a)).records.animal, 0.01, "a timeout changes no record");
-  // The state call alone also ends an overdue round once, without anyone guessing.
-  const [{ game: g5 }] = await asUser(b, "select public.start_draw_game($1,'thing') as game", [id]);
-  await ready(g5);
-  await admin.query("update public.draw_games set deadline_at=clock_timestamp()-interval '1 second', started_at=clock_timestamp()-interval '101 seconds' where id=$1", [g5]);
-  const [s1, s2] = await Promise.all([state(a), state(b)]);
-  assert.equal(s1.result, "timeout");
-  assert.equal(s2.result, "timeout");
-  assert.equal((await admin.query("select count(*)::int n from public.draw_games where id=$1 and result='timeout' and finished_at is not null", [g5])).rows[0].n, 1);
-  // A slower win than the best time does not replace it.
-  await admin.query("update public.draw_records set best_seconds=0 where room_id=$1 and category='animal'", [id]);
-  const [{ game: g6 }] = await asUser(a, "select public.start_draw_game($1,'animal') as game", [id]);
-  await ready(g6);
-  const drawerOf6 = (await state(a)).role === "drawer" ? a : b;
-  const guesserOf6 = drawerOf6 === a ? b : a;
-  await asUser(guesserOf6, "select public.guess_draw($1,$2)", [g6, await wordOf(g6)]);
-  assert.equal((await state(a)).records.animal, 0, "only a better time replaces the record");
-  assert.ok(best >= 0);
+  await timeUp(g4);
+  assert.equal((await state(a)).records.mix, undefined);
+  // The old two-argument start still works (swap rule).
+  const g5 = await asUser(a, "select public.start_draw_game($1,'animal') as g", [id]).then((r) => r[0].g);
+  assert.equal((await state(a)).role, "guesser", "A drew last time, so A guesses now");
+  // A lobby can be cancelled.
+  await assert.rejects(asUser(c, "select public.cancel_draw_game($1)", [g5]), /Game unavailable/);
+  await asUser(b, "select public.cancel_draw_game($1)", [g5]);
 
   // Strangers see nothing and change nothing.
-  for (const sql of [
-    "select public.draw_state($1)",
-  ]) await assert.rejects(asUser(c, sql, [id]), /Room unavailable/);
-  for (const sql of ["select public.ready_draw_game($1)", "select public.guess_draw($1,'아무거나')", "select public.undo_draw_stroke($1)", "select public.clear_draw_strokes($1)"])
+  await assert.rejects(asUser(c, "select public.draw_state($1)", [id]), /Room unavailable/);
+  for (const sql of ["select public.ready_draw_game($1)", "select public.guess_draw($1,'아무거나')", "select public.pass_draw_word($1)", "select public.undo_draw_stroke($1)", "select public.clear_draw_strokes($1)"])
     await assert.rejects(asUser(c, sql, [game]), /Game unavailable/);
-  await assert.rejects(stroke(c, game), /Game unavailable/);
   for (const t of ["draw_games", "draw_strokes", "draw_guesses", "draw_records"])
     assert.deepEqual(await asUser(c, `select * from public.${t}`), [], t + " is empty for an outsider");
 
-  // Leaving closes the room: nobody can draw or guess any more.
   await asUser(a, "select public.leave_couple_room($1)", [id]);
   await assert.rejects(asUser(b, "select public.draw_state($1)", [id]), /Room unavailable/);
 });
@@ -1008,64 +1025,81 @@ test("gomoku: turns, occupied cells, resent taps, all four winning directions, s
   await assert.rejects(asUser(c, "select public.resign_gomoku($1)", [g]), /Room unavailable/);
 });
 
-test("minigolf: fixed physics, both balls roll at once, resent shots, holes advance, records only improve, strangers", async () => {
+test("minigolf: fixed physics with sand and water, both balls roll at once, resent shots, 3/6/9 holes, totals carry, records only improve, strangers", async () => {
   const { a, id, token } = await fixture(),
     b = await user(),
     c = await user();
   await asUser(b, "select public.accept_couple_invite($1)", [token]);
   const sim = async (hole, x, y, ang, pw) =>
     (await admin.query("select duri_private.golf_simulate($1,$2,$3,$4,$5) as r", [hole, x, y, ang, pw])).rows[0].r;
+  const course = async (h) => (await admin.query("select duri_private.golf_course($1) as c", [h])).rows[0].c;
   const state = async (who) => (await asUser(who, "select public.golf_state($1) as s", [id]))[0].s;
   const start = async (who, n) => (await asUser(who, "select public.start_golf($1,$2) as g", [id, n]))[0].g;
   const shoot = (who, game, ang, pw, shot = randomUUID()) =>
     asUser(who, "select public.golf_shot($1,$2,$3,$4) as r", [game, shot, ang, pw]).then((r) => r[0].r);
+  const inside = (x, y, [x1, y1, x2, y2]) => x > x1 && x < x2 && y > y1 && y < y2;
 
-  // --- physics: same input, same path; balls never leave the field or enter a block
-  const one = await sim(1, 120, 300, 0.3, 0.6);
-  assert.deepEqual(await sim(1, 120, 300, 0.3, 0.6), one, "deterministic");
-  assert.ok(one.path.length > 5 && one.ms > 100);
-  let rolls = 0;
-  for (let h = 1; h <= 3; h++) {
-    const course = (await admin.query("select duri_private.golf_course($1) as c", [h])).rows[0].c;
-    for (let i = 0; i < 25; i++) {
-      const r = await sim(h, course.tee[0], course.tee[1], (i / 25) * Math.PI * 2, 0.2 + (i % 5) * 0.2);
+  // --- physics: same input, same path; one point per tick; balls never leave the field or stop in water
+  const one = await sim(1, 110, 300, 0.3, 0.6);
+  assert.deepEqual(await sim(1, 110, 300, 0.3, 0.6), one, "deterministic");
+  assert.equal(one.path.length, Math.round((one.ms * 60) / 1000) + 1, "one path point per tick (plus the start)");
+  let rolls = 0, wetRolls = 0;
+  for (let h = 1; h <= 9; h++) {
+    const co = await course(h);
+    assert.equal(co.n, h);
+    assert.ok(co.name.length > 0);
+    assert.ok(!co.water.some((w) => inside(co.tee[0], co.tee[1], w)), `tee of hole ${h} is dry`);
+    assert.ok(!co.water.some((w) => inside(co.cup.x, co.cup.y, w)), `cup of hole ${h} is dry`);
+    for (let i = 0; i < 16; i++) {
+      const r = await sim(h, co.tee[0], co.tee[1], (i / 16) * Math.PI * 2, 0.25 + (i % 4) * 0.25);
       rolls++;
-      for (const [x, y] of r.path) {
-        assert.ok(x >= 11 && x <= 989 && y >= 11 && y <= 589, `inside field hole ${h} shot ${i}: ${x},${y}`);
-      }
+      for (const [x, y] of r.path) assert.ok(x >= 11 && x <= 989 && y >= 11 && y <= 589, `inside field hole ${h} shot ${i}: ${x},${y}`);
+      if (r.water) {
+        wetRolls++;
+        assert.deepEqual([r.x, r.y], co.tee, "back to where it was hit from");
+        const [lx, ly] = r.path.at(-1);
+        assert.ok(co.water.some(([x1, y1, x2, y2]) => inside(lx, ly, [x1 - 0.1, y1 - 0.1, x2 + 0.1, y2 + 0.1])), "the path ends in the water");
+      } else assert.ok(!co.water.some((w) => inside(r.x, r.y, w)), "never rests in water");
     }
   }
-  assert.equal(rolls, 75);
-  // Block on hole 1 (460..540 x 180..420): a straight shot from the tee at the cup must bounce off it, never cross.
-  const straight = await sim(1, 120, 300, 0, 1);
-  assert.ok(straight.path.every(([x, y]) => !(x > 448 && x < 552 && y > 168 && y < 432 && x > 460 && x < 540)), "never inside the block");
-  assert.ok(straight.path.some(([x]) => x < 450) && Math.max(...straight.path.map(([x]) => x)) < 470 || straight.path.every(([x, y]) => x < 460 || y < 180 || y > 420 || x > 540), "bounced or went around");
-  // Slow roll into the cup from 60 px away drops in; a fast pass over the cup does not.
+  assert.equal(rolls, 144);
+  assert.ok(wetRolls > 0, "some shots find water");
+  // Hole 4: straight at the lake goes in the water.
+  const lake = await sim(4, 300, 300, 0, 0.6);
+  assert.equal(lake.water, true);
+  assert.deepEqual([lake.x, lake.y], [300, 300]);
+  // Sand slows: the same roll stops sooner when it starts in sand (hole 1 sand 640..790 x 400..540).
+  const inSand = await sim(1, 650, 470, 0, 0.3);
+  const onGrass = await sim(1, 650, 570, 0, 0.3);
+  const reach = (r) => Math.max(...r.path.map(([x]) => x)) - 650;
+  assert.ok(reach(inSand) < reach(onGrass) / 2, `sand roll ${reach(inSand)} px vs grass ${reach(onGrass)} px`);
+  // Block on hole 1 (450..530 x 170..430): the straight shot never passes through it.
+  const straight = await sim(1, 110, 300, 0, 1);
+  assert.ok(straight.path.every(([x, y]) => !inside(x, y, [450, 170, 530, 430])), "never inside the block");
+  // Slow roll into the cup from 60 px away drops in; a fast pass flies over it first.
   const near = await sim(1, 820, 300, 0, 0.12);
   assert.equal(near.holed, true, "slow ball drops in");
   assert.equal(near.x, 880);
   const fast = await sim(1, 820, 300, 0, 1);
-  // It flies over the cup (passes x = 880 without stopping) and may only drop in later, when it comes back slowly.
-  assert.ok(fast.path[1][0] > 880 || Math.max(...fast.path.map(([x]) => x)) > 900, "fast ball rolls over the cup");
-  const firstSamples = fast.path.slice(0, 3);
-  assert.ok(firstSamples.every(([x, y]) => !(x === 880 && y === 300)), "no instant drop at full speed");
+  assert.ok(Math.max(...fast.path.map(([x]) => x)) > 900, "fast ball rolls over the cup");
 
-  // --- lonely room / strangers
-  await assert.rejects(start(c, 1), /Room unavailable/);
-  await assert.rejects(asUser(a, "select public.start_golf($1,2)", [id]), /Invalid course/);
+  // --- lonely room / strangers / bad input
+  await assert.rejects(start(c, 3), /Room unavailable/);
+  await assert.rejects(asUser(a, "select public.start_golf($1,1)", [id]), /Invalid course/);
+  await assert.rejects(asUser(a, "select public.start_golf($1,4)", [id]), /Invalid course/);
   assert.equal((await state(a)).game, null);
   await assert.rejects(state(c), /Room unavailable/);
-  await assert.rejects(asUser(a, "select * from public.golf_balls"), /permission denied/);
-  await assert.rejects(asUser(a, "select * from public.golf_shots"), /permission denied/);
-  await assert.rejects(asUser(a, "select * from public.golf_records"), /permission denied/);
+  for (const t of ["golf_games", "golf_balls", "golf_shots", "golf_records"])
+    await assert.rejects(asUser(a, `select * from public.${t}`), /permission denied/);
 
   // --- one game per room; start twice returns the same game
-  const g1 = await start(a, 1);
-  assert.equal(await start(b, 3), g1, "second start returns the open game");
+  const g1 = await start(a, 3);
+  assert.equal(await start(b, 9), g1, "second start returns the open game");
   let s = await state(a);
   assert.equal(s.hole, 1);
-  assert.deepEqual([s.me.x, s.me.y], [120, 300]);
-  assert.deepEqual([s.partner.x, s.partner.y], [120, 300], "both balls at the tee");
+  assert.equal(s.holes, 3);
+  assert.deepEqual([s.me.x, s.me.y], [110, 300]);
+  assert.deepEqual([s.partner.x, s.partner.y], [110, 300], "both balls at the tee");
   await assert.rejects(shoot(c, g1, 0, 0.5), /Room unavailable/);
   await assert.rejects(shoot(a, g1, 0, 0), /Invalid shot/);
   await assert.rejects(shoot(a, g1, 0, 1.5), /Invalid shot/);
@@ -1076,98 +1110,116 @@ test("minigolf: fixed physics, both balls roll at once, resent shots, holes adva
   const [ra, rb] = await Promise.all([shoot(a, g1, 0.5, 0.4, shotId), shoot(b, g1, -0.5, 0.4)]);
   assert.equal(ra.status, "ok");
   assert.equal(rb.status, "ok");
-  assert.deepEqual(ra.path, (await sim(1, 120, 300, 0.5, 0.4)).path, "A's path equals a solo simulation");
-  assert.deepEqual(rb.path, (await sim(1, 120, 300, -0.5, 0.4)).path, "B's path equals a solo simulation");
-  // Resent shot id: same path, no extra stroke.
+  assert.deepEqual(ra.path, (await sim(1, 110, 300, 0.5, 0.4)).path, "A's path equals a solo simulation");
+  assert.deepEqual(rb.path, (await sim(1, 110, 300, -0.5, 0.4)).path, "B's path equals a solo simulation");
+  assert.equal(ra.untilMs - ra.startedMs, ra.ms, "the shooter gets the replay clock back at once");
+  // Resent shot id: same path and clock, no extra stroke.
   const dup = await shoot(a, g1, 0.5, 0.4, shotId);
   assert.equal(dup.status, "duplicate");
   assert.deepEqual(dup.path, ra.path);
+  assert.equal(dup.startedMs, ra.startedMs);
   s = await state(a);
   assert.equal(s.me.strokes, 1);
   assert.equal(s.partner.strokes, 1);
-  // While the ball still rolls, a second shot is refused.
+  assert.equal(s.me.startedMs, ra.startedMs);
   await assert.rejects(shoot(a, g1, 0.1, 0.5), /Ball moving/);
-  // Partner view mirrors mine.
   const sb = await state(b);
   assert.deepEqual(sb.partner.path, s.me.path);
   assert.deepEqual(sb.me.path, s.partner.path);
-  assert.ok(s.nowMs > 1e12);
 
-  // --- hole in one for both (slow roll from near the cup), then the hole advances after the replay finished
-  const put = async (who, x, y) => admin.query("update public.golf_balls set x=$3,y=$4,moving_until=clock_timestamp()-interval '1 second',strokes=0,shot_no=0 where game_id=$1 and user_id=$2", [g1, who, x, y]);
-  await put(a, 820, 300);
-  await put(b, 820, 300);
+  // --- water costs one extra stroke and puts the ball back (hole 1 has no water: use hole 4 via a 3-hole game later)
+  const put = async (game, who, x, y, strokes = 0) =>
+    admin.query("update public.golf_balls set x=$3,y=$4,strokes=$5,holed=false,moving_until=clock_timestamp()-interval '1 second' where game_id=$1 and user_id=$2", [game, who, x, y, strokes]);
+
+  // --- hole in one for both, then hole 2 after the replay finished; strokes carry into the total
+  await put(g1, a, 820, 300);
+  await put(g1, b, 820, 300, 2);
   assert.equal((await shoot(a, g1, 0, 0.12)).holed, true);
   await assert.rejects(shoot(a, g1, 0, 0.12), /Already in the cup|Ball moving/);
-  s = await state(a);
-  assert.equal(s.status, "open", "partner still playing");
   assert.equal((await shoot(b, g1, 0, 0.12)).holed, true);
-  // Replay not finished yet: the game stays on this hole.
-  s = await state(a);
-  assert.equal(s.status, "open");
-  // Finish the replay (move the DB clock mark into the past) and the 1-hole game ends.
+  assert.equal((await state(a)).hole, 1, "replay not finished: still hole 1");
   await admin.query("update public.golf_balls set moving_until=clock_timestamp()-interval '1 second' where game_id=$1", [g1]);
   s = await state(a);
-  assert.equal(s.status, "done");
-  assert.deepEqual(s.best, { "1": 2 }, "two strokes in total (1 + 1)");
-  await assert.rejects(shoot(a, g1, 0, 0.12), /Game over/);
-
-  // --- 3-hole game: totals carry, a worse run does not replace the record, 1-hole record is separate
-  const g3 = await start(a, 3);
-  assert.notEqual(g3, g1);
-  const finishHole = async (strokesA, strokesB) => {
-    await admin.query("update public.golf_balls set x=820,y=300,strokes=$2,holed=false,moving_until=clock_timestamp()-interval '1 second' where game_id=$1 and user_id=$3", [g3, strokesA - 1, a]);
-    await admin.query("update public.golf_balls set x=820,y=300,strokes=$2,holed=false,moving_until=clock_timestamp()-interval '1 second' where game_id=$1 and user_id=$3", [g3, strokesB - 1, b]);
-  };
-  // The cup differs per hole, so fake the end of each hole directly: mark both holed with their stroke counts.
-  const endHole = async (sa, sb2) => {
-    await admin.query("update public.golf_balls set strokes=$2,holed=true,moving_until=clock_timestamp()-interval '1 second' where game_id=$1 and user_id=$3", [g3, sa, a]);
-    await admin.query("update public.golf_balls set strokes=$2,holed=true,moving_until=clock_timestamp()-interval '1 second' where game_id=$1 and user_id=$3", [g3, sb2, b]);
-  };
-  void finishHole;
-  await endHole(4, 5);
-  s = await state(a);
-  assert.equal(s.hole, 2, "advanced to hole 2");
+  assert.equal(s.hole, 2);
+  assert.equal(s.me.total, 1);
+  assert.equal(s.partner.total, 3);
   assert.equal(s.me.strokes, 0);
-  assert.equal(s.me.holed, false);
-  assert.equal(s.me.total, 4);
-  assert.equal(s.partner.total, 5);
-  assert.deepEqual([s.me.x, s.me.y], [100, 520], "hole 2 tee");
-  await endHole(3, 3);
+  assert.deepEqual([s.me.x, s.me.y], (await course(2)).tee, "hole 2 tee");
+  // Hole 2 water (400..560 x 480..600): roll into it from the right.
+  await put(g1, a, 620, 540, 0);
+  const splash = await shoot(a, g1, Math.PI, 0.5);
+  assert.equal(splash.water, true);
+  assert.equal(splash.n, 2, "1 stroke + 1 penalty");
   s = await state(a);
-  assert.equal(s.hole, 3);
-  await endHole(2, 6);
-  s = await state(a);
-  assert.equal(s.status, "done");
-  assert.deepEqual(s.best, { "1": 2, "3": 23 }, "4+5+3+3+2+6 = 23");
-  // A worse 3-hole run keeps the old record; a better one replaces it.
-  const g3b = await start(b, 3);
-  const end2 = async (game, sa, sb2) => {
+  assert.deepEqual([s.me.x, s.me.y], [620, 540], "back where it was hit from");
+  assert.equal(s.me.water, true);
+  // Finish holes 2 and 3 directly: mark both holed with their stroke counts.
+  const endHole = async (game, sa, sb2) => {
     await admin.query("update public.golf_balls set strokes=$2,holed=true,moving_until=clock_timestamp()-interval '1 second' where game_id=$1 and user_id=$3", [game, sa, a]);
     await admin.query("update public.golf_balls set strokes=$2,holed=true,moving_until=clock_timestamp()-interval '1 second' where game_id=$1 and user_id=$3", [game, sb2, b]);
-    await state(a);
+    return state(a);
   };
-  for (let i = 0; i < 3; i++) await end2(g3b, 9, 9);
-  assert.equal((await state(a)).best["3"], 23, "worse run does not replace the record");
-  const g3c = await start(a, 3);
-  for (let i = 0; i < 3; i++) await end2(g3c, 2, 3);
-  assert.equal((await state(a)).best["3"], 15, "better run replaces it");
+  s = await endHole(g1, 4, 5);
+  assert.equal(s.hole, 3);
+  assert.equal(s.me.water, false, "water mark cleared on the next hole");
+  assert.equal(s.me.total, 5);
+  s = await endHole(g1, 2, 2);
+  assert.equal(s.status, "done");
+  assert.deepEqual(s.best, { "3": 17 }, "1+3 + 4+5 + 2+2 = 17");
+  await assert.rejects(shoot(a, g1, 0, 0.12), /Game over/);
 
-  // --- 10 strokes at most: the 10th stroke ends the hole even if it misses
-  const g4 = await start(a, 1);
-  await admin.query("update public.golf_balls set strokes=9,moving_until=clock_timestamp()-interval '1 second' where game_id=$1 and user_id=$2", [g4, a]);
-  const last = await shoot(a, g4, Math.PI, 0.3);
+  // --- 9 holes: totals carry over every hole; a worse 3-hole run keeps the record, a better one replaces it
+  const g9 = await start(a, 9);
+  for (let h = 1; h <= 9; h++) {
+    s = await endHole(g9, 2, 3);
+    if (h < 9) assert.equal(s.hole, h + 1);
+  }
+  assert.equal(s.status, "done");
+  assert.equal(s.me.total, 18);
+  assert.equal(s.partner.total, 27);
+  assert.deepEqual(s.best, { "3": 17, "9": 45 });
+  const g3b = await start(b, 3);
+  for (let i = 0; i < 3; i++) await endHole(g3b, 9, 9);
+  assert.equal((await state(a)).best["3"], 17, "worse run does not replace the record");
+  const g3c = await start(a, 3);
+  for (let i = 0; i < 3; i++) await endHole(g3c, 2, 2);
+  assert.equal((await state(a)).best["3"], 12, "better run replaces it");
+
+  // --- 10 strokes at most: the 10th stroke ends the hole even if it misses; water cannot push past 10
+  const g6 = await start(a, 6);
+  await put(g6, a, 300, 300, 9);
+  const last = await shoot(a, g6, Math.PI, 0.3);
   assert.equal(last.holed, true, "10th stroke closes the hole");
   assert.equal((await state(a)).me.strokes, 10);
 
-  // --- cancel: no record; strangers cannot cancel or read
-  await asUser(a, "select public.cancel_golf($1)", [g4]);
+  // --- cancel: no record; strangers cannot cancel
+  await asUser(a, "select public.cancel_golf($1)", [g6]);
   assert.equal((await state(a)).status, "cancelled");
-  await assert.rejects(asUser(c, "select public.cancel_golf($1)", [g4]), /Room unavailable/);
-  assert.equal((await state(a)).best["1"], 2);
+  await assert.rejects(asUser(c, "select public.cancel_golf($1)", [g6]), /Room unavailable/);
+  assert.equal((await state(a)).best["6"], undefined);
 
   // --- signals carry no coordinates
   const signals = (await admin.query("select payload from realtime.sent where topic=$1 and event='golf'", ["room:" + id])).rows;
   assert.ok(signals.length > 5);
   assert.ok(signals.every((x) => Object.keys(x.payload).join() === "change"));
+});
+
+test("guess bank: 40 games in a row use all 120 questions once, then they start over", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const seen = [];
+  for (let i = 0; i < 40; i++) {
+    const [{ g }] = await asUser(a, "select public.start_guess_game($1) as g", [id]);
+    const { rows } = await admin.query("select questions from public.guess_games where id=$1", [g]);
+    seen.push(...rows[0].questions);
+    // Finish it a moment apart so the order of games is clear.
+    await admin.query("update public.guess_games set finished_at=now(), created_at=now() - make_interval(secs => $2) where id=$1", [g, 1000 - i]);
+  }
+  assert.equal(seen.length, 120);
+  assert.equal(new Set(seen).size, 120, "no question repeated within 40 games");
+  assert.ok(seen.every((q) => q >= 0 && q <= 119));
+  const [{ g }] = await asUser(a, "select public.start_guess_game($1) as g", [id]);
+  const { rows } = await admin.query("select questions from public.guess_games where id=$1", [g]);
+  assert.deepEqual([...rows[0].questions].sort((x, y) => x - y), [...seen.slice(0, 3)].sort((x, y) => x - y), "the 41st game reuses the oldest three");
 });

@@ -2,18 +2,25 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
-  drawCategories, categoryLabel, clockOffset, secondsLeft, timeShare, strokesToPaths, isValidSegment, formatSeconds, DRAW_SECONDS,
+  drawCategories, categoryLabel, clockOffset, secondsLeft, timeShare, strokesToPaths, isValidSegment, formatSeconds, recordText, DRAW_SECONDS,
 } from "../../src/core/draw.ts";
 
-test("categories match the database and every category has at least 20 words", async () => {
-  const sql = await readFile(new URL("../../supabase/migrations/202611120001_draw_quiz.sql", import.meta.url), "utf8");
-  assert.deepEqual(drawCategories.map((c) => c.value), ["food", "animal", "thing", "place", "date"]);
+test("categories match the database and every category has 60 words", async () => {
+  const sql =
+    (await readFile(new URL("../../supabase/migrations/202611120001_draw_quiz.sql", import.meta.url), "utf8")) +
+    (await readFile(new URL("../../supabase/migrations/202611130006_draw_rush.sql", import.meta.url), "utf8"));
+  assert.deepEqual(drawCategories.map((c) => c.value), ["food", "animal", "thing", "place", "date", "mix"]);
   for (const { value } of drawCategories) {
     assert.ok(sql.includes("'" + value + "'"), value);
-    const words = sql.match(new RegExp("\\('" + value + "', '[^']+'", "g")) ?? [];
-    assert.ok(words.length >= 20, value + " has " + words.length);
+    if (value === "mix") continue; // takes words from all five
+    const words = (sql.match(new RegExp("\\('" + value + "', '[^']+'", "g")) ?? []).map((m) => m.split("'")[3])
+      .filter((w) => !drawCategories.some((c) => c.value === w)); // skip "check (category in ('food', 'animal', ...))"
+    assert.equal(new Set(words).size, 60, value + " has " + new Set(words).size);
   }
   assert.equal(categoryLabel("date"), "데이트 활동");
+  assert.equal(categoryLabel("mix"), "전부 섞기");
+  assert.equal(recordText(undefined), "없음");
+  assert.equal(recordText(7), "7개");
   assert.match(sql, /interval '100 seconds'/);
   assert.equal(DRAW_SECONDS, 100);
 });

@@ -2,6 +2,8 @@ import { HomeLive } from "./preview";
 import { InstallControl } from "./install";
 import { roomToday } from "../core/dates";
 import { defaultZone } from "../core/preview";
+import { redirect } from "next/navigation";
+import { serverClient } from "../lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +13,12 @@ const steps = [
   { title: "같은 숫자를 함께 보기", line: "상대가 들어오면 두 화면이 새로고침 없이 같은 날을 세요." },
 ];
 
-export default function Home() {
+// Signed in on this device already? Go straight to the room: the sign-in cookie lasts 400 days
+// and is only removed by "로그아웃". The Chrome popup's "전체 웹앱 열기" lands here.
+export default async function Home() {
+  const supabase = await serverClient();
+  const user = supabase ? (await supabase.auth.getUser()).data.user : null;
+  if (user) redirect("/room");
   return (
     <>
       <header className="nav">

@@ -4,20 +4,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorMessage } from "../../../core/auth-paths";
 import {
-  BOARD_H, BOARD_W, DRAW_SECONDS, clockOffset, categoryLabel, drawCategories, formatSeconds, isValidSegment,
-  penColors, penWidths, secondsLeft, strokesToPaths, timeShare,
+  BOARD_H, BOARD_W, DRAW_SECONDS, clockOffset, categoryLabel, drawCategories, isValidSegment,
+  penColors, penWidths, recordText, secondsLeft, strokesToPaths, timeShare,
   type DrawCategory, type DrawGuess, type DrawRecords, type DrawState, type Point, type Stroke,
 } from "../../../core/draw";
 
 type Pen = { id: string; color: string; width: number; points: Point[]; sent: number };
 
-// "100초 그림 퀴즈". What this screen may know comes only from draw_state() and the member-readable
-// tables: the word reaches the drawer, and the guesser only after the round is over.
+// "100초 그림 퀴즈": in 100 seconds, solve as many words as you can. What this screen may know comes only
+// from draw_state() and the member-readable tables: the current word reaches the drawer only.
 export function DrawGame({ roomId, initial }: { roomId: string; initial: DrawState }) {
   const [state, setState] = useState<DrawState>(initial);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [guesses, setGuesses] = useState<DrawGuess[]>([]);
   const [category, setCategory] = useState<DrawCategory>("food");
+  const [iDraw, setIDraw] = useState(true);
   const [color, setColor] = useState<string>(penColors[0]);
   const [width, setWidth] = useState<number>(10);
   const [text, setText] = useState("");
@@ -29,6 +30,7 @@ export function DrawGame({ roomId, initial }: { roomId: string; initial: DrawSta
   const supabaseRef = useRef<ReturnType<typeof browserClient>>(null);
   const offsetRef = useRef(clockOffset(initial.nowMs, Date.now()));
   const gameRef = useRef<string | null>(initial.game);
+  const wordNoRef = useRef<number>(initial.game ? initial.wordNo : 1);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const penRef = useRef<Pen | null>(null);
   const pendingRef = useRef<Stroke[]>([]);
@@ -51,17 +53,20 @@ export function DrawGame({ roomId, initial }: { roomId: string; initial: DrawSta
     const next = data as DrawState;
     offsetRef.current = clockOffset(next.nowMs, Date.now());
     gameRef.current = next.game;
+    if (next.game) wordNoRef.current = next.wordNo;
     setState(next);
   }, [roomId]);
 
   const loadBoard = useCallback(async (id: string) => {
     const supabase = supabaseRef.current;
     if (!supabase) return;
+    const wordNo = wordNoRef.current;
+    // Only the current word's drawing and answers: every word starts on a clean board.
     const [s, g] = await Promise.all([
-      supabase.from("draw_strokes").select("seq, stroke, segment, color, width, points").eq("game_id", id).order("seq"),
-      supabase.from("draw_guesses").select("id, player, guess, correct").eq("game_id", id).order("id"),
+      supabase.from("draw_strokes").select("seq, stroke, segment, color, width, points").eq("game_id", id).eq("word_no", wordNo).order("seq"),
+      supabase.from("draw_guesses").select("id, player, guess, correct").eq("game_id", id).eq("word_no", wordNo).order("id"),
     ]);
-    if (gameRef.current !== id) return;
+    if (gameRef.current !== id || wordNoRef.current !== wordNo) return;
     if (s.data) setStrokes(s.data as Stroke[]);
     if (g.data) setGuesses(g.data as DrawGuess[]);
   }, []);
@@ -101,14 +106,17 @@ export function DrawGame({ roomId, initial }: { roomId: string; initial: DrawSta
     };
   }, [roomId, refresh, loadBoard]);
 
+  const wordNo = state.game ? state.wordNo : 0;
   useEffect(() => {
+    pendingRef.current = [];
+    penRef.current = null;
     if (state.game) loadBoard(state.game);
     else {
       setStrokes([]);
       setGuesses([]);
       pendingRef.current = [];
     }
-  }, [state.game, loadBoard]);
+  }, [state.game, wordNo, loadBoard]);
 
   // Countdown: redraw the clock a few times a second; when it reaches 0 ask the server to end the round.
   useEffect(() => {
@@ -248,6 +256,7 @@ export function DrawGame({ roomId, initial }: { roomId: string; initial: DrawSta
     const result = await call("guess_draw", { game: id, attempt });
     setText("");
     if (result === "wrong") setNote("아니에요. 다시 도전해 보세요!");
+    else if (result === "correct") setNote("정답! 다음 문제예요.");
     else setNote("");
     if (gameRef.current) await loadBoard(gameRef.current);
   }
@@ -258,9 +267,10 @@ export function DrawGame({ roomId, initial }: { roomId: string; initial: DrawSta
       <div className="draw">
         <section className="sheet draw-intro">
           <h2>100초 그림 퀴즈</h2>
-          <p className="lead">한 명이 제시어를 그리고, 다른 한 명이 100초 안에 맞혀요. 판마다 역할이 바뀌어요.</p>
+          <p className="lead">100초 동안 한 명이 그리고, 다른 한 명이 최대한 많이 맞혀요. 맞히면 바로 다음 문제가 나와요.</p>
           <CategoryPicker value={category} onChange={setCategory} />
-          <button type="button" className="button" disabled={busy} onClick={() => call("start_draw_game", { target: roomId, cat: category })}>게임 시작</button>
+          <RolePicker value={iDraw} onChange={setIDraw} />
+          <button type="button" className="button" disabled={busy} onClick={() => call("start_draw_game", { target: roomId, cat: category, i_draw: iDraw })}>게임 시작</button>
           {error && <p role="alert" className="error">{error}</p>}
         </section>
         <Records records={state.records} />
@@ -269,7 +279,7 @@ export function DrawGame({ roomId, initial }: { roomId: string; initial: DrawSta
   }
 
   const myRoleText = isDrawer ? "그리는 사람" : "맞히는 사람";
-  const nextRoleText = isDrawer ? "맞히는 사람" : "그리는 사람";
+  const isNewBest = game.phase === "done" && game.score > 0 && game.records[game.category] === game.score;
 
   return (
     <div className="draw">
@@ -285,33 +295,41 @@ export function DrawGame({ roomId, initial }: { roomId: string; initial: DrawSta
               <button type="button" className="button" disabled={busy || game.meReady} onClick={() => call("ready_draw_game", { game: game.game })}>
                 {game.meReady ? "준비 완료" : "준비"}
               </button>
-              <button type="button" className="button ghost" disabled={busy} onClick={() => call("cancel_draw_game", { game: game.game })}>카테고리 다시 고르기</button>
+              <button type="button" className="button ghost" disabled={busy} onClick={() => call("cancel_draw_game", { game: game.game })}>카테고리·역할 다시 고르기</button>
             </div>
           </div>
         )}
         {game.phase === "live" && (
           <>
-            {isDrawer && game.word && <p className="draw-word">제시어 <strong>{game.word}</strong></p>}
-            {!isDrawer && <p className="lead">상대가 그리는 그림을 보고 무엇인지 맞혀 보세요.</p>}
-            <p className="draw-timer" role="timer"><strong>{left}</strong>초 남았어요</p>
+            <div className="draw-live-row">
+              <p className="draw-timer" role="timer"><strong suppressHydrationWarning>{left}</strong>초 남았어요</p>
+              <p className="draw-score" aria-live="polite"><span>맞힌 개수</span> <strong data-testid="draw-score">{game.score}</strong></p>
+            </div>
+            {isDrawer && game.word && (
+              <div className="draw-word-row">
+                <p className="draw-word">{game.wordNo}번 제시어 <strong>{game.word}</strong></p>
+                <button type="button" className="button ghost" disabled={busy} onClick={() => call("pass_draw_word", { game: game.game })}>패스</button>
+              </div>
+            )}
+            {!isDrawer && <p className="lead">{game.wordNo}번 문제: 상대가 그리는 그림을 보고 맞혀 보세요.</p>}
             <div className="draw-bar" aria-hidden="true">
-              <span style={{ transform: `scaleX(${game.deadlineMs ? timeShare(game.deadlineMs, Date.now(), offsetRef.current) : 0})` }} />
+              <span suppressHydrationWarning style={{ transform: `scaleX(${game.deadlineMs ? timeShare(game.deadlineMs, Date.now(), offsetRef.current) : 0})` }} />
             </div>
           </>
         )}
         {game.phase === "done" && (
           <div className="draw-result" aria-live="polite">
-            {game.result === "won" ? (
-              <>
-                <h2>정답!</h2>
-                <p className="lead"><strong>{game.seconds !== null ? formatSeconds(game.seconds) : ""}</strong> 만에 맞혔어요. 정답은 <strong>{game.word}</strong></p>
-                {game.seconds !== null && game.records[game.category] === game.seconds && <p className="hit">우리 커플 최고 기록이에요!</p>}
-              </>
-            ) : (
-              <>
-                <h2>시간 끝!</h2>
-                <p className="lead">정답은 <strong>{game.word}</strong>였어요.</p>
-              </>
+            <h2>시간 끝!</h2>
+            <p className="lead">100초 동안 <strong data-testid="draw-final">{game.score}개</strong> 맞혔어요{game.passes > 0 ? ` (패스 ${game.passes}번)` : ""}.</p>
+            {isNewBest && <p className="hit">우리 커플 최고 기록이에요!</p>}
+            {game.words.length > 0 && (
+              <ol className="draw-word-list">
+                {game.words.map((w) => (
+                  <li key={w.n} data-outcome={w.outcome ?? "missed"}>
+                    {w.word} <span>{w.outcome === "correct" ? "정답" : w.outcome === "pass" ? "패스" : "못 맞힘"}</span>
+                  </li>
+                ))}
+              </ol>
             )}
           </div>
         )}
@@ -362,9 +380,20 @@ export function DrawGame({ roomId, initial }: { roomId: string; initial: DrawSta
         </form>
       )}
 
-      {game.phase !== "lobby" && guesses.length > 0 && (
+      {game.phase === "live" && game.words.length > 0 && (
+        <section className="sheet" aria-label="지나간 문제">
+          <h3>지나간 문제</h3>
+          <ol className="draw-word-list">
+            {game.words.map((w) => (
+              <li key={w.n} data-outcome={w.outcome ?? "missed"}>{w.word} <span>{w.outcome === "correct" ? "정답" : "패스"}</span></li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {game.phase === "live" && guesses.length > 0 && (
         <section className="sheet" aria-label="시도한 답">
-          <h3>시도한 답</h3>
+          <h3>이번 문제에 시도한 답</h3>
           <ul className="draw-guesses">
             {guesses.map((g) => (
               <li key={g.id} data-correct={g.correct}>{g.guess} <span>{g.correct ? "정답" : "아니에요"}</span></li>
@@ -376,15 +405,15 @@ export function DrawGame({ roomId, initial }: { roomId: string; initial: DrawSta
       {game.phase === "done" && (
         <section className="sheet draw-again">
           <h3>한 판 더</h3>
-          <p className="hint">다음 판에는 내가 <strong>{nextRoleText}</strong>이 돼요.</p>
           <CategoryPicker value={category} onChange={setCategory} />
-          <button type="button" className="button" disabled={busy} onClick={() => call("start_draw_game", { target: roomId, cat: category })}>한 판 더</button>
+          <RolePicker value={iDraw} onChange={setIDraw} />
+          <button type="button" className="button" disabled={busy} onClick={() => call("start_draw_game", { target: roomId, cat: category, i_draw: iDraw })}>한 판 더</button>
         </section>
       )}
 
       <Records records={game.records} />
       {error && <p role="alert" className="error">{error}</p>}
-      <p className="hint draw-total">제한 시간은 {DRAW_SECONDS}초예요.</p>
+      <p className="hint draw-total">제한 시간은 {DRAW_SECONDS}초예요. 기록은 100초 동안 맞힌 개수예요.</p>
     </div>
   );
 }
@@ -393,7 +422,7 @@ function CategoryPicker({ value, onChange }: { value: DrawCategory; onChange: (v
   return (
     <fieldset className="draw-cats">
       <legend>카테고리</legend>
-      <div className="choice-grid five">
+      <div className="choice-grid six">
         {drawCategories.map((c) => (
           <label key={c.value} className="choice">
             <input type="radio" name="draw-category" value={c.value} checked={value === c.value} onChange={() => onChange(c.value)} />
@@ -405,15 +434,33 @@ function CategoryPicker({ value, onChange }: { value: DrawCategory; onChange: (v
   );
 }
 
+function RolePicker({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <fieldset className="draw-cats">
+      <legend>누가 그릴까요?</legend>
+      <div className="choice-grid two">
+        <label className="choice">
+          <input type="radio" name="draw-role" checked={value} onChange={() => onChange(true)} />
+          <span>내가 그릴게요</span>
+        </label>
+        <label className="choice">
+          <input type="radio" name="draw-role" checked={!value} onChange={() => onChange(false)} />
+          <span>상대가 그려요</span>
+        </label>
+      </div>
+    </fieldset>
+  );
+}
+
 function Records({ records }: { records: DrawRecords }) {
   return (
     <section className="sheet draw-records" aria-label="우리 커플 최고 기록">
-      <h3>우리 커플 최고 기록</h3>
+      <h3>우리 커플 최고 기록 (100초에 맞힌 개수)</h3>
       <dl>
         {drawCategories.map((c) => (
           <div key={c.value}>
             <dt>{c.label}</dt>
-            <dd>{records[c.value] === undefined ? "아직 없어요" : formatSeconds(records[c.value] as number)}</dd>
+            <dd>{recordText(records[c.value])}</dd>
           </div>
         ))}
       </dl>

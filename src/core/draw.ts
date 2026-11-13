@@ -8,6 +8,7 @@ export const drawCategories = [
   { value: "thing", label: "사물" },
   { value: "place", label: "장소" },
   { value: "date", label: "데이트 활동" },
+  { value: "mix", label: "전부 섞기" },
 ] as const;
 export type DrawCategory = (typeof drawCategories)[number]["value"];
 
@@ -20,7 +21,9 @@ export const DRAW_SECONDS = 100;
 export const BOARD_W = 1000;
 export const BOARD_H = 750;
 
+// Best number of words solved in 100 seconds, per category.
 export type DrawRecords = Partial<Record<DrawCategory, number>>;
+export type DrawWord = { n: number; word: string; outcome: "correct" | "pass" | null };
 export type DrawState =
   | { game: null; nowMs: number; records: DrawRecords }
   | {
@@ -34,10 +37,17 @@ export type DrawState =
       startedMs: number | null;
       deadlineMs: number | null;
       result: "won" | "timeout" | null;
-      seconds: number | null;
-      word: string | null;
+      score: number;
+      passes: number;
+      wordNo: number;
+      word: string | null; // the current word, for the drawer only
+      words: DrawWord[]; // earlier words (both see them); every word once the round is over
       records: DrawRecords;
     };
+
+export function recordText(value: number | undefined): string {
+  return value === undefined ? "없음" : `${value}개`;
+}
 
 export type Point = [number, number];
 export type Stroke = { seq: number; stroke: string; segment?: string; color: string; width: number; points: Point[] };
