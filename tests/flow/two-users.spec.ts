@@ -259,12 +259,9 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   const word3 = (await pageA.locator(".draw-word strong").innerText()).trim();
   await pageB.waitForTimeout(1500);
   expect(bTraffic.join("\n")).not.toContain(word3);
-  // Time up (moved by the test instead of waiting 100 s): both see the count, the record is 1.
-  const { data: open } = await admin.from("draw_games").select("id").is("result", null).eq("drawer", a.id);
-  for (const row of open ?? [])
-    await admin.from("draw_games").update({ started_at: new Date(Date.now() - 101_000).toISOString(), deadline_at: new Date(Date.now() - 1000).toISOString() }).eq("id", row.id);
-  await pageA.reload();
-  await expect(pageA.getByTestId("draw-final")).toHaveText("1개", { timeout: 10_000 });
+  // Time up: really wait for the database's 100 seconds (no test shortcut; the server key has no table rights).
+  // Both screens end on their own when their countdown reaches 0 and the database confirms it.
+  await expect(pageA.getByTestId("draw-final")).toHaveText("1개", { timeout: 110_000 });
   await expect(pageB.getByTestId("draw-final")).toHaveText("1개", { timeout: 15_000 });
   await expect(pageA.locator(".draw-records")).toContainText("1개");
   // One more round where A chooses that B draws.
