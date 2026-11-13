@@ -376,7 +376,11 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   const canvasA = pageA.getByTestId("golf-canvas");
   await expect(canvasA).toHaveAttribute("data-can-shoot", "true", { timeout: 10_000 });
   await expect(pageB.getByTestId("golf-canvas")).toHaveAttribute("data-can-shoot", "true", { timeout: 10_000 });
+  await canvasA.scrollIntoViewIfNeeded();
+  await pageA.evaluate(() => window.scrollBy(0, 150)); // keep the whole course inside the window
   const box = (await canvasA.boundingBox())!;
+  expect(box.y).toBeGreaterThan(0);
+  expect(box.y + box.height).toBeLessThan(pageA.viewportSize()!.height);
   const at = (lx: number, ly: number) => ({ x: box.x + (lx / 1000) * box.width, y: box.y + (ly / 600) * box.height });
   // Ball starts at the tee (120, 300): pull left to (30, 300) and let go, the ball flies right.
   await pageA.mouse.move(at(120, 300).x, at(120, 300).y);
