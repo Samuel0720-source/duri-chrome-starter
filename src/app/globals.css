@@ -409,3 +409,14 @@ small { display: block; margin-top: var(--space-3xs); font-weight: 400; color: v
 .gomoku-board .cell[data-win="true"]::before { box-shadow: 0 0 0 3px var(--color-accent); }
 .gomoku-board .cell:focus-visible { outline: 3px solid var(--color-accent); outline-offset: -3px; z-index: 3; }
 @media (prefers-reduced-motion: no-preference) { .gomoku-board .cell::before { transition: opacity 120ms; } }
+
+/* 동시 미니골프 */
+.golf { display: grid; gap: var(--space-lg); max-width: 760px; }
+.golf .sheet { display: grid; gap: var(--space-sm); }
+.golf h2 { margin: 0; }
+.golf-wrap { padding: var(--space-sm); background: var(--color-paper-2); border: 2px solid var(--color-rule); border-radius: var(--radius-field); }
+.golf-canvas { display: block; width: 100%; aspect-ratio: 1000 / 600; touch-action: none; cursor: grab; border-radius: var(--radius-field); }
+.golf-canvas[data-can-shoot="false"] { cursor: default; }
+.golf-buttons { display: grid; gap: var(--space-sm); padding-top: var(--space-sm); }
+.golf-buttons label { display: grid; gap: var(--space-2xs, 4px); }
+.golf-buttons input[type="range"] { width: 100%; }
