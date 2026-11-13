@@ -42,6 +42,43 @@ async function answer(page: Page, round: number, own: number, guess: number) {
   await card.getByRole("button", { name: "답 제출" }).click();
 }
 
+// A stand-in for the YouTube IFrame Player so the test does not depend on youtube.com being reachable.
+// It keeps its own clock, reports the same state numbers (1 playing, 2 paused, 3 buffering, 5 cued),
+// and lets the test act like a person pressing YouTube's own controls (userPause, userSeek) or hit an embed error.
+function fakeYouTube() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const w = window as any;
+  const box = (w.__yt = { players: [] as any[], userPause() { box.players[0]._set(2); }, userSeek(s: number) { box.players[0].seekTo(s); }, fail(code: number) { box.players[0].ev.onError?.({ data: code }); } });
+  class Player {
+    ev: any; id: string; t = 0; at = performance.now(); state = 5;
+    constructor(el: HTMLElement, o: any) {
+      this.ev = o.events || {};
+      this.id = o.videoId;
+      const shell = document.createElement("div");
+      shell.className = "fake-yt";
+      el.replaceWith(shell);
+      box.players.push(this);
+      setTimeout(() => this.ev.onReady?.({ target: this }), 20);
+    }
+    _now() { return this.state === 1 ? this.t + (performance.now() - this.at) / 1000 : this.t; }
+    _set(state: number) {
+      this.t = this._now();
+      this.at = performance.now();
+      this.state = state;
+      setTimeout(() => this.ev.onStateChange?.({ data: state }), 0);
+    }
+    getCurrentTime() { return this._now(); }
+    getPlayerState() { return this.state; }
+    seekTo(s: number) { this.t = s; this.at = performance.now(); }
+    playVideo() { if (this.state !== 1) this._set(1); }
+    pauseVideo() { if (this.state === 1) this._set(2); }
+    cueVideoById(o: { videoId: string; startSeconds?: number }) { this.id = o.videoId; this.t = o.startSeconds ?? 0; this.at = performance.now(); this.state = 5; }
+  }
+  w.YT = { Player };
+}
+const playerTime = (page: Page) => page.evaluate(() => (window as any).__yt.players[0].getCurrentTime() as number);
+const playerState = (page: Page) => page.evaluate(() => (window as any).__yt.players[0].state as number);
+
 test.afterAll(async () => {
   // Clean up anyone the test made, even if a step failed. Already-deleted users just error.
   for (const id of made) await admin.auth.admin.deleteUser(id).catch(() => {});
@@ -201,6 +238,70 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await pageA.getByRole("button", { name: "한 판 더" }).click();
   await expect(pageA.getByText("나는 맞히는 사람")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.getByText("나는 그리는 사람")).toBeVisible({ timeout: 10_000 });
+
+  // Watch together: a link, both ready, play / pause / seek follow each other, a reload resumes, an embed error recovers.
+  for (const page of [pageA, pageB]) {
+    await page.route("https://www.youtube.com/**", (route) => route.abort());
+    await page.addInitScript(fakeYouTube);
+  }
+  await pageA.getByRole("link", { name: "함께 보기", exact: true }).click();
+  await pageB.getByRole("link", { name: "함께 보기", exact: true }).click();
+  await expect(pageA.locator(".watch[data-watch=idle]")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.locator(".watch[data-watch=idle]")).toBeVisible({ timeout: 10_000 });
+  await pageA.getByLabel("유튜브 링크").fill("https://evil.example.com/watch?v=dQw4w9WgXcQ");
+  await pageA.getByRole("button", { name: "영상 정하기" }).click();
+  await expect(pageA.getByText("유튜브 링크가 아닌 것 같아요")).toBeVisible();
+  await pageA.getByLabel("유튜브 링크").fill("https://youtu.be/dQw4w9WgXcQ?si=share");
+  await pageA.getByRole("button", { name: "영상 정하기" }).click();
+  await expect(pageA.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => playerState(pageB), { timeout: 10_000 }).toBe(5);
+  // One ready is not enough; the second starts both.
+  await pageA.getByRole("button", { name: "준비됐어요" }).click();
+  await expect(pageB.getByText("상대도 준비했어요.")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.locator(".watch[data-watch=paused]")).toBeVisible();
+  await pageB.getByRole("button", { name: "준비됐어요" }).click();
+  await expect(pageA.locator(".watch[data-watch=playing]")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.locator(".watch[data-watch=playing]")).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => playerState(pageA), { timeout: 10_000 }).toBe(1);
+  await expect.poll(() => playerState(pageB), { timeout: 10_000 }).toBe(1);
+  await expect.poll(async () => Math.abs((await playerTime(pageA)) - (await playerTime(pageB))), { timeout: 10_000 }).toBeLessThan(2.5);
+  // A pauses, B jumps 10 s while paused, A plays again.
+  await pageA.getByRole("button", { name: "같이 멈춤" }).click();
+  await expect(pageB.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => playerState(pageB), { timeout: 10_000 }).toBe(2);
+  const before = await playerTime(pageB);
+  await pageB.getByRole("button", { name: "+10초" }).click();
+  await expect.poll(async () => (await playerTime(pageA)) - before, { timeout: 10_000 }).toBeGreaterThan(8);
+  await pageA.getByRole("button", { name: "같이 재생" }).click();
+  await expect(pageB.locator(".watch[data-watch=playing]")).toBeVisible({ timeout: 10_000 });
+  // Someone presses pause on the video itself (not our button): the partner follows.
+  await pageB.evaluate(() => (window as any).__yt.userPause());
+  await expect(pageA.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
+  // …and drags its progress bar: the partner follows to the same spot.
+  await pageA.evaluate(() => (window as any).__yt.userSeek(100));
+  await expect.poll(async () => Math.abs((await playerTime(pageB)) - 100), { timeout: 10_000 }).toBeLessThan(1.5);
+  // A reload comes back to the saved spot, paused; then playing, it comes back to the live spot.
+  await pageB.reload();
+  await expect(pageB.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
+  await expect.poll(async () => Math.abs((await playerTime(pageB)) - 100), { timeout: 10_000 }).toBeLessThan(1.5);
+  await pageA.getByRole("button", { name: "같이 재생" }).click();
+  await expect(pageB.locator(".watch[data-watch=playing]")).toBeVisible({ timeout: 10_000 });
+  await pageB.reload();
+  await expect(pageB.locator(".watch[data-watch=playing]")).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => playerState(pageB), { timeout: 10_000 }).toBe(1);
+  await expect.poll(async () => Math.abs((await playerTime(pageA)) - (await playerTime(pageB))), { timeout: 10_000 }).toBeLessThan(2.5);
+  // An embed-restricted video: a clear message and a way forward (another link).
+  await pageA.evaluate(() => (window as any).__yt.fail(150));
+  await expect(pageA.getByText("퍼가기가 막혀 있어서")).toBeVisible();
+  await expect(pageA.getByRole("link", { name: "유튜브에서 열기" })).toBeVisible();
+  await expect(pageA.getByRole("button", { name: "준비됐어요" })).toBeDisabled();
+  await pageA.getByLabel("유튜브 링크").fill("https://www.youtube.com/watch?v=aaaaaaaaaaa");
+  await pageA.getByRole("button", { name: "영상 정하기" }).click();
+  await expect(pageA.getByText("퍼가기가 막혀 있어서")).toHaveCount(0, { timeout: 10_000 });
+  await expect(pageA.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.getByRole("button", { name: "준비됐어요" })).toBeEnabled({ timeout: 10_000 });
 
   await pageA.getByRole("link", { name: "홈", exact: true }).click();
   await pageB.getByRole("link", { name: "홈", exact: true }).click();
