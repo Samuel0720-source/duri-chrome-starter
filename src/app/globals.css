@@ -377,3 +377,13 @@ small { display: block; margin-top: var(--space-3xs); font-weight: 400; color: v
 .watch-blocked p { margin: 0; }
 .watch-buttons { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
 .watch-clock { margin: 0; font-family: var(--font-display); font-size: var(--text-display-s); color: var(--color-accent); line-height: 1; }
+
+/* ---- 도우미 (P5-1) ---- */
+.helper { display: grid; gap: var(--space-lg); max-width: 760px; }
+.helper .sheet { display: grid; gap: var(--space-md); }
+.helper h2, .helper h3 { margin: 0; }
+.helper-list { display: grid; gap: var(--space-md); list-style: none; margin: 0; padding: 0; }
+.helper-pick { display: grid; gap: var(--space-sm); justify-items: start; padding: var(--space-md); border: 2px solid var(--color-rule); border-radius: var(--radius-field); }
+.helper-pick p { margin: 0; }
+.helper-chips { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; margin: 0; }
+.chip { padding: 2px var(--space-sm); border: 2px solid var(--color-accent); border-radius: 999px; }

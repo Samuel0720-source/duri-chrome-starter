@@ -308,6 +308,17 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageB.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.getByRole("button", { name: "준비됐어요" })).toBeEnabled({ timeout: 10_000 });
 
+  // Helper: conditions in Korean give only activities that fit, and the AI switch is honestly off.
+  await pageA.getByRole("link", { name: "도우미", exact: true }).click();
+  await expect(pageA.getByText("AI 연결은 꺼져 있어요")).toBeVisible({ timeout: 10_000 });
+  await pageA.getByLabel("원하는 조건").fill("10분, 경쟁은 싫어");
+  await pageA.getByRole("button", { name: "추천받기" }).click();
+  await expect(pageA.getByRole("heading", { name: "상대 선택 맞히기" })).toBeVisible();
+  await expect(pageA.getByRole("heading", { name: "100초 그림 퀴즈" })).toHaveCount(0);
+  await expect(pageA.getByRole("heading", { name: "함께 보기" })).toHaveCount(0);
+  await pageA.getByRole("link", { name: "이 활동 열기" }).click();
+  await expect(pageA).toHaveURL(/\/room\/game/);
+
   await pageA.getByRole("link", { name: "홈", exact: true }).click();
   await pageB.getByRole("link", { name: "홈", exact: true }).click();
   await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);

@@ -71,7 +71,7 @@ before(async () => {
     if (error.code !== "57P01") throw error;
   });
   admin = await pool.connect();
-  await admin.query(`create role authenticated nologin; create role anon nologin;
+  await admin.query(`create role authenticated nologin; create role anon nologin; create role service_role nologin;
     create schema auth; create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql stable as $$
       select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
@@ -150,6 +150,15 @@ before(async () => {
     await readFile(
       new URL(
         "../../supabase/migrations/202611120002_watch_together.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611130001_api_budget.sql",
         import.meta.url,
       ),
       "utf8",
@@ -751,4 +760,101 @@ test("watch together: links are parsed by the database, both must be ready, comm
   await asUser(b, "select public.watch_set_video($1,$2)", [id, "https://www.youtube.com/watch?v=aaaaaaaaaaa"]);
   const next = await state(a);
   assert.deepEqual([next.videoId, next.positionSec, next.playing, next.meReady, next.partnerReady], ["aaaaaaaaaaa", 0, false, false, false]);
+});
+
+test("cost gate: closed by default, room/day and project/month limits, replay is free, the last share goes to one request, strangers and members cannot reserve", async () => {
+  const { a, id } = await fixture(),
+    other = await fixture(),
+    c = await user();
+  const asServer = async (sql, args = []) => {
+    const cl = await pool.connect();
+    try {
+      await cl.query("begin");
+      await cl.query("set local role service_role");
+      const res = await cl.query(sql, args);
+      await cl.query("commit");
+      return res.rows;
+    } catch (e) { await cl.query("rollback"); throw e; } finally { cl.release(); }
+  };
+  const reserve = async (room, kind, key, cents) =>
+    (await asServer("select public.reserve_api_call($1,$2,$3,$4) as r", [room, kind, key, cents]))[0].r;
+  const set = (sql) => admin.query("update duri_private.api_settings set " + sql);
+  const wipe = () => admin.query("delete from duri_private.api_ledger");
+
+  // Closed by default: nothing is reserved, nothing is booked.
+  assert.deepEqual(await reserve(id, "ai", "key-closed-1", 5), { ok: false, reason: "disabled" });
+  await set("paid_enabled = true");
+  assert.deepEqual(await reserve(id, "ai", "key-closed-2", 5), { ok: false, reason: "no_price" }, "a missing price blocks");
+  await set("price_ai_cents = 2, price_places_cents = 4");
+  assert.deepEqual(await reserve(id, "ai", "key-closed-3", 5), { ok: false, reason: "monthly" }, "budget 0 blocks");
+  assert.equal((await admin.query("select count(*)::int n from duri_private.api_ledger")).rows[0].n, 0);
+
+  // Who may call: only the server role. Members and strangers get nothing.
+  await set("monthly_budget_cents = 100");
+  await assert.rejects(asUser(a, "select public.reserve_api_call($1,'ai','key-member-1',5)", [id]), /permission denied/);
+  await assert.rejects(asUser(a, "select public.settle_api_call('key-member-1',1)"), /permission denied/);
+  await assert.rejects(asUser(a, "select * from duri_private.api_ledger"), /permission denied/);
+  {
+    const anon = await pool.connect();
+    try {
+      await anon.query("set role anon");
+      await assert.rejects(anon.query("select public.reserve_api_call($1,'ai','key-anon-001',5)", [id]), /permission denied/);
+    } finally {
+      await anon.query("reset role");
+      anon.release();
+    }
+  }
+  await assert.rejects(asUser(c, "select public.api_usage($1)", [id]), /Room unavailable/);
+  await assert.rejects(reserve(id, "video", "key-bad-0001", 5), /Invalid api call/);
+  await assert.rejects(reserve(id, "ai", "key-bad-0002", 0), /Invalid api call/);
+
+  // A reservation books at least the configured price; a repeated key is a replay and costs nothing more.
+  assert.deepEqual(await reserve(id, "ai", "key-one-0001", 1), { ok: true });
+  assert.deepEqual(await reserve(id, "ai", "key-one-0001", 1), { ok: true, replay: true });
+  const row = (await admin.query("select reserved_cents, status from duri_private.api_ledger where request_key='key-one-0001'")).rows;
+  assert.deepEqual(row, [{ reserved_cents: 2, status: "reserved" }]);
+  assert.equal(row.length, 1);
+
+  // Settling replaces the worst case with the real cost; a release gives the booking back.
+  await asServer("select public.settle_api_call('key-one-0001', 1)");
+  assert.equal((await admin.query("select settled_cents from duri_private.api_ledger where request_key='key-one-0001'")).rows[0].settled_cents, 1);
+  await asServer("select public.settle_api_call('key-one-0001', 99)");
+  assert.equal((await admin.query("select settled_cents from duri_private.api_ledger where request_key='key-one-0001'")).rows[0].settled_cents, 1, "a settled call is not settled twice");
+  assert.deepEqual(await reserve(id, "ai", "key-two-0001", 2), { ok: true });
+  await asServer("select public.release_api_call('key-two-0001')");
+
+  // Room/day limit: 10 AI calls a day per room (released ones do not count), another room is unaffected.
+  await wipe();
+  await set("monthly_budget_cents = 100000, room_daily_ai = 3");
+  for (let i = 0; i < 3; i++) assert.deepEqual(await reserve(id, "ai", "key-day-000" + i, 2), { ok: true });
+  assert.deepEqual(await reserve(id, "ai", "key-day-0009", 2), { ok: false, reason: "room_daily" });
+  assert.deepEqual(await reserve(other.id, "ai", "key-day-1000", 2), { ok: true });
+  await asServer("select public.release_api_call('key-day-0000')");
+  assert.deepEqual(await reserve(id, "ai", "key-day-0010", 2), { ok: true }, "a released booking frees a slot");
+  assert.deepEqual(await reserve(id, "places", "key-day-0011", 4), { ok: true }, "places have their own count");
+
+  // Usage a member sees: counts and a fill level, no prices.
+  const usage = (await asUser(a, "select public.api_usage($1) as u", [id]))[0].u;
+  assert.deepEqual([usage.paidEnabled, usage.aiUsed, usage.aiLimit, usage.placesUsed, usage.placesLimit], [true, 3, 3, 1, 3]);
+  assert.ok(!JSON.stringify(usage).includes("cents"));
+
+  // Month limit with two requests racing for the LAST share: exactly one wins.
+  await wipe();
+  await set("monthly_budget_cents = 10, room_daily_ai = 50");
+  assert.deepEqual(await reserve(id, "ai", "key-fill-0001", 6), { ok: true });
+  const race = await Promise.all([reserve(id, "ai", "key-race-0001", 4), reserve(other.id, "ai", "key-race-0002", 4), reserve(id, "ai", "key-race-0003", 4)]);
+  assert.equal(race.filter((r) => r.ok).length, 1, "only one of three fits in the remaining 4 cents");
+  assert.ok(race.filter((r) => !r.ok).every((r) => r.reason === "monthly"));
+  const total = (await admin.query("select sum(coalesce(settled_cents, reserved_cents))::int s from duri_private.api_ledger")).rows[0].s;
+  assert.ok(total <= 10, "booked " + total);
+  // An unsettled (timed-out) call keeps its worst-case booking.
+  assert.deepEqual(await reserve(id, "ai", "key-fill-0002", 2), { ok: false, reason: "monthly" });
+
+  // Closed rooms and a switch-off.
+  await set("monthly_budget_cents = 100000");
+  await admin.query("update public.couple_rooms set closed_at = clock_timestamp() where id = $1", [other.id]);
+  assert.deepEqual(await reserve(other.id, "ai", "key-closed-r1", 2), { ok: false, reason: "room" });
+  await set("paid_enabled = false");
+  assert.deepEqual(await reserve(id, "ai", "key-off-00001", 2), { ok: false, reason: "disabled" });
+  await set("paid_enabled = false, monthly_budget_cents = 0, price_ai_cents = null, price_places_cents = null");
 });
