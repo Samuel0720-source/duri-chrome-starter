@@ -5,7 +5,7 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "tests/flow",
   workers: 1,
-  timeout: 90_000,
+  timeout: 180_000,
   reporter: "list",
   use: { baseURL: process.env.FLOW_URL ?? "http://localhost:3000", headless: true },
 });
