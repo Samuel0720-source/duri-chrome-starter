@@ -146,6 +146,15 @@ before(async () => {
       "utf8",
     ),
   );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611120002_watch_together.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 });
 after(async () => {
   admin?.release();
@@ -617,4 +626,129 @@ test("draw quiz: the guesser never gets the word, the database sets the deadline
   // Leaving closes the room: nobody can draw or guess any more.
   await asUser(a, "select public.leave_couple_room($1)", [id]);
   await assert.rejects(asUser(b, "select public.draw_state($1)", [id]), /Room unavailable/);
+});
+
+test("watch together: links are parsed by the database, both must be ready, commands bump a revision, silence freezes the clock, strangers are refused", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user(),
+    c = await user();
+  const state = async (who) => (await asUser(who, "select public.watch_state($1) as s", [id]))[0].s;
+  const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  const VID = "dQw4w9WgXcQ";
+  const cmd = (who, kind, pos, req = randomUUID()) =>
+    asUser(who, "select public.watch_command($1,$2,$3::numeric,$4) as rev", [id, kind, pos, req]);
+
+  // The link parser: good links give the id, everything else gives nothing.
+  const parse = async (u) => (await admin.query("select duri_private.parse_youtube($1) as v", [u])).rows[0].v;
+  for (const ok of [
+    "https://www.youtube.com/watch?v=" + VID,
+    "https://youtube.com/watch?feature=share&v=" + VID + "&t=30s",
+    "https://m.youtube.com/watch?v=" + VID,
+    "https://music.youtube.com/watch?v=" + VID,
+    "https://youtu.be/" + VID + "?si=abc",
+    "https://www.youtube.com/shorts/" + VID,
+    "https://www.youtube.com/embed/" + VID,
+    "https://www.youtube.com/live/" + VID,
+    "  https://youtu.be/" + VID + "  ",
+  ]) assert.equal(await parse(ok), VID, ok);
+  for (const bad of [
+    "", "hello", "https://evil.com/watch?v=" + VID, "https://youtube.com.evil.com/watch?v=" + VID,
+    "https://www.youtube.com/watch?v=short", "https://www.youtube.com/watch?v=" + VID + "x",
+    "https://www.youtube.com/playlist?list=PL123", "javascript:alert(1)", "http://youtu.be/",
+    "https://www.youtube.com/watch?v=" + "a".repeat(400),
+  ]) assert.equal(await parse(bad), null, bad);
+
+  // Strangers and bad input; the tables are closed to direct reads.
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  await assert.rejects(asUser(c, "select public.watch_state($1)", [id]), /Room unavailable/);
+  await assert.rejects(asUser(c, "select public.watch_set_video($1,$2)", [id, "https://youtu.be/" + VID]), /Room unavailable/);
+  await assert.rejects(asUser(a, "select public.watch_set_video($1,'https://evil.com/x')", [id]), /Invalid video link/);
+  await assert.rejects(asUser(a, "select public.watch_ready($1,true)", [id]), /No video/);
+  await assert.rejects(cmd(a, "play", 0), /No video/);
+  await assert.rejects(asUser(a, "select * from public.watch_sessions"), /permission denied/);
+  await assert.rejects(asUser(a, "select * from public.watch_presence"), /permission denied/);
+  const empty = await state(a);
+  assert.equal(empty.videoId, null);
+  assert.equal(empty.playing, false);
+
+  // A picks a video: paused at 0:00, nobody ready, revision goes up.
+  await asUser(a, "select public.watch_set_video($1,$2)", [id, "https://youtu.be/" + VID]);
+  const first = await state(a);
+  assert.deepEqual([first.videoId, first.playing, first.positionSec, first.meReady, first.partnerReady], [VID, false, 0, false, false]);
+  assert.ok(first.revision > empty.revision);
+  assert.equal((await state(b)).by, "partner");
+  assert.equal(first.by, "me");
+
+  // Both must press ready; the second press starts it for both at one database time.
+  await asUser(a, "select public.watch_ready($1,true)", [id]);
+  const waiting = await state(b);
+  assert.equal(waiting.playing, false, "one ready is not enough");
+  assert.equal(waiting.partnerReady, true);
+  await asUser(b, "select public.watch_ready($1,true)", [id]);
+  const rolling = await state(a);
+  assert.equal(rolling.playing, true);
+  assert.ok(rolling.revision > first.revision);
+  assert.ok(Math.abs(rolling.refMs - rolling.nowMs) < 2000, "reference time is the database's own clock");
+  await asUser(a, "select public.watch_ready($1,false)", [id]);
+  await asUser(a, "select public.watch_ready($1,true)", [id]);
+  assert.equal((await state(a)).revision, rolling.revision, "pressing ready again does not restart it");
+
+  // Commands: seek keeps playing, pause freezes, play resumes; a resent request does not bump twice.
+  await sleep(200);
+  const seekReq = randomUUID();
+  const r1 = (await cmd(b, "seek", 120.5, seekReq))[0].rev;
+  assert.ok(Number(r1) > Number(rolling.revision));
+  const afterSeek = await state(a);
+  assert.deepEqual([afterSeek.positionSec, afterSeek.playing, afterSeek.by, Number(afterSeek.revision)], [120.5, true, "partner", Number(r1)]);
+  assert.equal((await cmd(b, "seek", 999, seekReq))[0].rev, r1, "same request id: same answer");
+  assert.equal((await state(a)).positionSec, 120.5, "…and nothing changed");
+  await assert.rejects(cmd(b, "seek", 130), /Too many commands/);
+  await sleep(200);
+  await cmd(a, "pause", 125);
+  const paused = await state(b);
+  assert.deepEqual([paused.playing, paused.positionSec], [false, 125]);
+  await assert.rejects(cmd(a, "jump", 1), /Invalid command/);
+  await assert.rejects(cmd(a, "seek", -1), /Invalid position/);
+  await assert.rejects(cmd(a, "seek", 99999), /Invalid position/);
+  await assert.rejects(cmd(c, "play", 1), /Room unavailable/);
+  await sleep(200);
+  await cmd(b, "play", 125);
+  assert.equal((await state(a)).playing, true);
+
+  // Signals carry only an event name.
+  const signals = (await admin.query("select payload from realtime.sent where topic=$1 and event='watch'", ["room:" + id])).rows;
+  assert.ok(signals.length >= 6);
+  assert.ok(signals.every((s) => Object.keys(s.payload).join() === "change"));
+  assert.ok(!JSON.stringify(signals).includes(VID));
+
+  // One leaves: it keeps playing for the other. The last one leaves: the clock stops where they were.
+  await asUser(a, "select public.watch_leave($1)", [id]);
+  const alone = await state(b);
+  assert.equal(alone.playing, true);
+  assert.equal(alone.partnerHere, false);
+  assert.equal((await state(a)).meReady, false, "leaving clears ready");
+  await admin.query("update public.watch_sessions set ref_at = clock_timestamp() - interval '30 seconds', position_sec = 100 where room_id=$1", [id]);
+  const beforeFreeze = Number((await state(b)).revision);
+  await asUser(b, "select public.watch_leave($1)", [id]);
+  const frozen = (await admin.query("select playing, position_sec::float p, revision from public.watch_sessions where room_id=$1", [id])).rows[0];
+  assert.equal(frozen.playing, false);
+  assert.ok(frozen.p >= 129.5 && frozen.p <= 131, "position = 100 + about 30 seconds, got " + frozen.p);
+  assert.ok(Number(frozen.revision) > beforeFreeze);
+
+  // Coming back: the saved spot is waiting, and a stale heartbeat also freezes a crashed tab.
+  await asUser(a, "select public.watch_ping($1)", [id]);
+  const back = await state(a);
+  assert.deepEqual([back.videoId, back.playing, back.meReady], [VID, false, false]);
+  assert.ok(Math.abs(back.positionSec - frozen.p) < 0.01);
+  await cmd(a, "play", 130);
+  await admin.query("update public.watch_sessions set ref_at = clock_timestamp() - interval '200 seconds' where room_id=$1", [id]);
+  await admin.query("update public.watch_presence set last_seen = clock_timestamp() - interval '100 seconds' where room_id=$1", [id]);
+  const silent = await state(a);
+  assert.equal(silent.playing, false, "silent for 45+ seconds counts as gone");
+  assert.ok(Math.abs(silent.positionSec - 230) < 1.5, "frozen at the last heartbeat (130 + 100), got " + silent.positionSec);
+
+  // A new video resets everything.
+  await asUser(b, "select public.watch_set_video($1,$2)", [id, "https://www.youtube.com/watch?v=aaaaaaaaaaa"]);
+  const next = await state(a);
+  assert.deepEqual([next.videoId, next.positionSec, next.playing, next.meReady, next.partnerReady], ["aaaaaaaaaaa", 0, false, false, false]);
 });

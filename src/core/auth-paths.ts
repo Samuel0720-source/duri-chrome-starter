@@ -44,5 +44,9 @@ export function roomErrorMessage(message: string | undefined): string {
   if (text.includes("Too many guesses")) return "이번 판에서 시도할 수 있는 횟수를 모두 썼어요.";
   if (text.includes("Too many strokes")) return "한 판에 그릴 수 있는 선을 모두 썼어요. 전체 지우기를 눌러 보세요.";
   if (text.includes("Invalid stroke")) return "이 선은 보낼 수 없어요. 다시 그려 주세요.";
+  if (text.includes("Invalid video link")) return "유튜브 링크가 아닌 것 같아요. 예: https://youtu.be/영상번호";
+  if (text.includes("No video")) return "먼저 영상 링크를 넣어 주세요.";
+  if (text.includes("Too many commands")) return "너무 빨라요. 잠깐 뒤에 다시 눌러 주세요.";
+  if (text.includes("Invalid command") || text.includes("Invalid position")) return "이 조작은 보낼 수 없어요.";
   return "잠시 문제가 생겼어요. 다시 시도해 주세요.";
 }
