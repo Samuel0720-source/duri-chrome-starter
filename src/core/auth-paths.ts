@@ -51,6 +51,10 @@ export function roomErrorMessage(message: string | undefined): string {
   if (text.includes("Not your turn")) return "지금은 상대 차례예요.";
   if (text.includes("Occupied")) return "이미 돌이 있는 자리예요. 다른 곳을 골라 주세요.";
   if (text.includes("Game over")) return "이미 끝난 판이에요. 새 게임을 시작해 주세요.";
+  if (text.includes("Invalid shot")) return "그 세기나 방향으로는 칠 수 없어요.";
+  if (text.includes("Ball moving")) return "공이 아직 굴러가고 있어요. 멈춘 뒤에 쳐 주세요.";
+  if (text.includes("Already in the cup")) return "이미 컵에 들어갔어요. 상대를 기다려 주세요.";
+  if (text.includes("Invalid course")) return "코스를 고를 수 없어요.";
   if (text.includes("Invalid move")) return "그 자리에는 놓을 수 없어요.";
   return "잠시 문제가 생겼어요. 다시 시도해 주세요.";
 }
