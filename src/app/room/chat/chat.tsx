@@ -6,6 +6,9 @@ import { roomErrorKey } from "../../../core/auth-paths";
 import { ago, lastMineId, seenStatus, startsGroup } from "../../../core/chat";
 import { useT } from "../../../i18n/client";
 
+import { CallSession, type View } from "./call-session";
+import { CallControls } from "./call-controls";
+
 export type Message = { id: number; sender: string | null; body: string; created_at: string };
 type Shown = Message & { state?: "sending" | "failed"; request?: string };
 
@@ -18,8 +21,8 @@ function order(list: Shown[]): Shown[] {
 // as a signal; the list then reads only rows after the last one it has.
 export type ReadMark = { upto: number; atMs: number | null };
 
-export function Chat({ roomId, me, zone, initial, partnerName, initialPartnerRead, initialMyRead }: {
-  roomId: string; me: string; zone: string; initial: Message[]; partnerName: string; initialPartnerRead: ReadMark; initialMyRead: number;
+export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPartnerRead, initialMyRead }: {
+  prompt: string; roomId: string; me: string; zone: string; initial: Message[]; partnerName: string; initialPartnerRead: ReadMark; initialMyRead: number;
 }) {
   const { t, locale } = useT();
   const [messages, setMessages] = useState<Shown[]>(initial);
@@ -27,7 +30,11 @@ export function Chat({ roomId, me, zone, initial, partnerName, initialPartnerRea
   const [now, setNow] = useState(() => Date.now());
   const myReadRef = useRef(initialMyRead);
   const [text, setText] = useState("");
+  const [question, setQuestion] = useState(prompt);
   const [error, setError] = useState("");
+  const call = useRef<CallSession | null>(null);
+  const [callView, setCallView] = useState<View>({ phase: "idle", mode: "audio", note: "hint" });
+  const [callReady, setCallReady] = useState(false);
   const listRef = useRef<HTMLOListElement>(null);
   const supabaseRef = useRef<ReturnType<typeof browserClient>>(null);
   const lastId = useRef(initial.at(-1)?.id ?? 0);
@@ -73,6 +80,13 @@ export function Chat({ roomId, me, zone, initial, partnerName, initialPartnerRea
     const supabase = browserClient();
     supabaseRef.current = supabase;
     if (!supabase) return;
+    const session = new CallSession(me, async (id, kind, detail) => {
+      const { error } = await supabase.rpc("signal_room_call", { target: roomId, session_id: id, kind, detail });
+      if (error) throw new Error("Signaling unavailable");
+    }, setCallView);
+    call.current = session;
+    const leave = () => session.end();
+    window.addEventListener("pagehide", leave);
     let active = true;
     let channel: ReturnType<typeof supabase.channel> | undefined;
     (async () => {
@@ -80,10 +94,14 @@ export function Chat({ roomId, me, zone, initial, partnerName, initialPartnerRea
       if (!active) return;
       channel = supabase
         .channel("room:" + roomId, { config: { private: true } })
+        .on("broadcast", { event: "call" }, ({ payload }) => { void session.receive(payload); })
         .on("broadcast", { event: "messages" }, ({ payload }) => (payload?.change === "delete" ? reload() : pull()))
         .on("broadcast", { event: "prefs" }, () => loadPartnerRead())
         .on("broadcast", { event: "members" }, () => window.location.reload())
         .subscribe((status) => {
+          if (!active) return;
+          setCallReady(status === "SUBSCRIBED" && !!navigator.mediaDevices?.getUserMedia && typeof RTCPeerConnection !== "undefined");
+          if (status !== "SUBSCRIBED") session.end("offline", false);
           document.documentElement.dataset.roomLive = status === "SUBSCRIBED" ? "on" : "off";
           // After a reconnect, catch up on anything missed while offline.
           if (status === "SUBSCRIBED") { pull(); loadPartnerRead(); }
@@ -91,9 +109,12 @@ export function Chat({ roomId, me, zone, initial, partnerName, initialPartnerRea
     })();
     return () => {
       active = false;
+      window.removeEventListener("pagehide", leave);
+      session.end();
+      call.current = null;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomId, pull, reload, loadPartnerRead]);
+  }, [roomId, me, pull, reload, loadPartnerRead]);
 
   // Tell the database how far I have read, but only while this screen is really in front of me.
   const markRead = useCallback(async () => {
@@ -144,8 +165,9 @@ export function Chat({ roomId, me, zone, initial, partnerName, initialPartnerRea
 
   function send(event: React.FormEvent) {
     event.preventDefault();
-    const body = text.trim();
-    if (!body) return;
+    if (!text.trim()) return;
+    const body = question ? question + "\n" + text.trim() : text.trim();
+    setQuestion("");
     const request = crypto.randomUUID();
     const tempId = -Date.now();
     setMessages((old) => [...old, { id: tempId, sender: me, body, created_at: new Date().toISOString(), state: "sending", request }]);
@@ -173,6 +195,8 @@ export function Chat({ roomId, me, zone, initial, partnerName, initialPartnerRea
   const when = partnerRead.atMs ? ago(now, partnerRead.atMs) : { key: "rel.now" as const, n: 0 };
 
   return (
+    <>
+    <CallControls view={callView} session={call.current} ready={callReady} />
     <div className="chat">
       <ol className="chat-list" ref={listRef} aria-label={t("chat.list")} aria-live="polite">
         {messages.length === 0 && <li className="chat-empty">{t("chat.empty")}</li>}
@@ -197,13 +221,14 @@ export function Chat({ roomId, me, zone, initial, partnerName, initialPartnerRea
           </li>
         ))}
       </ol>
+      {question && <aside className="draft-question"><strong>{question}</strong> <button type="button" onClick={() => setQuestion("")}>{t("post.dismiss")}</button></aside>}
       <form className="chat-form" onSubmit={send}>
         <label htmlFor="chat-input" className="visually-hidden">{t("chat.input")}</label>
         <input
           id="chat-input"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          maxLength={1000}
+          maxLength={1000 - (question ? question.length + 1 : 0)}
           autoComplete="off"
           placeholder={t("chat.placeholder")}
         />
@@ -211,5 +236,6 @@ export function Chat({ roomId, me, zone, initial, partnerName, initialPartnerRea
       </form>
       {error && <p role="alert" className="error">{error}</p>}
     </div>
+    </>
   );
 }
