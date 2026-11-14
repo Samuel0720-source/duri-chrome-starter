@@ -145,7 +145,11 @@ export function HomeLive({ initialToday, children }: { initialToday: string; chi
       <section className="hero">
         <div className="container hero-grid">
           <div className="hero-text">{children}</div>
+          <div className="garden-print"><img src="/art/post-garden.webp" width="1080" height="720" fetchPriority="high" alt="" /></div>
+        </div>
+        <div className="container calendar-shelf" id="our-days">
           <div className="sheet hero-card">
+            <h2>{t("garden.calendar")}</h2>
             <Counter today={p.today} calendar={p.calendar} />
             <Fields {...p} />
             <p className="hint">{t("preview.hint")}</p>

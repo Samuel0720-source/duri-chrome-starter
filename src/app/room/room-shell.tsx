@@ -23,7 +23,7 @@ export async function RoomShell({ children, wide = true }: { children: React.Rea
       {wallpaper && <div className="wallpaper" aria-hidden="true" style={{ backgroundImage: `url(${photoUrl(wallpaper)})` }} />}
       <header className="top">
         <a className="brand" href="/room">
-          <img alt="" width="32" height="32" src="/icons/icon-192.png" />
+          <img alt="" width="61" height="41" src="/icons/postbirds.webp" />
           {t("app.name")}
         </a>
         <form action={signOut}>

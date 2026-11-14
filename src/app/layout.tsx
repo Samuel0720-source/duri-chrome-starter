@@ -4,6 +4,7 @@ import { Jua } from "next/font/google";
 import { I18nProvider } from "../i18n/client";
 import { getT } from "../i18n/server";
 import "./globals.css";
+import "./garden.css";
 
 // Rounded Korean display face for headings and the big day count.
 const jua = Jua({ weight: "400", subsets: ["latin"], preload: false, display: "swap", variable: "--font-jua" });
@@ -15,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#6e304b",
+  themeColor: "#fbe5e9",
 };
 export default async function Layout({ children }: { children: ReactNode }) {
   const { locale } = await getT();

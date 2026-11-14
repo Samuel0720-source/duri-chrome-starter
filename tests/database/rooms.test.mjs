@@ -243,6 +243,7 @@ before(async () => {
   await admin.query(await readFile(new URL("../../supabase/migrations/202611150001_album.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611150002_watch_netflix.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611160001_call_signals.sql", import.meta.url), "utf8"));
+  await admin.query(await readFile(new URL("../../supabase/migrations/202611170001_postcard_duel.sql", import.meta.url), "utf8"));
 });
 after(async () => {
   admin?.release();
@@ -1467,4 +1468,77 @@ test("only the two active seats can signal a call and the sender is assigned by 
   await assert.rejects(asUser(a, sql, [id, session, "offer", "wrong"]), /Invalid signal/);
   await asUser(b, "select public.leave_couple_room($1)", [id]);
   await assert.rejects(asUser(a, sql, ring), /Room unavailable/);
+});
+
+test("postcard duel shares a hidden 7-pair board, alternates each turn, handles races and rematches", async () => {
+  const { id, token, a } = await fixture();
+  const b = await user(), outsider = await user();
+  const rpc = async (who, sql, args) => (await asUser(who, "select public." + sql + " as state", args))[0].state;
+  const read = (who) => rpc(who, "postcard_state($1)", [id]);
+  const start = (who, revision) => rpc(who, "postcard_start($1,$2)", [id, revision]);
+  const flip = (who, revision, card) => rpc(who, "postcard_flip($1,$2,$3)", [id, revision, card]);
+  const blank = Array(14).fill(null);
+  assert.equal((await read(a)).phase, "idle");
+  await assert.rejects(start(a, 0), /Partner needed/);
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const [initial, other] = await Promise.all([start(a, 0), start(b, 0)]);
+  assert.deepEqual(initial.cards, blank);
+  assert.deepEqual(initial.owners, blank);
+  assert.deepEqual([initial.phase, initial.revision, other.revision, other.mySeat, initial.turnSeat], ["playing", 1, 1, 2, 1]);
+  await assert.rejects(read(outsider), /Room unavailable/);
+  await assert.rejects(start(outsider, 1), /Room unavailable/);
+  await assert.rejects(flip(outsider, 1, 0), /Room unavailable/);
+  await assert.rejects(asUser(a, "select deck from duri_private.postcard_games"), /permission denied/);
+  const { rows: [acl] } = await admin.query("select has_function_privilege('anon','public.postcard_flip(uuid,integer,integer)','EXECUTE') as anon");
+  assert.equal(acl.anon, false);
+  await assert.rejects(flip(b, 1, 5), /Not your turn/);
+  await assert.rejects(flip(a, 1, 14), /Invalid card/);
+
+  const { rows: [{ deck }] } = await admin.query("select deck from duri_private.postcard_games where room_id=$1", [id]);
+  const indices = Array.from({ length: 7 }, (_, face) => deck.flatMap((v, i) => v === face ? [i] : []));
+  assert.ok(indices.every(pair => pair.length === 2));
+  const first = indices[0][0], different = indices[1][0];
+  const [one, duplicate] = await Promise.all([flip(a, 1, first), flip(a, 1, first)]);
+  assert.deepEqual(one, duplicate);
+  assert.deepEqual(one.open, [first]);
+  assert.deepEqual(one.cards.filter(v => v !== null), [0]);
+  assert.equal(one.turnSeat, 1);
+  assert.deepEqual((await read(b)).cards, one.cards);
+  await assert.rejects(flip(a, one.revision, first), /Invalid card/);
+  const mismatch = await flip(a, one.revision, different);
+  assert.equal(mismatch.turnSeat, 2);
+  assert.deepEqual(mismatch.scores, [0,0]);
+  assert.deepEqual(mismatch.open, [first, different]);
+  assert.ok(mismatch.revealMs > 0);
+  await assert.rejects(flip(b, mismatch.revision, indices[2][0]), /Cards still showing/);
+  // Move only this fixture's deadline into the past without slowing the suite.
+  await admin.query("update duri_private.postcard_games set hide_at=clock_timestamp()-interval '2 seconds' where room_id=$1", [id]);
+  let state = await read(b);
+  assert.deepEqual(state.cards, blank);
+  assert.deepEqual(state.open, []);
+  assert.equal(state.revealMs, 0);
+  assert.equal((await start(a, state.revision)).revision, state.revision);
+  for (const [i, j] of indices) {
+    const mine = state.turnSeat;
+    const who = mine === 1 ? a : b;
+    state = await flip(who, state.revision, i);
+    state = await flip(who, state.revision, j);
+    assert.equal(state.turnSeat, 3-mine);
+    assert.deepEqual([state.owners[i],state.owners[j]], [mine,mine]);
+  }
+  assert.deepEqual(state.scores, [3,4]);
+  assert.equal(state.phase, "finished");
+  const next = await start(b, state.revision);
+  assert.deepEqual([next.phase, next.turnSeat, next.revision], ["playing", 2, state.revision+1]);
+  assert.deepEqual(next.cards, blank);
+  assert.deepEqual((await flip(a, state.revision, first)).cards, blank, "stale move cannot touch a rematch");
+  const broadcasts = (await admin.query("select distinct payload,private from realtime.sent where topic=$1 and event='postcards'", ["room:" + id])).rows;
+  assert.equal(broadcasts.length, 2);
+  for (const row of broadcasts) {
+    assert.equal(row.private, true);
+    assert.deepEqual(Object.keys(row.payload), ["change"]);
+  }
+  await asUser(a, "select public.leave_couple_room($1)", [id]);
+  await assert.rejects(read(b), /Room unavailable/);
+  await assert.rejects(flip(a,next.revision,first), /Room unavailable/);
 });
