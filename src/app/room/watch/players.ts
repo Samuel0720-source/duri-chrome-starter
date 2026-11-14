@@ -3,7 +3,8 @@
 import type { MessageKey } from "../../../i18n/dict";
 import { playerErrorKey, type VideoSource } from "../../../core/watch";
 
-// One small shape for three very different players (YouTube iframe, Vimeo iframe, a plain <video>), so the
+// One small shape for four very different players (YouTube iframe, Vimeo iframe, a plain <video>, and a
+// Netflix tab driven through the extension), so the
 // sync logic in watch-together.tsx does not care which one it drives. States use YouTube's numbers:
 // -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued.
 export type Player = {
@@ -21,6 +22,7 @@ export type PlayerEvents = {
   onState(code: number): void;
   onError(key: MessageKey): void;
   onAutoplayBlocked(): void;
+  say(key: MessageKey): string; // a sentence in the chosen language, for players that draw their own panel
 };
 
 function loadScript(src: string, ready: () => boolean): Promise<void> {
@@ -214,8 +216,115 @@ function file(host: HTMLElement, ref: string, ev: PlayerEvents): Player {
   };
 }
 
+// ---------------------------------------------------------------- Netflix (each person's own Netflix tab)
+// Netflix cannot play inside another site (DRM). Each person opens the title in their own Netflix tab, and
+// the 둘이 Chrome extension relays play / pause / position between that tab and this page
+// (extension/duri-bridge.js <-> background.js <-> netflix-bridge.js <-> netflix-player.js).
+// This adapter looks like the others to the sync logic: it sends commands and reports what Netflix reports.
+type FromExt = { duri: "from-ext"; type: "hello" | "link" | "state"; netflix?: boolean; time?: number; state?: number };
+
+function netflix(host: HTMLElement, ref: string, ev: PlayerEvents): Player {
+  const panel = document.createElement("div");
+  panel.className = "watch-netflix";
+  const title = document.createElement("h3");
+  title.textContent = ev.say("watch.nf.title");
+  const status = document.createElement("p");
+  status.className = "watch-netflix-status";
+  status.setAttribute("role", "status");
+  const open = document.createElement("a");
+  open.className = "button";
+  open.target = "duri-netflix";
+  open.rel = "noopener";
+  open.textContent = ev.say("watch.nf.open");
+  const note = document.createElement("p");
+  note.className = "hint";
+  note.textContent = ev.say("watch.nf.note");
+  panel.append(title, status, open, note);
+  host.replaceChildren(panel);
+
+  let id = ref;
+  let t = 0;
+  let at = performance.now();
+  let state = -1;
+  let found = false;
+  let linked = false;
+  let readySent = false;
+  const show = (mode: "check" | "noext" | "wait" | "linked") => {
+    panel.dataset.nf = mode;
+    status.textContent = ev.say(mode === "noext" ? "watch.nf.noExt" : mode === "linked" ? "watch.nf.linked" : mode === "wait" ? "watch.nf.wait" : "watch.nf.check");
+  };
+  const setLink = (r: string) => {
+    id = r;
+    open.href = "https://www.netflix.com/watch/" + r;
+  };
+  setLink(ref);
+  show("check");
+  const send = (cmd: "play" | "pause" | "seek", sec?: number) =>
+    window.postMessage({ duri: "to-ext", type: "cmd", cmd, sec }, window.location.origin);
+  const now = () => (state === 1 ? t + (performance.now() - at) / 1000 : t);
+
+  const onMessage = (e: MessageEvent<FromExt>) => {
+    if (e.source !== window || e.origin !== window.location.origin || e.data?.duri !== "from-ext") return;
+    const m = e.data;
+    if (m.type === "hello") {
+      found = true;
+      if (!linked) show("wait");
+    } else if (m.type === "link") {
+      found = true;
+      linked = Boolean(m.netflix);
+      show(linked ? "linked" : "wait");
+    } else if (m.type === "state" && Number.isFinite(m.time) && typeof m.state === "number") {
+      linked = true;
+      show("linked");
+      t = m.time!;
+      at = performance.now();
+      if (m.state !== state) {
+        state = m.state;
+        if (readySent) ev.onState(state);
+      }
+      if (!readySent) {
+        readySent = true;
+        ev.onReady();
+      }
+    }
+  };
+  window.addEventListener("message", onMessage);
+  window.postMessage({ duri: "to-ext", type: "ping" }, window.location.origin);
+  const check = setTimeout(() => {
+    if (!found) {
+      show("noext");
+      ev.onError("watch.err.netflixExt");
+    }
+  }, 2000);
+
+  return {
+    kind: "netflix",
+    getCurrentTime: now,
+    getPlayerState: () => state,
+    seekTo: (s) => {
+      t = s;
+      at = performance.now();
+      send("seek", s);
+    },
+    playVideo: () => send("play"),
+    pauseVideo: () => send("pause"),
+    load: (r, start) => {
+      setLink(r);
+      t = start;
+      at = performance.now();
+      if (id) send("seek", start);
+    },
+    destroy: () => {
+      clearTimeout(check);
+      window.removeEventListener("message", onMessage);
+      host.replaceChildren();
+    },
+  };
+}
+
 export async function createPlayer(source: VideoSource, host: HTMLElement, ref: string, ev: PlayerEvents): Promise<Player> {
   if (source === "vimeo") return vimeo(host, ref, ev);
   if (source === "file") return file(host, ref, ev);
+  if (source === "netflix") return netflix(host, ref, ev);
   return youtube(host, ref, ev);
 }

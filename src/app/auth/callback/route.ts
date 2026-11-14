@@ -3,7 +3,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { safeNext } from "../../../core/auth-paths";
 import { serverClient } from "../../../lib/supabase/server";
 
-const otpTypes: EmailOtpType[] = ["magiclink", "email", "signup", "invite"];
+const otpTypes: EmailOtpType[] = ["magiclink", "email", "signup", "invite", "recovery"];
 
 // Two ways to land here:
 // 1. ?code=…        Google sign-in or a PKCE email link: exchange the one-time code.

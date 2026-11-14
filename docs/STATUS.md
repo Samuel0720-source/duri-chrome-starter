@@ -1,6 +1,6 @@
 # 현재 상태 · 다음 세션이 처음 읽을 파일
 
-**현재 단계는 P7(설정·영어·애칭·읽음 표시·영상 소스·확장 출시 빌드)입니다. 아래 P7 기록이 최신입니다.** (아래 표와 P1 기록은 당시 기록)
+**현재 단계는 P8(앨범·방 배경·비밀번호 로그인·넷플릭스 같이 보기, 도우미는 잠시 뺌)입니다. 맨 아래 P8 기록이 최신입니다.** (아래 표와 P1 기록은 당시 기록)
 
 **처음 기록:** 앱 주소의 기본값은 로컬 `http://localhost:3000`입니다. 공개 HTTPS 배포와 실제 커플 계정은 이후 단계입니다.
 
@@ -225,3 +225,11 @@
 - **검사 결과(실제):** `tsc` 통과, 단위 54개 통과, DB 18개 통과(`pgtest` 사용자로 실행 — root로는 initdb가 거부), Supabase duri-dev에 마이그레이션 3개 적용 → 새 함수 8개·제약 2개의 원문 해시가 로컬과 일치(guess_draw·watch_set_video 2개는 SQL 편집기에 붙일 때 본문 안 `--` 주석이 빠졌을 뿐, 주석 줄을 지운 해시가 6d58de65·79ed2989로 일치), 단어 300/300 영어, member_prefs RLS 켬·직접 수정 불가·anon 함수 실행 불가. 로컬에서 파일 영상 어댑터(재생·+10초·일시정지·20초에서 불러오기), 영어 홈·로그인·개인정보 화면, 언어 쿠키 365일 확인.
 - **미확인:** 실제 Vimeo 재생(이 환경에서 vimeo.com 접속 불가), 휴대폰에서 설정·골프 감각, 한국어·영어 외 언어(사전 파일을 추가하면 됨), Netflix 같은 DRM 서비스는 원리상 불가, 도메인·스토어 등록(Sam 계정 필요).
 - 다음 행동 하나: Sam이 도메인을 고르고 구매 → `docs/RELEASE.md` 3번 표 순서대로 연결 → `npm run extension:release https://새도메인`으로 만든 zip을 Chrome 웹 스토어에 “비공개”로 올리기.
+
+### P8 앨범·방 배경·비밀번호 로그인·넷플릭스·도우미 제거 · 2026-11-14
+
+- **요청(Sam):** 앨범 + 앨범 사진으로 방 배경(두 사람 같은 배경), 넷플릭스 같이 보기(한 계정 공유는 불가 → 각자 자기 넷플릭스 + 확장이 맞춤으로 결정), 도우미 잠시 제거, 이미지 같은 로그인(이메일+비밀번호, 계정 만들기, 비밀번호 찾기, Google 버튼), Apple 로그인은 빼기(Apple 개발자 등록 필요), GitHub 공유한 사람 편집 권한.
+- **변경 경로:** `supabase/migrations/202611150001_album.sql`(room_photos, couple_rooms.wallpaper, add/delete/set 함수, 비공개 Storage 버킷·정책 3개, 닫힌 방 앨범 정리), `202611150002_watch_netflix.sql`, `src/core/album.ts`, `src/app/api/photo/[id]/route.ts`, `src/app/room/album/{page,album}.tsx`, `src/app/room/{actions,room-shell,room-live,room-tabs}.tsx?`, `src/app/login/{actions,auth-ui,password-field}.tsx?`·`page.tsx`·`forgot/`·`reset/`, `src/app/signup/page.tsx`, `src/app/auth/callback/route.ts`(recovery), `src/core/{auth-paths,watch}.ts`, `src/app/room/watch/{players,watch-together}.tsx?`, `extension/{background,netflix-player,netflix-bridge,duri-bridge}.js`, `extension/manifest.json`(0.3.0), `scripts/{build,release}-extension.mjs`, `src/app/privacy/page.tsx`, 삭제: `src/app/room/helper/`, `src/core/recommend.ts`, `tests/unit/recommend.test.mjs`. 패키지 추가: `react-icons`(Google 버튼의 G 마크).
+- **검사 결과(실제):** `tsc` 통과, 단위 56개, DB 20개(새: 앨범 권한·200장 제한·배경 공유·삭제 시 배경 해제·닫힌 방 정리, 넷플릭스 링크) 통과. 로컬 브라우저: 넷플릭스 중계 테스트 통과(가짜 넷플릭스 페이지에 seek 125000ms·play·pause 전달, 잘못된 명령·음수·거대 위치 버림, /room/chat에서는 다리 없음, 넷플릭스 탭 닫으면 연결 끊김 알림), 실제 확장 팝업 테스트 통과. 로그인 화면 휴대폰(ko·en)·데스크톱 스크린샷 확인, 가로 스크롤 없음. Supabase: 두 마이그레이션 적용, 새 함수 6개 원문 해시 로컬과 일치, 버킷 비공개·5MB·jpeg/webp, 정책 3개, room_photos RLS 켬·직접 쓰기 불가·anon 실행 불가, 비밀번호 최소 길이 6→8, 가입 허용·이메일 확인 켬, 리디렉션 `/**` 확인.
+- **미확인:** 실제 넷플릭스(계정 필요, Sam이 직접), 비밀번호 찾기·가입 확인 메일 실제 수신(Supabase 기본 메일은 시간당 발송 수가 아주 적음 → 사용자가 늘면 Resend 같은 SMTP 연결 필요), 휴대폰에서 앨범 올리기(아이폰 HEIC는 Safari에서는 되지만 다른 브라우저는 안 될 수 있음), GitHub 협업자 권한(Sam의 이메일 인증 필요).
+- 다음 행동 하나: Sam이 GitHub 설정의 이메일 인증을 마치면 협업자 권한 확인, 그다음 두 컴퓨터 Chrome에 새 확장(0.3.0)을 설치해 넷플릭스 같은 작품으로 실제 같이 보기.

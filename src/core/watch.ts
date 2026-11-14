@@ -1,7 +1,7 @@
 // "함께 보기" small pure helpers. The database keeps the timetable; these only read it.
 import { shouldCorrectDrift } from "./playback.ts";
 
-export type VideoSource = "youtube" | "vimeo" | "file";
+export type VideoSource = "youtube" | "vimeo" | "file" | "netflix";
 export type WatchState = {
   source?: VideoSource; // older states (before Vimeo / files) have no source: YouTube
   videoId: string | null;
@@ -28,6 +28,8 @@ export function parseYouTube(raw: string): string | null {
 // The same rules as duri_private.parse_video: YouTube, Vimeo (with the hash of an unlisted video), or an https
 // address of a video file the browser can play.
 const VIMEO = /^https?:\/\/(?:www\.|player\.)?vimeo\.com\/(?:video\/|channels\/[A-Za-z0-9_-]+\/)?([0-9]{5,12})(?:\/([0-9a-f]{6,24}))?(?:[/?#].*)?$/i;
+// Netflix: only the title number. Each person plays it in their own Netflix tab; the extension keeps time.
+const NETFLIX = /^https?:\/\/(?:www\.)?netflix\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?(?:watch|title)\/([0-9]{5,12})(?:[/?#].*)?$/i;
 const FILE = /^https:\/\/[^\s"'<>\\]+\.(mp4|webm|ogg|ogv|mov|m4v)([?#][^\s"'<>\\]*)?$/i;
 export function parseVideo(raw: string): { source: VideoSource; ref: string } | null {
   const text = raw.trim();
@@ -39,6 +41,8 @@ export function parseVideo(raw: string): { source: VideoSource; ref: string } | 
     const hash = v[2] ?? /[?&]h=([0-9a-fA-F]{6,24})/.exec(text)?.[1];
     return { source: "vimeo", ref: v[1] + (hash ? ":" + hash.toLowerCase() : "") };
   }
+  const n = NETFLIX.exec(text);
+  if (n) return { source: "netflix", ref: n[1] };
   if (FILE.test(text)) return { source: "file", ref: text };
   return null;
 }
@@ -47,6 +51,7 @@ export function parseVideo(raw: string): { source: VideoSource; ref: string } | 
 export function videoPage(source: VideoSource, ref: string): string {
   if (source === "youtube") return "https://www.youtube.com/watch?v=" + ref;
   if (source === "vimeo") return "https://vimeo.com/" + ref.split(":")[0];
+  if (source === "netflix") return "https://www.netflix.com/watch/" + ref;
   return ref;
 }
 

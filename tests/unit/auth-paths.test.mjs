@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { invitePath, isEmail, isInviteToken, roomErrorKey, safeNext } from "../../src/core/auth-paths.ts";
+import { authErrorKey, invitePath, isEmail, isInviteToken, passwordProblem, roomErrorKey, safeNext } from "../../src/core/auth-paths.ts";
 import { makeT } from "../../src/i18n/dict.ts";
 const ko = makeT("ko");
 const en = makeT("en");
@@ -36,4 +36,20 @@ test("emails are checked loosely and database errors become a dictionary key, sh
   assert.equal(roomErrorKey("internal: relation secret_table"), "err.unknown");
   assert.match(en(roomErrorKey("Room full")), /two people/);
   assert.match(en(roomErrorKey("Invalid nickname")), /1-20 characters/);
+});
+
+test("passwords: 8 characters or more, at most 72 bytes (bcrypt reads no further)", () => {
+  assert.equal(passwordProblem("1234567"), "short");
+  assert.equal(passwordProblem("12345678"), null);
+  assert.equal(passwordProblem("a".repeat(72)), null);
+  assert.equal(passwordProblem("a".repeat(73)), "long");
+  assert.equal(passwordProblem("비밀번호".repeat(7)), "long"); // 28 characters, 84 bytes
+});
+
+test("sign-in errors become dictionary keys, never raw messages", () => {
+  assert.equal(authErrorKey("Invalid login credentials"), "login.err.wrong");
+  assert.equal(authErrorKey("Email not confirmed"), "login.err.unconfirmed");
+  assert.equal(authErrorKey("email rate limit exceeded"), "login.err.rate");
+  assert.equal(authErrorKey("Password should be at least 8 characters."), "login.err.weak");
+  assert.equal(authErrorKey(undefined), "login.err.try");
 });

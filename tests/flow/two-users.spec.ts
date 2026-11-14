@@ -16,9 +16,9 @@ const admin: SupabaseClient = createClient(url || "http://x", secret || "x", {
 });
 const made: string[] = [];
 
-async function makeUser(label: string) {
+async function makeUser(label: string, password?: string) {
   const email = `duri-flow-${label}-${randomUUID().slice(0, 8)}@example.com`;
-  const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true });
+  const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true, password });
   if (error || !data.user) throw error ?? new Error("createUser failed");
   made.push(data.user.id);
   return { id: data.user.id, email };
@@ -184,6 +184,52 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await pageB.locator("#lang").selectOption("ko");
   await pageB.getByRole("button", { name: "Change language" }).click();
   await expect(pageB.getByRole("heading", { name: "설정", exact: true })).toBeVisible({ timeout: 10_000 });
+
+  // 3b2. Album. A uploads a picture; both see it; B makes it the room background, which A's screen takes live;
+  // a third person gets nothing; only A can delete it, and deleting it clears the background.
+  await pageA.getByRole("link", { name: "앨범", exact: true }).click();
+  await expect(pageA.getByRole("heading", { name: "우리 앨범" })).toBeVisible();
+  await expect(pageA.locator("html")).toHaveAttribute("data-room-live", "on", { timeout: 30_000 });
+  const png = await pageA.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 640; c.height = 480;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#c06"; g.fillRect(0, 0, 640, 480);
+    g.fillStyle = "#fc0"; g.fillRect(100, 100, 300, 200);
+    return c.toDataURL("image/png").split(",")[1];
+  });
+  await pageA.getByTestId("album-input").setInputFiles({ name: "us.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") });
+  const tileA = pageA.locator(".album-tile img");
+  await expect(tileA).toHaveCount(1, { timeout: 20_000 });
+  await expect.poll(() => tileA.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth), { timeout: 10_000 }).toBe(480);
+  const photoId = (await tileA.getAttribute("src"))!.split("/api/photo/")[1].split("?")[0];
+  await pageB.goto("/room/album");
+  await expect(pageB.locator(".album-tile")).toHaveCount(1);
+  await pageB.locator(".album-tile").click();
+  await expect(pageB.getByRole("button", { name: "앨범에서 삭제" })).toHaveCount(0); // B did not add it
+  await pageB.getByRole("button", { name: "방 배경으로 쓰기" }).click();
+  await expect(pageB.getByText("방 배경을 바꿨어요.")).toBeVisible();
+  await expect(pageB.locator("main[data-wallpaper]")).toHaveAttribute("data-wallpaper", photoId);
+  await expect(pageA.locator("main[data-wallpaper]")).toHaveAttribute("data-wallpaper", photoId, { timeout: 10_000 });
+  const asA = await pageA.evaluate(async (id) => { const r = await fetch("/api/photo/" + id); return [r.status, r.headers.get("content-type")]; }, photoId);
+  expect(asA).toEqual([200, "image/jpeg"]);
+  const outsider = await makeUser("c");
+  const pageC = await signIn(browser, outsider.email, "/room");
+  expect(await pageC.evaluate(async (id) => (await fetch("/api/photo/" + id)).status, photoId)).toBe(404);
+  await pageC.context().close();
+  // (The test's server key has no table rights in this project, so the room id comes from the page.)
+  const roomOf = (await pageA.locator('.album-tools input[name="room"]').getAttribute("value"))!;
+  const publicUrl = url + "/storage/v1/object/public/room-photos/" + roomOf + "/" + photoId + ".jpg";
+  expect((await fetch(publicUrl)).ok).toBe(false); // the bucket is private
+  await pageA.locator(".album-tile").click();
+  await pageA.getByRole("button", { name: "앨범에서 삭제" }).click();
+  await pageA.getByRole("button", { name: "네, 삭제할게요" }).click();
+  await expect(pageA.getByText("사진을 삭제했어요.")).toBeVisible();
+  await expect(pageA.locator(".album-tile")).toHaveCount(0);
+  await expect(pageA.locator("main[data-wallpaper]")).toHaveCount(0);
+  const left = await admin.storage.from("room-photos").list(roomOf);
+  expect(left.error).toBeNull();
+  expect(left.data ?? []).toEqual([]);
 
   // 3c. Chat. Both open it; each sees the other's message without reloading.
   await pageA.getByRole("link", { name: "대화", exact: true }).click();
@@ -395,22 +441,6 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageB.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.getByRole("button", { name: "준비됐어요" })).toBeEnabled({ timeout: 10_000 });
 
-  // Helper: conditions in Korean give only activities that fit, and the AI switch is honestly off.
-  await pageA.getByRole("link", { name: "도우미", exact: true }).click();
-  await expect(pageA.getByText("AI 연결은 꺼져 있어요")).toBeVisible({ timeout: 10_000 });
-  await pageA.waitForTimeout(3000); // let the page finish starting before typing
-  // The page may still be starting up; typing before that is lost, so type again until the button wakes up.
-  await expect(async () => {
-    await pageA.getByLabel("원하는 조건").fill("10분, 경쟁은 싫어");
-    await expect(pageA.getByRole("button", { name: "추천받기" })).toBeEnabled({ timeout: 1000 });
-  }).toPass({ timeout: 25_000 });
-  await pageA.getByRole("button", { name: "추천받기" }).click();
-  await expect(pageA.getByRole("heading", { name: "상대 선택 맞히기" })).toBeVisible();
-  await expect(pageA.getByRole("heading", { name: "100초 그림 퀴즈" })).toHaveCount(0);
-  await expect(pageA.getByRole("heading", { name: "함께 보기" })).toHaveCount(0);
-  await pageA.getByRole("link", { name: "이 활동 열기" }).click();
-  await expect(pageA).toHaveURL(/\/room\/game/);
-
   // Gomoku: A starts, they alternate taps (preview, then confirm); A gets five in a row; the score shows; the rematch swaps who goes first.
   await pageA.goto("/room/game?g=gomoku");
   await pageB.goto("/room/game?g=gomoku");
@@ -522,4 +552,36 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageA.getByText("계정과 데이터를 모두 지웠어요.")).toBeVisible();
   const gone = await admin.auth.admin.getUserById(a.id);
   expect(gone.data.user).toBeNull();
+});
+
+test("email and password: sign in, wrong password, and the sign-up checks (no emails sent)", async ({ browser }) => {
+  const password = "duri-" + randomUUID().slice(0, 12);
+  const p = await makeUser("pw", password);
+  const page = await (await browser.newContext()).newPage();
+  await page.goto("/login");
+  await expect(page.getByRole("heading", { name: "반가워요" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Google로 계속하기" })).toBeVisible();
+  // Wrong password: a plain sentence, never the raw server message.
+  await page.getByLabel("이메일").fill(p.email);
+  await page.getByLabel("비밀번호", { exact: true }).fill(password + "x");
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page.getByText("이메일이나 비밀번호가 맞지 않아요")).toBeVisible();
+  // Right password: straight into the app.
+  await page.getByLabel("이메일").fill(p.email);
+  await page.getByLabel("비밀번호", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page).toHaveURL(/\/room$/);
+  await expect(page.getByRole("heading", { name: "우리 방 만들기" })).toBeVisible();
+  // Sign-up refuses a short password and two different passwords before asking Supabase anything.
+  const fresh = await (await browser.newContext()).newPage();
+  await fresh.goto("/signup");
+  await fresh.getByLabel("이메일").fill("someone@example.com");
+  await fresh.locator("#password").fill("abcdefgh1");
+  await fresh.locator("#again").fill("abcdefgh2");
+  await fresh.getByRole("button", { name: "계정 만들기" }).click();
+  await expect(fresh.getByText("두 비밀번호가 서로 달라요.")).toBeVisible();
+  await fresh.goto("/login/forgot");
+  await expect(fresh.getByRole("heading", { name: "비밀번호 찾기" })).toBeVisible();
+  await page.context().close();
+  await fresh.context().close();
 });

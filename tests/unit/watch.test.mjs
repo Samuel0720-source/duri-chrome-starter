@@ -83,3 +83,12 @@ test("other video links: Vimeo (with the unlisted hash) and https video files, t
   assert.equal(videoPage("vimeo", "123456789:abcdef12"), "https://vimeo.com/123456789");
   assert.equal(videoPage("youtube", "dQw4w9WgXcQ"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
 });
+
+test("Netflix links: only the title number, the same rules as the database", () => {
+  assert.deepEqual(parseVideo("https://www.netflix.com/watch/81234567?trackId=1&tctx=0"), { source: "netflix", ref: "81234567" });
+  assert.deepEqual(parseVideo("https://www.netflix.com/kr/title/80057281"), { source: "netflix", ref: "80057281" });
+  for (const bad of ["https://www.netflix.com/browse", "https://www.netflix.com.evil.com/watch/81234567", "https://www.netflix.com/watch/123"]) {
+    assert.equal(parseVideo(bad), null, bad);
+  }
+  assert.equal(videoPage("netflix", "81234567"), "https://www.netflix.com/watch/81234567");
+});

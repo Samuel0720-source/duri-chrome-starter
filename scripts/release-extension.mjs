@@ -53,14 +53,24 @@ export function zip(entries) {
 }
 
 // What the store review cares about, checked before anything is packed.
-export function checkManifest(manifest, files) {
+// The only pages the extension may run on: Netflix watch pages, and the 함께 보기 page of this web app.
+export function allowedScriptPages(origin) {
+  return new Set(["https://www.netflix.com/watch/*", origin + "/room/watch*"]);
+}
+
+export function checkManifest(manifest, files, origin = "https://duri.example") {
   const problems = [];
   if (manifest.manifest_version !== 3) problems.push("manifest_version must be 3");
   if (!/^\d+(\.\d+){0,3}$/.test(manifest.version ?? "")) problems.push("version must be 1-4 numbers");
   const allowed = new Set(["storage"]);
   for (const p of manifest.permissions ?? []) if (!allowed.has(p)) problems.push("unexpected permission: " + p);
   if (manifest.host_permissions?.length) problems.push("host_permissions are not needed");
-  if (manifest.content_scripts?.length) problems.push("content_scripts are not needed");
+  const pages = allowedScriptPages(origin);
+  for (const script of manifest.content_scripts ?? []) {
+    for (const match of script.matches ?? []) if (!pages.has(match)) problems.push("content script on an unexpected page: " + match);
+    if (script.all_frames) problems.push("content scripts stay in the top frame");
+  }
+  if (manifest.background && Object.keys(manifest.background).join() !== "service_worker") problems.push("background must be one service worker");
   if (!manifest.default_locale) problems.push("default_locale is missing");
   for (const lang of ["en", "ko"]) if (!files.includes(`_locales/${lang}/messages.json`)) problems.push(`_locales/${lang}/messages.json is missing`);
   for (const size of ["16", "32", "48", "128"]) if (!manifest.icons?.[size]) problems.push("icon " + size + " is missing");
@@ -76,7 +86,7 @@ export async function releaseExtension(input = productionOrigin, outDir = join(r
   const paths = await listFiles(directory);
   const names = paths.map((p) => relative(directory, p).split(sep).join("/"));
   const manifest = JSON.parse(await readFile(join(directory, "manifest.json"), "utf8"));
-  const problems = checkManifest(manifest, names);
+  const problems = checkManifest(manifest, names, origin);
   if (problems.length) throw new Error("Not ready for the store:\n- " + problems.join("\n- "));
   const entries = await Promise.all(paths.map(async (p, i) => ({ name: names[i], data: await readFile(p) })));
   const file = join(outDir, `duri-extension-${manifest.version}.zip`);

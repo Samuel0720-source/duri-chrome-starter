@@ -10,6 +10,25 @@ export function isEmail(value: string): boolean {
   return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+// Passwords: at least 8 characters. Supabase stores them with bcrypt, which reads only the first 72 bytes,
+// so a longer one would silently ignore its end; we refuse it instead.
+export const PASSWORD_MIN = 8;
+export function passwordProblem(value: string): "short" | "long" | null {
+  if (value.length < PASSWORD_MIN) return "short";
+  if (new TextEncoder().encode(value).length > 72) return "long";
+  return null;
+}
+
+// Supabase Auth error messages become a dictionary key for the sign-in screens.
+export function authErrorKey(message: string | undefined) {
+  const text = (message ?? "").toLowerCase();
+  if (text.includes("invalid login credentials")) return "login.err.wrong" as const;
+  if (text.includes("email not confirmed")) return "login.err.unconfirmed" as const;
+  if (text.includes("rate limit") || text.includes("too many")) return "login.err.rate" as const;
+  if (text.includes("password")) return "login.err.weak" as const;
+  return "login.err.try" as const;
+}
+
 // issue_couple_invite returns two UUIDs without dashes: 64 lowercase hex characters.
 export function isInviteToken(value: string): boolean {
   return /^[0-9a-f]{64}$/.test(value);
