@@ -1,6 +1,8 @@
 # 현재 상태 · 다음 세션이 처음 읽을 파일
 
-**현재 단계는 P1, ‘Chrome에서 열기’입니다.** 앱 주소의 기본값은 로컬 `http://localhost:3000`입니다. 공개 HTTPS 배포와 실제 커플 계정은 이후 단계입니다.
+**현재 단계는 P7(설정·영어·애칭·읽음 표시·영상 소스·확장 출시 빌드)입니다. 아래 P7 기록이 최신입니다.** (아래 표와 P1 기록은 당시 기록)
+
+**처음 기록:** 앱 주소의 기본값은 로컬 `http://localhost:3000`입니다. 공개 HTTPS 배포와 실제 커플 계정은 이후 단계입니다.
 
 | 들어 있는 것 | 현재 동작 |
 |---|---|
@@ -214,3 +216,12 @@
 - **GitHub Actions 실제 사이트 흐름 테스트 통과(4m56s):** 로그인 쿠키 만료 300일+·홈/로그인 페이지가 방으로 바로 이동, 그림 퀴즈(정답 → 양쪽 1점·새 단어·B 그림판 비워짐, 패스, B가 받은 응답 어디에도 현재 단어 없음, **실제 100초** 후 양쪽 '1개'·기록 1개, '상대가 그려요'로 역할 선택), 골프(두 사람 동시 드래그 → 양쪽 타수판 1/1, A 재타격이 B 화면에 라이브로 2, 새로고침 복원, 그만두기). 첫 실행은 테스트가 관리자 키로 마감 시각을 옮기려다 실패(이 프로젝트의 service_role에는 표 권한이 없음) → 권한을 넓히지 않고 실제 100초를 기다리게 바꿈. `Check starter`(빌드·브라우저 검사 포함) 통과.
 - **미확인:** 두 실제 기기에서의 골프 부드러움·난이도, 휴대폰에서 작은 코스(공이 작게 보임), 그림 퀴즈를 100초 끝까지 사람이 하는 흐름(자동 테스트는 마감 시각을 옮겨 확인).
 - 다음 행동 하나: Sam이 두 기기로 골프 3홀과 그림 퀴즈 한 판을 해 보고 느낌을 알려 주기.
+
+### P7 설정·언어·애칭·읽음·영상·골프·확장 출시 · 2026-11-13 · 커밋 77bf25c
+
+- **요청(Sam):** 외국인도 쓰게 언어 설정, 설정 안에 방 설정(테마)·사용 가이드·계정 삭제, 서로 애칭(게임·채팅에 표시), 채팅 읽음 표시, YouTube 외 영상 링크로 같이 보기, 영상 밑 ←/→ 10초, 골프 놓을 때 버벅임, 다음 단계(도메인·확장 출시 빌드).
+- **변경 경로:** `supabase/migrations/202611140001_member_prefs.sql`(애칭·읽은 위치), `202611140002_draw_english.sql`(단어 300개 영어·영어 정답 인정), `202611140003_watch_sources.sql`(youtube/vimeo/file), `src/i18n/`(core·dict·server·client·messages/ko·en, 키 약 441개), `src/app/room/settings/page.tsx`, `src/app/room/room-shell.tsx`, `src/app/room/delete-account.tsx`, `src/app/language-form.tsx`, `src/app/lang-switch.tsx`, `src/lib/room-names.ts`, `src/core/{chat,golf-physics,guess-en}.ts`, `src/app/room/watch/players.ts`·`watch-together.tsx`, `src/app/room/game/golf-game.tsx`, 모든 방·게임·법률 화면(번역), `extension/_locales/{en,ko}`, `extension/manifest.json`(0.2.0), `extension/popup.{html,js}`, `scripts/release-extension.mjs`, `docs/RELEASE.md`, 테스트(`tests/unit/{i18n,chat,release}.test.mjs` 새로, 나머지 갱신, `tests/database/rooms.test.mjs`, `tests/flow/two-users.spec.ts`), Playwright 로캘 ko-KR.
+- **골프 버벅임 원인:** 놓는 순간 서버 응답(왕복)이 올 때까지 공이 멈춰 있었다. 이제 브라우저가 DB와 **같은 물리 코드**(`golf-physics.ts`, PL/pgSQL 한 줄씩 옮김)로 즉시 굴리고, 서버 경로는 확인용이다. 270개 샷이 DB와 완전히 같음(DB 테스트). 서버가 거절하면 로컬 재생을 지우고 상태를 다시 읽는다.
+- **검사 결과(실제):** `tsc` 통과, 단위 54개 통과, DB 18개 통과(`pgtest` 사용자로 실행 — root로는 initdb가 거부), Supabase duri-dev에 마이그레이션 3개 적용 → 새 함수 8개·제약 2개의 원문 해시가 로컬과 일치(guess_draw·watch_set_video 2개는 SQL 편집기에 붙일 때 본문 안 `--` 주석이 빠졌을 뿐, 주석 줄을 지운 해시가 6d58de65·79ed2989로 일치), 단어 300/300 영어, member_prefs RLS 켬·직접 수정 불가·anon 함수 실행 불가. 로컬에서 파일 영상 어댑터(재생·+10초·일시정지·20초에서 불러오기), 영어 홈·로그인·개인정보 화면, 언어 쿠키 365일 확인.
+- **미확인:** 실제 Vimeo 재생(이 환경에서 vimeo.com 접속 불가), 휴대폰에서 설정·골프 감각, 한국어·영어 외 언어(사전 파일을 추가하면 됨), Netflix 같은 DRM 서비스는 원리상 불가, 도메인·스토어 등록(Sam 계정 필요).
+- 다음 행동 하나: Sam이 도메인을 고르고 구매 → `docs/RELEASE.md` 3번 표 순서대로 연결 → `npm run extension:release https://새도메인`으로 만든 zip을 Chrome 웹 스토어에 “비공개”로 올리기.

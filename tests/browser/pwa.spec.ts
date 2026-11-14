@@ -80,7 +80,7 @@ test("Chrome receives a valid install manifest and an offline fallback without p
       page.getByRole("heading", { name: "지금은 오프라인이에요" }),
     ).toBeVisible();
     const paths = await page.evaluate(async () => {
-      const cache = await caches.open("duri-public-fallback-v1");
+      const cache = await caches.open("duri-public-fallback-v2");
       return (await cache.keys()).map((r) => new URL(r.url).pathname);
     });
     expect(paths).toEqual(["/offline.html"]);

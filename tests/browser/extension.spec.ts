@@ -107,6 +107,8 @@ test("unpacked Chrome extension passes the same scenario via native extension AP
     args: ["--enable-unsafe-extension-debugging"],
   });
   try {
+    // Tabs opened by the extension skip Playwright's locale emulation, so pin the web language like a Korean user who picked it.
+    await context.addCookies([{ name: "duri_lang", value: "ko", url: baseURL! }]);
     // DevTools installs only our local build in this disposable Chromium profile.
     const control = await context.browser()!.newBrowserCDPSession();
     let id: string;
