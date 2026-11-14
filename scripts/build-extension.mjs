@@ -34,6 +34,10 @@ export async function buildExtension(input = localOrigin, directory = defaultDir
     await writeFile(join(directory, "core", name + ".js"), outputText);
   }
   await writeFile(join(directory, "origin.js"), "export const webOrigin = " + JSON.stringify(origin) + ";\n");
+  // The 함께 보기 bridge may run only on this web app's own address.
+  const manifestPath = join(directory, "manifest.json");
+  const manifest = (await readFile(manifestPath, "utf8")).replaceAll("__DURI_ORIGIN__", origin);
+  await writeFile(manifestPath, manifest);
   return directory;
 }
 

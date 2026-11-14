@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_name__",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "__MSG_description__",
   "permissions": [
     "storage"
@@ -21,5 +21,38 @@
       "48": "icons/48.png"
     }
   },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.netflix.com/watch/*"
+      ],
+      "js": [
+        "netflix-bridge.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://www.netflix.com/watch/*"
+      ],
+      "js": [
+        "netflix-player.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "__DURI_ORIGIN__/room/watch*"
+      ],
+      "js": [
+        "duri-bridge.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
   "default_locale": "en"
 }

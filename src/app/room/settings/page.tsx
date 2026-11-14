@@ -14,7 +14,7 @@ import { RoomShell } from "../room-shell";
 
 export const dynamic = "force-dynamic";
 
-const guide = ["start", "home", "games", "golf", "watch", "chat", "settings", "install"] as const;
+const guide = ["start", "home", "games", "golf", "watch", "album", "chat", "settings", "install"] as const;
 
 // Settings: language, nicknames, room theme and first day, a short guide, and the account.
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {

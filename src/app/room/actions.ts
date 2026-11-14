@@ -4,7 +4,25 @@ import { redirect } from "next/navigation";
 import { invitePath, isInviteToken, roomErrorKey } from "../../core/auth-paths";
 import { isPreviewStart, zones } from "../../core/preview";
 import { isMood } from "../../core/moods";
+import { isUuid } from "../../core/album";
 import { appOrigin, serverClient } from "../../lib/supabase/server";
+
+type Client = NonNullable<Awaited<ReturnType<typeof serverClient>>>;
+
+// Removes every album file of a room. Runs while the person is still a member (Storage checks that),
+// right before the room closes. Returns false if Storage refused, so the caller can stop.
+async function removeRoomFiles(supabase: Client, room: string) {
+  if (!isUuid(room)) return true;
+  const bucket = supabase.storage.from("room-photos");
+  for (let round = 0; round < 10; round++) {
+    const { data, error } = await bucket.list(room, { limit: 1000 });
+    if (error) return false;
+    if (!data || data.length === 0) return true;
+    const { error: removeError } = await bucket.remove(data.map((f) => room + "/" + f.name));
+    if (removeError) return false;
+  }
+  return false;
+}
 
 async function signedIn() {
   const supabase = await serverClient();
@@ -55,6 +73,8 @@ export async function leaveRoom(formData: FormData) {
   if (formData.get("confirm") !== "yes") redirect("/room/settings?error=leave#account");
   const { supabase, user } = await signedIn();
   if (!user) redirect("/login?next=/room");
+  // Album files first: after leaving, Storage no longer lets either partner delete them.
+  if (!(await removeRoomFiles(supabase, room))) redirect("/room/settings?error=leave#account");
   const { error } = await supabase.rpc("leave_couple_room", { target: room });
   redirect(error ? "/room/settings?error=leave#account" : "/room?left=1");
 }
@@ -66,6 +86,8 @@ export async function deleteAccount(formData: FormData) {
   if (formData.get("confirm") !== "yes") redirect(back);
   const { supabase, user } = await signedIn();
   if (!user) redirect("/login?next=/room");
+  const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", user.id).maybeSingle();
+  if (seat && !(await removeRoomFiles(supabase, seat.room_id))) redirect(back);
   const { error } = await supabase.rpc("delete_my_account");
   if (error) redirect(back);
   // The account is gone; clear this browser's session cookies too.
@@ -123,6 +145,28 @@ export async function removePlan(formData: FormData) {
   if (!user) redirect("/login?next=/room");
   const { error } = await supabase.rpc("remove_room_plan", { plan });
   redirect(error ? "/room?error=plan#plans" : "/room#plans");
+}
+
+// Album: the shared background (an album photo, or none) and taking a photo out of the album.
+export async function setWallpaper(formData: FormData) {
+  const room = String(formData.get("room") ?? "");
+  const photo = String(formData.get("photo") ?? "");
+  const { supabase, user } = await signedIn();
+  if (!user) redirect("/login?next=/room/album");
+  const { error } = await supabase.rpc("set_room_wallpaper", { target: room, photo: isUuid(photo) ? photo : null });
+  redirect(error ? "/room/album?error=gone" : "/room/album?saved=wallpaper");
+}
+
+export async function deletePhoto(formData: FormData) {
+  const photo = String(formData.get("photo") ?? "");
+  if (!isUuid(photo)) redirect("/room/album?error=gone");
+  const { supabase, user } = await signedIn();
+  if (!user) redirect("/login?next=/room/album");
+  const { data: files, error } = await supabase.rpc("delete_room_photo", { photo });
+  if (error || !Array.isArray(files)) redirect("/room/album?error=gone");
+  // The album row is gone; the files go too. A failure here leaves an unlisted file, never a visible one.
+  await supabase.storage.from("room-photos").remove(files as string[]);
+  redirect("/room/album?saved=deleted");
 }
 
 export async function signOut() {

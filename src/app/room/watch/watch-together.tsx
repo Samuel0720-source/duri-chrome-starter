@@ -273,6 +273,7 @@ export function WatchTogether({ roomId, hasPartner, partnerName }: { roomId: str
       },
       onError: (key) => setPlayerMsg(key),
       onAutoplayBlocked: () => setBlocked(true),
+      say: (key) => t(key),
     }).then(
       (made) => {
         if (cancelled) made.destroy();

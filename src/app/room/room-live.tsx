@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { browserClient } from "../../lib/supabase/browser";
 
-// Listens on the room's private channel and re-renders the page when a partner joins or leaves.
+// Listens on the room's private channel and re-renders the page when a partner joins or leaves,
+// or the theme, background, plans or album change.
 export function RoomLive({ roomId }: { roomId: string }) {
   const router = useRouter();
   useEffect(() => {
@@ -21,6 +22,7 @@ export function RoomLive({ roomId }: { roomId: string }) {
         .on("broadcast", { event: "members" }, () => router.refresh())
         .on("broadcast", { event: "room" }, () => router.refresh())
         .on("broadcast", { event: "plans" }, () => router.refresh())
+        .on("broadcast", { event: "photos" }, () => router.refresh())
         // The data attribute lets tests (and debugging) see the channel is live.
         .subscribe((status) => {
           document.documentElement.dataset.roomLive = status === "SUBSCRIBED" ? "on" : "off";

@@ -82,7 +82,11 @@ before(async () => {
     create table realtime.sent(payload jsonb, event text, topic text, private boolean);
     create function realtime.send(payload jsonb, event text, topic text, private boolean) returns void
       language sql as $$ insert into realtime.sent values(payload,event,topic,private) $$;
-    create function realtime.topic() returns text language sql stable as $$ select current_setting('realtime.topic',true) $$;`);
+    create function realtime.topic() returns text language sql stable as $$ select current_setting('realtime.topic',true) $$;
+    -- Stand-in for Supabase Storage: just the two tables the album migration touches.
+    create schema storage; grant usage on schema storage to authenticated,anon;
+    create table storage.buckets(id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+    create table storage.objects(bucket_id text, name text, owner uuid);`);
   await admin.query(
     await readFile(
       new URL(
@@ -236,6 +240,8 @@ before(async () => {
       "utf8",
     ),
   );
+  await admin.query(await readFile(new URL("../../supabase/migrations/202611150001_album.sql", import.meta.url), "utf8"));
+  await admin.query(await readFile(new URL("../../supabase/migrations/202611150002_watch_netflix.sql", import.meta.url), "utf8"));
 });
 after(async () => {
   admin?.release();
@@ -1372,4 +1378,74 @@ test("watch together: YouTube, Vimeo and https video files; everything else is r
   await assert.rejects(asUser(a, "select public.watch_set_video($1,$2)", [id, "https://www.netflix.com/watch/123"]), /Invalid video link/);
   // The table itself refuses a bad combination even from the server key.
   await assert.rejects(admin.query("update public.watch_sessions set source='file', video_id='http://x.mp4' where room_id=$1", [id]), /watch_sessions_video_check/);
+});
+
+test("album: only members add, see and remove photos; the background is shared and cleared with its photo", async () => {
+  const { a, id, token } = await fixture();
+  const b = await user();
+  const c = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const p1 = randomUUID();
+  const room = (await admin.query("select id from public.couple_rooms where id=$1", [id])).rows[0].id;
+  const file = (p, t = "") => room + "/" + p + t + ".jpg";
+  const policy = (who, name) =>
+    asUser(who, "select duri_private.is_member(duri_private.photo_room($1)) as ok", [name]).then((r) => r[0].ok);
+  // Storage policies: members may touch only '<their room>/<uuid>[_t].jpg'.
+  assert.equal(await policy(a, file(p1)), true);
+  assert.equal(await policy(b, file(p1, "_t")), true);
+  assert.equal(await policy(c, file(p1)), false);
+  assert.equal(await policy(a, room + "/../" + p1 + ".jpg"), false);
+  assert.equal(await policy(a, room + "/" + p1 + ".png"), false);
+  // Not uploaded yet, outsider, bad size.
+  await assert.rejects(asUser(a, "select public.add_room_photo($1,$2,800,600)", [id, p1]), /Photo not uploaded/);
+  await admin.query("insert into storage.objects values('room-photos',$1,$2)", [file(p1), a]);
+  await assert.rejects(asUser(c, "select public.add_room_photo($1,$2,800,600)", [id, p1]), /Room unavailable/);
+  await assert.rejects(asUser(a, "select public.add_room_photo($1,$2,1601,600)", [id, p1]), /Invalid photo/);
+  await asUser(a, "select public.add_room_photo($1,$2,800,600)", [id, p1]);
+  await asUser(a, "select public.add_room_photo($1,$2,800,600)", [id, p1]); // a retry adds nothing
+  assert.equal((await asUser(b, "select id from public.room_photos")).length, 1);
+  assert.deepEqual(await asUser(c, "select id from public.room_photos"), []);
+  await assert.rejects(asUser(a, "insert into public.room_photos values($1,$2,$3,1,1)", [randomUUID(), id, a]), /permission denied/);
+  // Background: B picks A's photo; both see it; an outsider cannot set it; a foreign photo is refused.
+  await asUser(b, "select public.set_room_wallpaper($1,$2)", [id, p1]);
+  assert.deepEqual(await asUser(a, "select wallpaper from public.couple_rooms where id=$1", [id]), [{ wallpaper: p1 }]);
+  await assert.rejects(asUser(c, "select public.set_room_wallpaper($1,null)", [id]), /Room unavailable/);
+  await assert.rejects(asUser(a, "select public.set_room_wallpaper($1,$2)", [id, randomUUID()]), /Photo unavailable/);
+  const events = (await admin.query("select event from realtime.sent where topic=$1", ["room:" + id])).rows.map((r) => r.event);
+  assert.ok(events.includes("photos") && events.includes("room"));
+  // Only the person who added it removes it; that clears the background and returns both file names.
+  await assert.rejects(asUser(b, "select public.delete_room_photo($1)", [p1]), /Photo unavailable/);
+  const [{ files }] = await asUser(a, "select public.delete_room_photo($1) as files", [p1]);
+  assert.deepEqual(files, [file(p1), file(p1, "_t")]);
+  assert.deepEqual(await asUser(a, "select wallpaper from public.couple_rooms where id=$1", [id]), [{ wallpaper: null }]);
+  // 200-photo limit.
+  for (let i = 0; i < 200; i++) {
+    const p = randomUUID();
+    await admin.query("insert into public.room_photos(id,room_id,added_by,width,height) values($1,$2,$3,1,1)", [p, id, a]);
+  }
+  const extra = randomUUID();
+  await admin.query("insert into storage.objects values('room-photos',$1,$2)", [file(extra), a]);
+  await assert.rejects(asUser(a, "select public.add_room_photo($1,$2,10,10)", [id, extra]), /Album full/);
+  // Closing the room leaves no album rows.
+  await asUser(a, "select public.set_room_wallpaper($1,(select id from public.room_photos limit 1))", [id]);
+  await asUser(b, "select public.leave_couple_room($1)", [id]);
+  assert.equal((await admin.query("select count(*)::int n from public.room_photos where room_id=$1", [id])).rows[0].n, 0);
+  assert.equal((await admin.query("select wallpaper from public.couple_rooms where id=$1", [id])).rows[0].wallpaper, null);
+});
+
+test("watch together: Netflix links keep only the title number; each person plays it in their own Netflix tab", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const parse = async (link) => (await admin.query("select * from duri_private.parse_video($1)", [link])).rows[0];
+  assert.deepEqual(await parse("https://www.netflix.com/watch/81234567?trackId=14170286&tctx=1"), { source: "netflix", ref: "81234567" });
+  assert.deepEqual(await parse("https://www.netflix.com/title/80057281"), { source: "netflix", ref: "80057281" });
+  assert.deepEqual(await parse("https://www.netflix.com/kr/title/80057281"), { source: "netflix", ref: "80057281" });
+  assert.deepEqual(await parse("https://netflix.com/kr-en/watch/80057281"), { source: "netflix", ref: "80057281" });
+  for (const bad of ["https://www.netflix.com/browse", "https://www.netflix.com.evil.com/watch/81234567", "https://evil.com/netflix.com/watch/81234567", "https://www.netflix.com/watch/123"])
+    assert.equal((await parse(bad)).ref, null, bad);
+  await asUser(a, "select public.watch_set_video($1,$2)", [id, "https://www.netflix.com/watch/81234567?trackId=1"]);
+  const [{ s }] = await asUser(b, "select public.watch_state($1) as s", [id]);
+  assert.deepEqual([s.source, s.videoId, s.playing], ["netflix", "81234567", false]);
+  await assert.rejects(admin.query("update public.watch_sessions set video_id='abc' where room_id=$1", [id]), /watch_sessions_video_check/);
 });
