@@ -42,10 +42,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <RoomTabs active="settings" />
         <h1 className="settings-title">{t("settings.title")}</h1>
         <div className="settings-stack">
-          <section className="sheet" id="lang" aria-labelledby="lang-head">
+          <section className="sheet" id="language" aria-labelledby="lang-head">
             <h2 id="lang-head">{t("settings.lang.title")} · Language</h2>
             <p className="hint">{t("settings.lang.hint")}</p>
-            <LanguageForm current={locale} back="/room/settings#lang" label={t("settings.lang.title")} button={t("settings.lang.apply")} />
+            <LanguageForm current={locale} back="/room/settings#language" label={t("settings.lang.title")} button={t("settings.lang.apply")} />
           </section>
 
           <section className="sheet" id="nick" aria-labelledby="nick-head">
