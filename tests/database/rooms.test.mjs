@@ -242,6 +242,7 @@ before(async () => {
   );
   await admin.query(await readFile(new URL("../../supabase/migrations/202611150001_album.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611150002_watch_netflix.sql", import.meta.url), "utf8"));
+  await admin.query(await readFile(new URL("../../supabase/migrations/202611160001_call_signals.sql", import.meta.url), "utf8"));
 });
 after(async () => {
   admin?.release();
@@ -1448,4 +1449,22 @@ test("watch together: Netflix links keep only the title number; each person play
   const [{ s }] = await asUser(b, "select public.watch_state($1) as s", [id]);
   assert.deepEqual([s.source, s.videoId, s.playing], ["netflix", "81234567", false]);
   await assert.rejects(admin.query("update public.watch_sessions set video_id='abc' where room_id=$1", [id]), /watch_sessions_video_check/);
+});
+
+test("only the two active seats can signal a call and the sender is assigned by the database", async () => {
+  const { a, id, token } = await fixture();
+  const b = await user(), third = await user(), session = randomUUID();
+  const sql = "select public.signal_room_call($1,$2,$3,$4)";
+  const ring = [id, session, "ring", "audio"];
+  await assert.rejects(asUser(a, sql, ring), /Room unavailable/);
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  await asUser(a, sql, ring);
+  await asUser(b, sql, [id, session, "accept", ""]);
+  const { rows } = await admin.query("select payload, private from realtime.sent where topic=$1 and event='call'", ["room:" + id]);
+  assert.deepEqual(rows[0], { payload: { sender: a, id: session, kind: "ring", detail: "audio" }, private: true });
+  assert.equal(rows[1].payload.sender, b);
+  await assert.rejects(asUser(third, sql, ring), /Room unavailable/);
+  await assert.rejects(asUser(a, sql, [id, session, "offer", "wrong"]), /Invalid signal/);
+  await asUser(b, "select public.leave_couple_room($1)", [id]);
+  await assert.rejects(asUser(a, sql, ring), /Room unavailable/);
 });

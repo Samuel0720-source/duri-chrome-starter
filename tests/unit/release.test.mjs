@@ -26,14 +26,14 @@ function unzip(buf) {
 test("store build: production https address, only the storage permission, both languages, a valid zip", async () => {
   const out = await mkdtemp(join(tmpdir(), "duri-release-"));
   const r = await releaseExtension("https://duri.example", out);
-  assert.match(r.file, /duri-extension-0\.3\.0\.zip$/);
+  assert.match(r.file, /duri-extension-0\.4\.0\.zip$/);
   const files = unzip(await readFile(r.file));
   assert.equal(files["origin.js"].toString(), 'export const webOrigin = "https://duri.example";\n');
   const manifest = JSON.parse(files["manifest.json"].toString());
   assert.deepEqual(manifest.permissions, ["storage"]);
   assert.equal(JSON.parse(files["_locales/en/messages.json"]).name.message, "Duri · Anniversaries");
   assert.equal(JSON.parse(files["_locales/ko/messages.json"]).name.message, "둘이 · 기념일");
-  for (const f of ["popup.html", "popup.js", "core/dates.js", "core/preview.js", "icons/128.png", "background.js", "netflix-player.js", "netflix-bridge.js", "duri-bridge.js"]) assert.ok(files[f], f);
+  for (const f of ["popup.html", "popup.js", "icons/postbirds.webp", "core/dates.js", "core/preview.js", "icons/128.png", "background.js", "netflix-player.js", "netflix-bridge.js", "duri-bridge.js"]) assert.ok(files[f], f);
   // Netflix together: scripts only on Netflix watch pages and on this site's 함께 보기 page.
   assert.deepEqual(manifest.content_scripts.flatMap((c) => c.matches), ["https://www.netflix.com/watch/*", "https://www.netflix.com/watch/*", "https://duri.example/room/watch*"]);
   assert.equal(manifest.host_permissions, undefined);

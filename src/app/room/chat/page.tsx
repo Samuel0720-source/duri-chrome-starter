@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { roomToday } from "../../../core/dates";
+import { postcardQuestion } from "../../../core/postcards";
 import { isMood } from "../../../core/moods";
 import { getT } from "../../../i18n/server";
 import { serverClient } from "../../../lib/supabase/server";
@@ -8,7 +10,7 @@ import { Chat, type Message } from "./chat";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChatPage() {
+export default async function ChatPage({ searchParams }: { searchParams: Promise<{ prompt?: string }> }) {
   const { t } = await getT();
   const supabase = await serverClient();
   if (!supabase) redirect("/login?error=config");
@@ -24,6 +26,7 @@ export default async function ChatPage() {
   ]);
   if (!room) redirect("/room");
   const full = (count ?? 0) >= 2;
+  const prompt = (await searchParams).prompt === "today" ? t(postcardQuestion(roomToday(new Date(), room.timezone))) : "";
   const initial: Message[] = (recent ?? []).reverse();
   const mine = (prefs ?? []).find((p) => p.user_id === auth.user.id);
   const theirs = (prefs ?? []).find((p) => p.user_id !== auth.user.id);
@@ -38,6 +41,7 @@ export default async function ChatPage() {
             <Chat
               roomId={room.id}
               me={auth.user.id}
+              prompt={prompt}
               zone={room.timezone}
               initial={initial}
               partnerName={mine?.partner_nickname ?? t("common.partner")}

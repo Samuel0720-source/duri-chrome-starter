@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { coupleCalendar, daysFrom, roomToday, upcomingMilestones } from "../../core/dates";
 import { MilestoneRail } from "../milestone-rail";
+import { postcardQuestion } from "../../core/postcards";
 import { isMood } from "../../core/moods";
 import { defaultZone, zones } from "../../core/preview";
 import { getT } from "../../i18n/server";
@@ -80,6 +81,13 @@ export default async function RoomPage({
       <div className="room" data-mood={mood}>
       <RoomLive roomId={room.id} />
       <RoomTabs active="home" />
+      {full && <section className="daily-post" aria-labelledby="daily-heading">
+        <img src="/icons/postbirds.webp" width="144" height="96" alt="" />
+        <div><h2 id="daily-heading">{t("post.daily")}</h2><p>{t(postcardQuestion(today))}</p>
+          <div className="post-links"><a href="/room/chat?prompt=today">{t("post.reply")}</a>
+            <a href="/room/game?g=post">{t("game.post")}</a></div>
+        </div>
+      </section>}
       <div className="room-grid">
         <section className="sheet room-count" aria-label={t("home.room")}>
           <div className="dateline">
