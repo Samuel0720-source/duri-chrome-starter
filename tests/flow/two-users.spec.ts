@@ -122,6 +122,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
 
   // 3. B opens the invite (sign-in first), then joins.
   const pageB = await signIn(browser, b.email, invitePath);
+  pageB.on("pageerror", (e) => console.log("pageB pageerror:", e.message.slice(0, 300)));
+  pageB.on("console", (m) => { if (m.type() === "error") console.log("pageB console error:", m.text().slice(0, 300)); });
   await pageB.getByRole("button", { name: "방에 들어가기" }).click();
   await expect(pageB.getByText("두 사람이 모두 들어왔어요.")).toBeVisible();
   // A sees it without reloading: the realtime message refreshes the page.
@@ -140,10 +142,19 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageB.getByRole("heading", { name: "설정", exact: true })).toBeVisible();
   // A click before hydration is lost, so repeat it until the picker reacts.
   const applyTheme = pageB.getByRole("button", { name: "이 테마로 바꾸기" });
-  await expect(async () => {
-    await pageB.locator('label.mood-option[data-mood="night"]').click();
-    await expect(applyTheme).toBeEnabled({ timeout: 1_000 });
-  }).toPass({ timeout: 15_000 });
+  try {
+    await expect(async () => {
+      await pageB.locator('label.mood-option[data-mood="night"]').click();
+      await expect(applyTheme).toBeEnabled({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+  } catch (e) {
+    console.log("theme form:", await pageB.evaluate(() => {
+      const f = document.querySelector(".mood-form");
+      const checked = f?.querySelector<HTMLInputElement>("input[name=mood]:checked")?.value;
+      return JSON.stringify({ url: location.href, checked, button: f?.querySelector("button")?.outerHTML, room: document.querySelector(".room")?.getAttribute("data-mood"), forms: document.querySelectorAll(".mood-form").length });
+    }));
+    throw e;
+  }
   await applyTheme.click();
   await expect(pageB.locator('.room[data-mood="night"]')).toHaveCount(1);
   await expect(pageA.locator('.room[data-mood="night"]')).toHaveCount(1, { timeout: 10_000 });
