@@ -214,9 +214,9 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   const asA = await pageA.evaluate(async (id) => { const r = await fetch("/api/photo/" + id); return [r.status, r.headers.get("content-type")]; }, photoId);
   expect(asA).toEqual([200, "image/jpeg"]);
   const outsider = await makeUser("c");
-  const pageC = await signIn(browser, outsider.email, "/room");
-  expect(await pageC.evaluate(async (id) => (await fetch("/api/photo/" + id)).status, photoId)).toBe(404);
-  await pageC.context().close();
+  const pageOut = await signIn(browser, outsider.email, "/room");
+  expect(await pageOut.evaluate(async (id) => (await fetch("/api/photo/" + id)).status, photoId)).toBe(404);
+  await pageOut.context().close();
   // (The test's server key has no table rights in this project, so the room id comes from the page.)
   const roomOf = (await pageA.locator('.album-tools input[name="room"]').getAttribute("value"))!;
   const publicUrl = url + "/storage/v1/object/public/room-photos/" + roomOf + "/" + photoId + ".jpg";
