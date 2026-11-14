@@ -4,9 +4,11 @@ import type { GuessState } from "../../../core/guess";
 import type { DrawState } from "../../../core/draw";
 import type { GomokuState } from "../../../core/gomoku";
 import type { GolfState } from "../../../core/golf";
+import { getT } from "../../../i18n/server";
 import { serverClient } from "../../../lib/supabase/server";
-import { signOut } from "../actions";
+import { roomNames } from "../../../lib/room-names";
 import { RoomTabs } from "../room-tabs";
+import { RoomShell } from "../room-shell";
 import { GuessGame } from "./guess-game";
 import { DrawGame } from "./draw-game";
 import { GomokuGame } from "./gomoku-game";
@@ -15,6 +17,7 @@ import { GolfGame } from "./golf-game";
 export const dynamic = "force-dynamic";
 
 export default async function GamePage({ searchParams }: { searchParams: Promise<{ g?: string }> }) {
+  const { t } = await getT();
   const g = (await searchParams).g;
   const which = g === "draw" ? "draw" : g === "gomoku" ? "gomoku" : g === "golf" ? "golf" : "guess";
   const supabase = await serverClient();
@@ -23,56 +26,46 @@ export default async function GamePage({ searchParams }: { searchParams: Promise
   if (!auth.user) redirect("/login?next=/room/game");
   const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle();
   if (!seat) redirect("/room");
-  const [{ data: room }, { count }, { data: state }, { data: drawState }, { data: gomokuState }, { data: golfState }] = await Promise.all([
+  const [{ data: room }, { count }, { data: state }, { data: drawState }, { data: gomokuState }, { data: golfState }, names] = await Promise.all([
     supabase.from("couple_rooms").select("id, mood").eq("id", seat.room_id).maybeSingle(),
     supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
     which === "guess" ? supabase.rpc("guess_state", { target: seat.room_id }) : Promise.resolve({ data: null }),
     which === "draw" ? supabase.rpc("draw_state", { target: seat.room_id }) : Promise.resolve({ data: null }),
     which === "gomoku" ? supabase.rpc("gomoku_state", { target: seat.room_id }) : Promise.resolve({ data: null }),
     which === "golf" ? supabase.rpc("golf_state", { target: seat.room_id }) : Promise.resolve({ data: null }),
+    roomNames(supabase, seat.room_id, auth.user.id),
   ]);
   if (!room) redirect("/room");
   const full = (count ?? 0) >= 2;
+  const partnerName = names.partnerNick ?? t("common.partner");
+  const games = [["guess", "/room/game"], ["draw", "/room/game?g=draw"], ["gomoku", "/room/game?g=gomoku"], ["golf", "/room/game?g=golf"]] as const;
 
   return (
-    <main className="wrap room-wrap">
-      <header className="top">
-        <a className="brand" href="/room">
-          <img alt="" width="32" height="32" src="/icons/icon-192.png" />
-          둘이
-        </a>
-        <form action={signOut}>
-          <button type="submit" className="link">로그아웃</button>
-        </form>
-      </header>
+    <RoomShell>
       <div className="room" data-mood={isMood(room.mood) ? room.mood : "berry"}>
         <RoomTabs active="game" />
-        <h1 className="visually-hidden">게임</h1>
+        <h1 className="visually-hidden">{t("game.title")}</h1>
         {full ? (
           <>
-            <nav className="game-switch" aria-label="게임 고르기">
-              <a href="/room/game" aria-current={which === "guess" ? "page" : undefined}>상대 선택 맞히기</a>
-              <a href="/room/game?g=draw" aria-current={which === "draw" ? "page" : undefined}>100초 그림 퀴즈</a>
-              <a href="/room/game?g=gomoku" aria-current={which === "gomoku" ? "page" : undefined}>오목</a>
-              <a href="/room/game?g=golf" aria-current={which === "golf" ? "page" : undefined}>미니골프</a>
+            <nav className="game-switch" aria-label={t("game.pick")}>
+              {games.map(([key, href]) => (
+                <a key={key} href={href} aria-current={which === key ? "page" : undefined}>{t(`game.${key}`)}</a>
+              ))}
             </nav>
             {which === "golf" ? (
-              <GolfGame roomId={room.id} initial={(golfState as GolfState | null) ?? { game: null, best: {}, nowMs: Date.now() }} />
+              <GolfGame roomId={room.id} partnerName={partnerName} initial={(golfState as GolfState | null) ?? { game: null, best: {}, nowMs: Date.now() }} />
             ) : which === "gomoku" ? (
-              <GomokuGame roomId={room.id} initial={(gomokuState as GomokuState | null) ?? { game: null, myWins: 0, partnerWins: 0, draws: 0 }} />
+              <GomokuGame roomId={room.id} partnerName={partnerName} initial={(gomokuState as GomokuState | null) ?? { game: null, myWins: 0, partnerWins: 0, draws: 0 }} />
             ) : which === "draw" ? (
-              <DrawGame
-                roomId={room.id}
-                initial={(drawState as DrawState | null) ?? { game: null, nowMs: Date.now(), records: {} }}
-              />
+              <DrawGame roomId={room.id} partnerName={partnerName} initial={(drawState as DrawState | null) ?? { game: null, nowMs: Date.now(), records: {} }} />
             ) : (
-              <GuessGame roomId={room.id} initial={(state as GuessState | null) ?? { game: null }} />
+              <GuessGame roomId={room.id} partnerName={partnerName} initial={(state as GuessState | null) ?? { game: null }} />
             )}
           </>
         ) : (
-          <p className="notice">상대가 방에 들어오면 함께 게임할 수 있어요. <a href="/room">초대 링크 만들기</a></p>
+          <p className="notice">{t("game.needPartner")} <a href="/room">{t("chat.inviteLink")}</a></p>
         )}
       </div>
-    </main>
+    </RoomShell>
   );
 }

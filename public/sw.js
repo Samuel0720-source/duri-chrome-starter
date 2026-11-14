@@ -1,5 +1,5 @@
 // Only this public fallback is cached. App HTML, authentication and API responses stay on the network.
-const CACHE = "duri-public-fallback-v1";
+const CACHE = "duri-public-fallback-v2";
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches

@@ -8,8 +8,8 @@ test("only the next hundred-day mark and the next anniversary, plus special days
   // 2026-11-09: Christmas is 46 days away; Valentine's Day (97 days) also fits; White Day (125) does not.
   const list = upcomingMilestones("2026-08-13", "2026-11-09");
   assert.deepEqual(labels(list), ["100일", "크리스마스", "발렌타인데이", "1주년"]);
-  assert.deepEqual(list[0], { label: "100일", date: "2026-11-20", daysLeft: 11 });
-  assert.deepEqual(list[1], { label: "크리스마스", date: "2026-12-25", daysLeft: 46 });
+  assert.deepEqual(list[0], { label: "100일", kind: "days", n: 100, date: "2026-11-20", daysLeft: 11 });
+  assert.deepEqual(list[1], { label: "크리스마스", kind: "christmas", date: "2026-12-25", daysLeft: 46 });
   assert.equal(list.at(-1).date, "2027-08-13");
 });
 
@@ -25,7 +25,7 @@ test("a special day across the new year is found", () => {
 });
 
 test("a milestone falling today counts as zero days left", () => {
-  assert.deepEqual(upcomingMilestones("2026-08-13", "2026-11-20")[0], { label: "100일", date: "2026-11-20", daysLeft: 0 });
+  assert.deepEqual(upcomingMilestones("2026-08-13", "2026-11-20")[0], { label: "100일", kind: "days", n: 100, date: "2026-11-20", daysLeft: 0 });
 });
 
 test("a first day still ahead starts the count from that day", () => {
@@ -36,4 +36,11 @@ test("a first day still ahead starts the count from that day", () => {
 test("a 29 February start falls on 28 February in common years", () => {
   const list = upcomingMilestones("2024-02-29", "2026-11-09");
   assert.ok(list.some((m) => m.label === "3주년" && m.date === "2027-02-28"));
+});
+
+test("each milestone carries a kind (and a number) so any language can name it", async () => {
+  const { makeT } = await import("../../src/i18n/dict.ts");
+  const en = makeT("en");
+  const list = upcomingMilestones("2026-08-13", "2026-11-09");
+  assert.deepEqual(list.map((m) => en(`ms.${m.kind}`, { n: m.n ?? 0 })), ["Day 100", "Christmas", "Valentine's Day", "1-year anniversary"]);
 });

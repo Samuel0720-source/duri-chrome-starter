@@ -135,12 +135,36 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageA.locator(".plan-list").getByText("새해 일출 보기")).toBeVisible();
   await expect(pageB.locator(".plan-list").getByText("새해 일출 보기")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.locator(".room-count").getByText("새해 일출 보기")).toBeVisible();
-  // B switches the shared mood; A's page takes it live.
-  await pageB.getByText("방 설정", { exact: true }).click();
+  // Settings. B switches the shared theme there; A's home page takes it live.
+  await pageB.getByRole("link", { name: "설정", exact: true }).click();
+  await expect(pageB.getByRole("heading", { name: "설정", exact: true })).toBeVisible();
   await pageB.locator('label.mood-option[data-mood="night"]').click();
-  await pageB.getByRole("button", { name: "이 무드로 바꾸기" }).click();
+  await pageB.getByRole("button", { name: "이 테마로 바꾸기" }).click();
   await expect(pageB.locator('.room[data-mood="night"]')).toHaveCount(1);
   await expect(pageA.locator('.room[data-mood="night"]')).toHaveCount(1, { timeout: 10_000 });
+  // A gives B a nickname; B's settings show what A calls B.
+  await pageA.getByRole("link", { name: "설정", exact: true }).click();
+  await pageA.getByLabel("내가 상대를 부르는 애칭").fill("곰돌이");
+  await pageA.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(pageA.getByText("저장했어요.")).toBeVisible();
+  await expect(pageA.getByLabel("내가 상대를 부르는 애칭")).toHaveValue("곰돌이");
+  await pageB.reload();
+  await expect(pageB.getByTestId("nick-theirs")).toHaveText("상대가 나를 부르는 애칭: 곰돌이");
+  // The guide and the account section live here too.
+  await expect(pageB.getByText("사용 가이드")).toBeVisible();
+  await expect(pageB.getByText("계정 삭제", { exact: true }).first()).toBeVisible();
+  // B switches the language to English and back; only B's screen changes.
+  await pageB.locator("#lang").selectOption("en");
+  await pageB.getByRole("button", { name: "언어 바꾸기" }).click();
+  await expect(pageB.getByRole("heading", { name: "Settings", exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.getByRole("link", { name: "Chat", exact: true })).toBeVisible();
+  await expect(pageB.getByTestId("nick-theirs")).toHaveText("My partner calls me: 곰돌이");
+  await expect(pageB.locator("html")).toHaveAttribute("lang", "en");
+  await pageA.reload();
+  await expect(pageA.getByRole("heading", { name: "설정", exact: true })).toBeVisible();
+  await pageB.locator("#lang").selectOption("ko");
+  await pageB.getByRole("button", { name: "Change language" }).click();
+  await expect(pageB.getByRole("heading", { name: "설정", exact: true })).toBeVisible({ timeout: 10_000 });
 
   // 3c. Chat. Both open it; each sees the other's message without reloading.
   await pageA.getByRole("link", { name: "대화", exact: true }).click();
@@ -150,10 +174,18 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await pageA.getByLabel("메시지").fill("안녕, 오늘 저녁 뭐 먹을까?");
   await pageA.getByRole("button", { name: "보내기" }).click();
   await expect(pageA.locator(".mine .bubble", { hasText: "오늘 저녁" })).toBeVisible();
+  // Read receipt: not seen until B's chat (in front) shows it, then "읽음 · 방금" for A.
+  await pageB.bringToFront();
   await expect(pageB.locator(".theirs .bubble", { hasText: "오늘 저녁" })).toBeVisible({ timeout: 10_000 });
+  await expect(pageA.getByTestId("chat-seen")).toHaveText("읽음 · 방금", { timeout: 10_000 });
   await pageB.getByLabel("메시지").fill("떡볶이!");
   await pageB.getByRole("button", { name: "보내기" }).click();
+  await expect(pageB.getByTestId("chat-seen")).toHaveAttribute("data-seen", /seen|unseen/);
+  await pageA.bringToFront();
   await expect(pageA.locator(".theirs .bubble", { hasText: "떡볶이" })).toBeVisible({ timeout: 10_000 });
+  // On A's screen B's message carries the nickname A chose; B sees that A read it.
+  await expect(pageA.locator(".chat-name").first()).toHaveText("곰돌이");
+  await expect(pageB.getByTestId("chat-seen")).toHaveText("읽음 · 방금", { timeout: 10_000 });
   // A reload shows the same conversation from the server.
   await pageA.reload();
   await expect(pageA.locator(".chat-list .bubble")).toHaveCount(2);
@@ -265,7 +297,7 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageB.getByTestId("draw-final")).toHaveText("1개", { timeout: 15_000 });
   await expect(pageA.locator(".draw-records")).toContainText("1개");
   // One more round where A chooses that B draws.
-  await pageA.getByText("상대가 그려요").click();
+  await pageA.getByText("곰돌이가 그려요").click();
   await pageA.getByRole("button", { name: "한 판 더" }).click();
   await expect(pageA.getByText("나는 맞히는 사람")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.getByText("나는 그리는 사람")).toBeVisible({ timeout: 10_000 });
@@ -279,10 +311,10 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await pageB.getByRole("link", { name: "함께 보기", exact: true }).click();
   await expect(pageA.locator(".watch[data-watch=idle]")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.locator(".watch[data-watch=idle]")).toBeVisible({ timeout: 10_000 });
-  await pageA.getByLabel("유튜브 링크").fill("https://evil.example.com/watch?v=dQw4w9WgXcQ");
+  await pageA.getByLabel("영상 링크").fill("https://evil.example.com/watch?v=dQw4w9WgXcQ");
   await pageA.getByRole("button", { name: "영상 정하기" }).click();
-  await expect(pageA.getByText("유튜브 링크가 아닌 것 같아요")).toBeVisible();
-  await pageA.getByLabel("유튜브 링크").fill("https://youtu.be/dQw4w9WgXcQ?si=share");
+  await expect(pageA.getByText("열 수 없는 영상 링크예요")).toBeVisible();
+  await pageA.getByLabel("영상 링크").fill("https://youtu.be/dQw4w9WgXcQ?si=share");
   await pageA.getByRole("button", { name: "영상 정하기" }).click();
   await expect(pageA.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
@@ -302,8 +334,13 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageB.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
   await expect.poll(() => playerState(pageB), { timeout: 10_000 }).toBe(2);
   const before = await playerTime(pageB);
-  await pageB.getByRole("button", { name: "+10초" }).click();
+  await pageB.getByRole("button", { name: "10초 앞으로" }).click();
   await expect.poll(async () => (await playerTime(pageA)) - before, { timeout: 10_000 }).toBeGreaterThan(8);
+  // The → key does the same (outside a text field), and the partner follows again.
+  await pageB.waitForTimeout(400);
+  await pageB.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await pageB.keyboard.press("ArrowRight");
+  await expect.poll(async () => (await playerTime(pageA)) - before, { timeout: 10_000 }).toBeGreaterThan(18);
   await pageA.getByRole("button", { name: "같이 재생" }).click();
   await expect(pageB.locator(".watch[data-watch=playing]")).toBeVisible({ timeout: 10_000 });
   // Someone presses pause on the video itself (not our button): the partner follows.
@@ -330,9 +367,9 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageA.getByRole("button", { name: "준비됐어요" })).toBeEnabled({ timeout: 10_000 });
   await pageA.evaluate(() => (window as any).__yt.fail(150));
   await expect(pageA.getByText("퍼가기가 막혀 있어서")).toBeVisible();
-  await expect(pageA.getByRole("link", { name: "유튜브에서 열기" })).toBeVisible();
+  await expect(pageA.getByRole("link", { name: "원래 사이트에서 열기" })).toBeVisible();
   await expect(pageA.getByRole("button", { name: "준비됐어요" })).toBeDisabled();
-  await pageA.getByLabel("유튜브 링크").fill("https://www.youtube.com/watch?v=aaaaaaaaaaa");
+  await pageA.getByLabel("영상 링크").fill("https://www.youtube.com/watch?v=aaaaaaaaaaa");
   await pageA.getByRole("button", { name: "영상 정하기" }).click();
   await expect(pageA.getByText("퍼가기가 막혀 있어서")).toHaveCount(0, { timeout: 10_000 });
   await expect(pageA.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
@@ -381,7 +418,7 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageA.getByText("이겼어요!")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.getByText("졌어요.")).toBeVisible({ timeout: 10_000 });
   await expect(pageA.locator('.cell[data-win="true"]')).toHaveCount(5);
-  await expect(pageA.getByText("나 1승 · 상대 0승 · 무승부 0")).toBeVisible();
+  await expect(pageA.getByText("나 1승 · 곰돌이 0승 · 무승부 0")).toBeVisible();
   await expect(pageB.getByText("나 0승 · 상대 1승 · 무승부 0")).toBeVisible({ timeout: 10_000 });
   await pageB.reload();
   await expect(pageB.locator('.cell[data-win="true"]')).toHaveCount(5, { timeout: 10_000 });
@@ -450,7 +487,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   // Find the message by its text: Next.js also keeps an empty role="alert" route announcer on every page.
   await expect(pageC.getByText("만료되었거나 이미 사용된 초대예요", { exact: false })).toBeVisible();
 
-  // 5. B leaves. A is told.
+  // 5. B leaves (from Settings). A is told.
+  await pageB.getByRole("link", { name: "설정", exact: true }).click();
   await pageB.getByText("방 나가기", { exact: true }).first().click();
   await pageB.getByLabel("네, 방을 닫고 나갈게요").check();
   await pageB.getByRole("button", { name: "방 나가기" }).click();

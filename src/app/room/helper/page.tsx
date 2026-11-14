@@ -1,13 +1,15 @@
 import { redirect } from "next/navigation";
 import { isMood } from "../../../core/moods";
+import { getT } from "../../../i18n/server";
 import { serverClient } from "../../../lib/supabase/server";
-import { signOut } from "../actions";
 import { RoomTabs } from "../room-tabs";
+import { RoomShell } from "../room-shell";
 import { Helper, type Usage } from "./helper";
 
 export const dynamic = "force-dynamic";
 
 export default async function HelperPage() {
+  const { t } = await getT();
   const supabase = await serverClient();
   if (!supabase) redirect("/login?error=config");
   const { data: auth } = await supabase.auth.getUser();
@@ -22,21 +24,12 @@ export default async function HelperPage() {
   const { data: usage } = await supabase.rpc("api_usage", { target: room.id });
 
   return (
-    <main className="wrap room-wrap">
-      <header className="top">
-        <a className="brand" href="/room">
-          <img alt="" width="32" height="32" src="/icons/icon-192.png" />
-          둘이
-        </a>
-        <form action={signOut}>
-          <button type="submit" className="link">로그아웃</button>
-        </form>
-      </header>
+    <RoomShell>
       <div className="room" data-mood={isMood(room.mood) ? room.mood : "berry"}>
         <RoomTabs active="helper" />
-        <h1 className="visually-hidden">도우미</h1>
+        <h1 className="visually-hidden">{t("helper.title")}</h1>
         <Helper hasPartner={(count ?? 0) >= 2} usage={usage as Usage | null} />
       </div>
-    </main>
+    </RoomShell>
   );
 }

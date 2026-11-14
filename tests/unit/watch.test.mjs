@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { parseYouTube, targetPosition, classifyRevision, shouldCheckDrift, formatClock, playerErrorMessage } from "../../src/core/watch.ts";
+import { parseYouTube, parseVideo, videoPage, targetPosition, classifyRevision, shouldCheckDrift, formatClock, playerErrorKey } from "../../src/core/watch.ts";
 import { shouldCorrectDrift } from "../../src/core/playback.ts";
 
 const VID = "dQw4w9WgXcQ";
@@ -65,8 +65,21 @@ test("clock text and error messages", () => {
   assert.equal(formatClock(65.9), "1:05");
   assert.equal(formatClock(3725), "1:02:05");
   assert.equal(formatClock(-3), "0:00");
-  assert.match(playerErrorMessage(150), /퍼가기/);
-  assert.match(playerErrorMessage(101), /퍼가기/);
-  assert.match(playerErrorMessage(100), /비공개/);
-  assert.ok(playerErrorMessage(5).length > 5);
+  assert.equal(playerErrorKey(150), "watch.err.embed");
+  assert.equal(playerErrorKey(101), "watch.err.embed");
+  assert.equal(playerErrorKey(100), "watch.err.gone");
+  assert.equal(playerErrorKey(5), "watch.err.load");
+});
+
+test("other video links: Vimeo (with the unlisted hash) and https video files, the same rules as the database", () => {
+  assert.deepEqual(parseVideo("https://youtu.be/dQw4w9WgXcQ"), { source: "youtube", ref: "dQw4w9WgXcQ" });
+  assert.deepEqual(parseVideo("https://vimeo.com/76979871"), { source: "vimeo", ref: "76979871" });
+  assert.deepEqual(parseVideo("https://vimeo.com/123456789/AbCdEf1234"), { source: "vimeo", ref: "123456789:abcdef1234" });
+  assert.deepEqual(parseVideo("https://player.vimeo.com/video/123456789?h=abcdef12&autoplay=1"), { source: "vimeo", ref: "123456789:abcdef12" });
+  assert.deepEqual(parseVideo("https://cdn.example.com/clips/trip.MP4?sig=abc"), { source: "file", ref: "https://cdn.example.com/clips/trip.MP4?sig=abc" });
+  for (const bad of ["http://example.com/a.mp4", "https://example.com/a.exe", "https://example.com/our trip.mp4", "https://www.netflix.com/watch/123", ""]) {
+    assert.equal(parseVideo(bad), null, bad);
+  }
+  assert.equal(videoPage("vimeo", "123456789:abcdef12"), "https://vimeo.com/123456789");
+  assert.equal(videoPage("youtube", "dQw4w9WgXcQ"), "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
 });

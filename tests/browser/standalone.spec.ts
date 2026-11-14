@@ -6,6 +6,7 @@ test("the PWA installs and launches the full website in standalone mode", async 
   const context = await playwright.chromium.launchPersistentContext(testInfo.outputPath("pwa-profile"), {
     channel: "chromium",
     headless: true,
+    locale: "ko-KR",
     viewport: null,
     executablePath: process.env.CHROMIUM_PATH || undefined,
   });

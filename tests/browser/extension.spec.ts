@@ -101,6 +101,7 @@ test("unpacked Chrome extension passes the same scenario via native extension AP
   const context = await playwright.chromium.launchPersistentContext(testInfo.outputPath("profile"), {
     headless: true,
     channel: "chromium",
+    locale: "ko-KR",
     executablePath: process.env.CHROMIUM_PATH || undefined,
     ignoreDefaultArgs: ["--disable-extensions"],
     args: ["--enable-unsafe-extension-debugging"],

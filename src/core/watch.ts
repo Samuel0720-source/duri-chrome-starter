@@ -1,7 +1,9 @@
 // "함께 보기" small pure helpers. The database keeps the timetable; these only read it.
 import { shouldCorrectDrift } from "./playback.ts";
 
+export type VideoSource = "youtube" | "vimeo" | "file";
 export type WatchState = {
+  source?: VideoSource; // older states (before Vimeo / files) have no source: YouTube
   videoId: string | null;
   positionSec: number; // reference position (seconds)
   refMs: number; // database time (epoch ms) at which positionSec was true
@@ -21,6 +23,31 @@ export function parseYouTube(raw: string): string | null {
   const text = raw.trim();
   if (text.length === 0 || text.length > 300 || !HOST.test(text)) return null;
   return ID.exec(text)?.[1] ?? null;
+}
+
+// The same rules as duri_private.parse_video: YouTube, Vimeo (with the hash of an unlisted video), or an https
+// address of a video file the browser can play.
+const VIMEO = /^https?:\/\/(?:www\.|player\.)?vimeo\.com\/(?:video\/|channels\/[A-Za-z0-9_-]+\/)?([0-9]{5,12})(?:\/([0-9a-f]{6,24}))?(?:[/?#].*)?$/i;
+const FILE = /^https:\/\/[^\s"'<>\\]+\.(mp4|webm|ogg|ogv|mov|m4v)([?#][^\s"'<>\\]*)?$/i;
+export function parseVideo(raw: string): { source: VideoSource; ref: string } | null {
+  const text = raw.trim();
+  if (text.length === 0 || text.length > 600) return null;
+  const yt = parseYouTube(text);
+  if (yt) return { source: "youtube", ref: yt };
+  const v = VIMEO.exec(text);
+  if (v) {
+    const hash = v[2] ?? /[?&]h=([0-9a-fA-F]{6,24})/.exec(text)?.[1];
+    return { source: "vimeo", ref: v[1] + (hash ? ":" + hash.toLowerCase() : "") };
+  }
+  if (FILE.test(text)) return { source: "file", ref: text };
+  return null;
+}
+
+// Where the original can be opened in a new tab.
+export function videoPage(source: VideoSource, ref: string): string {
+  if (source === "youtube") return "https://www.youtube.com/watch?v=" + ref;
+  if (source === "vimeo") return "https://vimeo.com/" + ref.split(":")[0];
+  return ref;
 }
 
 // Where the video should be right now. Playing: reference + time since the reference. Paused: the reference.
@@ -63,10 +90,10 @@ export function formatClock(seconds: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${rest}` : `${m}:${rest}`;
 }
 
-// YouTube's player error codes -> what the person should do next.
-export function playerErrorMessage(code: number): string {
-  if (code === 101 || code === 150) return "이 영상은 퍼가기가 막혀 있어서 여기서 같이 볼 수 없어요. 다른 영상 링크를 넣어 주세요.";
-  if (code === 100) return "삭제됐거나 비공개인 영상이에요. 다른 영상 링크를 넣어 주세요.";
-  if (code === 2) return "링크의 영상 번호가 올바르지 않아요. 링크를 다시 확인해 주세요.";
-  return "영상을 불러오지 못했어요. 잠시 뒤에 다시 하거나 다른 영상을 골라 주세요.";
+// YouTube's player error codes -> a dictionary key saying what to do next.
+export function playerErrorKey(code: number) {
+  if (code === 101 || code === 150) return "watch.err.embed" as const;
+  if (code === 100) return "watch.err.gone" as const;
+  if (code === 2) return "watch.err.id" as const;
+  return "watch.err.load" as const;
 }

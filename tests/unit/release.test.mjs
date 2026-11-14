@@ -1,0 +1,47 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { inflateRawSync } from "node:zlib";
+import { checkManifest, releaseExtension } from "../../scripts/release-extension.mjs";
+
+// Reads a zip's central directory back, so the test checks what the store would unpack.
+function unzip(buf) {
+  const end = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  const count = buf.readUInt16LE(end + 10);
+  let at = buf.readUInt32LE(end + 16);
+  const files = {};
+  for (let i = 0; i < count; i++) {
+    const size = buf.readUInt32LE(at + 20), nameLen = buf.readUInt16LE(at + 28), extra = buf.readUInt16LE(at + 30), comment = buf.readUInt16LE(at + 32);
+    const local = buf.readUInt32LE(at + 42);
+    const name = buf.toString("utf8", at + 46, at + 46 + nameLen);
+    const lnameLen = buf.readUInt16LE(local + 26), lextra = buf.readUInt16LE(local + 28);
+    files[name] = inflateRawSync(buf.subarray(local + 30 + lnameLen + lextra, local + 30 + lnameLen + lextra + size));
+    at += 46 + nameLen + extra + comment;
+  }
+  return files;
+}
+
+test("store build: production https address, only the storage permission, both languages, a valid zip", async () => {
+  const out = await mkdtemp(join(tmpdir(), "duri-release-"));
+  const r = await releaseExtension("https://duri.example", out);
+  assert.match(r.file, /duri-extension-0\.2\.0\.zip$/);
+  const files = unzip(await readFile(r.file));
+  assert.equal(files["origin.js"].toString(), 'export const webOrigin = "https://duri.example";\n');
+  const manifest = JSON.parse(files["manifest.json"].toString());
+  assert.deepEqual(manifest.permissions, ["storage"]);
+  assert.equal(JSON.parse(files["_locales/en/messages.json"]).name.message, "Duri · Anniversaries");
+  assert.equal(JSON.parse(files["_locales/ko/messages.json"]).name.message, "둘이 · 기념일");
+  for (const f of ["popup.html", "popup.js", "core/dates.js", "core/preview.js", "icons/128.png"]) assert.ok(files[f], f);
+  await assert.rejects(releaseExtension("http://localhost:3000", out), /https address/);
+});
+
+test("the store checks catch what review would reject", () => {
+  const ok = { manifest_version: 3, version: "0.2.0", permissions: ["storage"], default_locale: "en", icons: { 16: 1, 32: 1, 48: 1, 128: 1 } };
+  const files = ["_locales/en/messages.json", "_locales/ko/messages.json"];
+  assert.deepEqual(checkManifest(ok, files), []);
+  assert.deepEqual(checkManifest({ ...ok, permissions: ["storage", "tabs"] }, files), ["unexpected permission: tabs"]);
+  assert.ok(checkManifest({ ...ok, host_permissions: ["<all_urls>"] }, files).length === 1);
+  assert.ok(checkManifest(ok, ["_locales/en/messages.json"]).some((p) => p.includes("ko")));
+});

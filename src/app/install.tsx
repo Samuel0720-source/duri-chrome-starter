@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useT } from "../i18n/client";
 type InstallEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
 export function InstallControl() {
+  const { t } = useT();
   const [offer, setOffer] = useState<InstallEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [help, setHelp] = useState(false);
@@ -49,17 +51,15 @@ export function InstallControl() {
       setHelp(true);
     }
   }
-  if (installed) return <span className="install-state">설치된 앱</span>;
+  if (installed) return <span className="install-state">{t("install.installed")}</span>;
   return (
     <div className="install">
       <button aria-expanded={help} onClick={install}>
-        앱 설치
+        {t("install.button")}
       </button>
       {help && (
         <div className="install-help" role="status">
-          컴퓨터 Chrome 메뉴에서 ‘전송, 저장 및 공유 → 페이지를 앱으로 설치’를 선택하세요.
-          휴대폰에서는 브라우저 메뉴나 공유 메뉴의 ‘앱 설치’ 또는 ‘홈 화면에
-          추가’를 찾아보세요.
+          {t("install.howto")}
         </div>
       )}
     </div>

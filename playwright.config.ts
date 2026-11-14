@@ -12,6 +12,7 @@ export default defineConfig({
   use: {
     baseURL: preview ? new URL(preview).origin : "http://127.0.0.1:3189",
     headless: true,
+    locale: "ko-KR",
     launchOptions: process.env.CHROMIUM_PATH
       ? { executablePath: process.env.CHROMIUM_PATH }
       : {},

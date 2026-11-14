@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { browserClient } from "../../../lib/supabase/browser";
-import { roomErrorMessage } from "../../../core/auth-paths";
+import { roomErrorKey } from "../../../core/auth-paths";
+import { guessQuestionsEn } from "../../../core/guess-en";
+import { useT } from "../../../i18n/client";
 import { guessQuestions, type GuessRound, type GuessState } from "../../../core/guess";
 
 // "상대 선택 맞히기". The browser only ever receives what guess_state() allows:
 // a partner's answer for a round arrives after both have answered that round.
-export function GuessGame({ roomId, initial }: { roomId: string; initial: GuessState }) {
+export function GuessGame({ roomId, initial, partnerName }: { roomId: string; initial: GuessState; partnerName: string }) {
+  const { t } = useT();
   const [state, setState] = useState<GuessState>(initial);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,7 +53,7 @@ export function GuessGame({ roomId, initial }: { roomId: string; initial: GuessS
     setBusy(true);
     const { error: failure } = await supabase.rpc(fn, args);
     setBusy(false);
-    if (failure) setError(roomErrorMessage(failure.message));
+    if (failure) setError(t(roomErrorKey(failure.message)));
     else setError("");
     await refresh();
   }
@@ -58,9 +61,9 @@ export function GuessGame({ roomId, initial }: { roomId: string; initial: GuessS
   if (!state.game) {
     return (
       <section className="sheet guess-intro">
-        <h2>상대 선택 맞히기</h2>
-        <p className="lead">질문 세 개. 내 답과, 상대가 고를 답을 함께 적어요. 둘 다 답해야 서로의 답이 열려요.</p>
-        <button type="button" className="button" disabled={busy} onClick={() => call("start_guess_game", { target: roomId })}>게임 시작</button>
+        <h2>{t("guess.title")}</h2>
+        <p className="lead">{t("guess.intro", { name: partnerName })}</p>
+        <button type="button" className="button" disabled={busy} onClick={() => call("start_guess_game", { target: roomId })}>{t("guess.start")}</button>
         {error && <p role="alert" className="error">{error}</p>}
       </section>
     );
@@ -70,17 +73,17 @@ export function GuessGame({ roomId, initial }: { roomId: string; initial: GuessS
     <div className="guess">
       {state.finished && (
         <section className="sheet guess-score" aria-live="polite">
-          <h2>결과</h2>
+          <h2>{t("guess.result")}</h2>
           <p className="score-line">
-            <span>내가 맞힌 수</span> <strong>{state.score.me}</strong>
-            <span>상대가 맞힌 수</span> <strong>{state.score.partner}</strong>
+            <span>{t("guess.myScore")}</span> <strong>{state.score.me}</strong>
+            <span>{t("guess.partnerScore", { name: partnerName })}</span> <strong>{state.score.partner}</strong>
           </p>
-          <button type="button" className="button" disabled={busy} onClick={() => call("start_guess_game", { target: roomId })}>새 게임</button>
+          <button type="button" className="button" disabled={busy} onClick={() => call("start_guess_game", { target: roomId })}>{t("guess.new")}</button>
         </section>
       )}
       <ol className="guess-rounds">
         {state.rounds.map((r) => (
-          <Round key={state.game + ":" + r.round} game={state.game} round={r} busy={busy} onAnswer={call} />
+          <Round key={state.game + ":" + r.round} game={state.game} round={r} busy={busy} onAnswer={call} partnerName={partnerName} />
         ))}
       </ol>
       {error && <p role="alert" className="error">{error}</p>}
@@ -88,11 +91,12 @@ export function GuessGame({ roomId, initial }: { roomId: string; initial: GuessS
   );
 }
 
-function Round({ game, round, busy, onAnswer }: {
-  game: string; round: GuessRound; busy: boolean;
+function Round({ game, round, busy, onAnswer, partnerName }: {
+  game: string; round: GuessRound; busy: boolean; partnerName: string;
   onAnswer: (fn: string, args: Record<string, unknown>) => Promise<void>;
 }) {
-  const item = guessQuestions[round.question];
+  const { t, locale } = useT();
+  const item = (locale === "en" ? guessQuestionsEn : guessQuestions)[round.question];
   const [own, setOwn] = useState<number | null>(null);
   const [guess, setGuess] = useState<number | null>(null);
   if (!item) return null;
@@ -100,22 +104,22 @@ function Round({ game, round, busy, onAnswer }: {
 
   return (
     <li className="sheet guess-round" data-round={round.round}>
-      <p className="round-no">{round.round}번째 질문</p>
+      <p className="round-no">{t("guess.roundNo", { n: round.round })}</p>
       <h3>{item.q}</h3>
       {round.mine ? (
         <div className="round-result">
-          <p>나의 선택 <strong>{name(round.mine.own)}</strong></p>
-          <p>내 예상 <strong>{name(round.mine.guess)}</strong></p>
+          <p>{t("guess.mine")} <strong>{name(round.mine.own)}</strong></p>
+          <p>{t("guess.myGuess")} <strong>{name(round.mine.guess)}</strong></p>
           {round.partner ? (
             <>
-              <p>상대의 선택 <strong>{name(round.partner.own)}</strong></p>
+              <p>{t("guess.theirs", { name: partnerName })} <strong>{name(round.partner.own)}</strong></p>
               <p className={round.mine.guess === round.partner.own ? "hit" : "miss"}>
-                {round.mine.guess === round.partner.own ? "맞혔어요!" : "아쉬워요. 다음엔 맞힐 거예요."}
+                {round.mine.guess === round.partner.own ? t("guess.hit") : t("guess.miss")}
               </p>
-              <p className="hint">상대는 내가 {name(round.partner.guess)}을(를) 고를 거라고 예상했어요.</p>
+              <p className="hint">{t("guess.theyGuessed", { name: partnerName, pick: name(round.partner.guess) })}</p>
             </>
           ) : (
-            <p className="waiting">상대의 답을 기다리는 중이에요. 답이 오면 바로 열려요.</p>
+            <p className="waiting">{t("guess.waiting", { name: partnerName })}</p>
           )}
         </div>
       ) : (
@@ -127,9 +131,9 @@ function Round({ game, round, busy, onAnswer }: {
             onAnswer("answer_guess", { game, round_no: round.round, own, guess });
           }}
         >
-          {round.partnerAnswered && <p className="hint">상대는 이미 답했어요.</p>}
+          {round.partnerAnswered && <p className="hint">{t("guess.partnerAnswered", { name: partnerName })}</p>}
           <fieldset>
-            <legend>나의 선택</legend>
+            <legend>{t("guess.mine")}</legend>
             <div className="choice-grid">
               {item.options.map((o, i) => (
                 <label key={o} className="choice">
@@ -140,7 +144,7 @@ function Round({ game, round, busy, onAnswer }: {
             </div>
           </fieldset>
           <fieldset>
-            <legend>상대는 무엇을 골랐을까요?</legend>
+            <legend>{t("guess.whatTheyPicked", { name: partnerName })}</legend>
             <div className="choice-grid">
               {item.options.map((o, i) => (
                 <label key={o} className="choice">
@@ -150,7 +154,7 @@ function Round({ game, round, busy, onAnswer }: {
               ))}
             </div>
           </fieldset>
-          <button type="submit" className="button" disabled={busy || own === null || guess === null}>답 제출</button>
+          <button type="submit" className="button" disabled={busy || own === null || guess === null}>{t("guess.submit")}</button>
         </form>
       )}
     </li>

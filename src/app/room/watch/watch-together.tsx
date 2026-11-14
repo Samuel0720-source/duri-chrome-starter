@@ -2,57 +2,26 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { browserClient } from "../../../lib/supabase/browser";
-import { roomErrorMessage } from "../../../core/auth-paths";
+import { roomErrorKey } from "../../../core/auth-paths";
 import { clockOffset } from "../../../core/draw";
 import {
-  classifyRevision, formatClock, parseYouTube, playerErrorMessage, shouldCheckDrift, shouldCorrectDrift, targetPosition,
-  type WatchState,
+  classifyRevision, formatClock, parseVideo, shouldCheckDrift, shouldCorrectDrift, targetPosition, videoPage,
+  type VideoSource, type WatchState,
 } from "../../../core/watch";
-
-// The small part of the official YouTube IFrame Player API this screen uses.
-type YTPlayer = {
-  getCurrentTime(): number;
-  getPlayerState(): number;
-  seekTo(seconds: number, allowSeekAhead: boolean): void;
-  playVideo(): void;
-  pauseVideo(): void;
-  cueVideoById(options: { videoId: string; startSeconds?: number }): void;
-};
-type YTEvent = { data: number };
-declare global {
-  interface Window {
-    YT?: { Player: new (el: HTMLElement, options: unknown) => YTPlayer };
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-
-function loadYouTubeApi(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.YT?.Player) return resolve();
-    const earlier = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      earlier?.();
-      resolve();
-    };
-    if (!document.querySelector("script[data-youtube-api]")) {
-      const script = document.createElement("script");
-      script.src = "https://www.youtube.com/iframe_api";
-      script.dataset.youtubeApi = "1";
-      script.onerror = () => reject(new Error("youtube api"));
-      document.head.appendChild(script);
-    }
-  });
-}
+import { useT } from "../../../i18n/client";
+import type { MessageKey } from "../../../i18n/dict";
+import { createPlayer, type Player } from "./players";
 
 const GUARD_MS = 1200; // after we move the player ourselves, its own events are not "someone pressed a button"
 
 // "함께 보기". The database holds the one timetable (video, position, playing, revision).
 // This screen follows it, and sends a command only when a person on THIS device pressed something.
-export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartner: boolean }) {
+export function WatchTogether({ roomId, hasPartner, partnerName }: { roomId: string; hasPartner: boolean; partnerName: string }) {
+  const { t } = useT();
   const [ws, setWs] = useState<WatchState | null>(null);
   const [link, setLink] = useState("");
   const [error, setError] = useState("");
-  const [playerMsg, setPlayerMsg] = useState("");
+  const [playerMsg, setPlayerMsg] = useState<MessageKey | "">("");
   const [apiFailed, setApiFailed] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
   const [blocked, setBlocked] = useState(false);
@@ -61,7 +30,7 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
 
   const supabaseRef = useRef<ReturnType<typeof browserClient>>(null);
   const hostRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<YTPlayer | null>(null);
+  const playerRef = useRef<Player | null>(null);
   const readyRef = useRef(false);
   const wsRef = useRef<WatchState | null>(null);
   const offsetRef = useRef(0);
@@ -77,6 +46,10 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
   const timers = useRef<{ pause?: ReturnType<typeof setTimeout>; seek?: ReturnType<typeof setTimeout>; autoplay?: ReturnType<typeof setTimeout> }>({});
 
   const videoId = ws?.videoId ?? null;
+  const source: VideoSource = ws?.source ?? "youtube";
+  // What is loaded is identified by source + id, so a YouTube id and a file address never collide.
+  const videoKey = videoId ? source + ":" + videoId : null;
+  const keyOf = (st: WatchState) => (st.videoId ? (st.source ?? "youtube") + ":" + st.videoId : null);
 
   const guard = () => {
     guardUntil.current = performance.now() + GUARD_MS;
@@ -91,13 +64,15 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
     const p = playerRef.current;
     if (!p || !readyRef.current || !s.videoId) return;
     guard();
+    if (p.kind !== (s.source ?? "youtube")) return; // a different kind of player is being made for this video
     const target = targetPosition(s, Date.now(), offsetRef.current);
-    if (loadedRef.current !== s.videoId) {
-      loadedRef.current = s.videoId;
+    const key = keyOf(s);
+    if (loadedRef.current !== key) {
+      loadedRef.current = key;
       setPlayerMsg("");
-      p.cueVideoById({ videoId: s.videoId, startSeconds: target });
+      p.load(s.videoId, target);
     } else {
-      p.seekTo(target, true);
+      p.seekTo(target);
     }
     if (s.playing) {
       p.playVideo();
@@ -155,7 +130,7 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
       queueRef.current = queueRef.current.then(async () => {
         const { data, error: failure } = await supabase.rpc("watch_command", { target: roomId, kind, pos, request_id: request });
         if (failure) {
-          if (!failure.message.includes("Too many commands")) setError(roomErrorMessage(failure.message));
+          if (!failure.message.includes("Too many commands")) setError(t(roomErrorKey(failure.message)));
           await refresh(true);
           return;
         }
@@ -184,7 +159,7 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
       sendCommand("pause", now);
     } else {
       const to = Math.max(0, now + seekBy);
-      p.seekTo(to, true);
+      p.seekTo(to);
       sendCommand("seek", to);
     }
   };
@@ -203,7 +178,7 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
     };
     const ping = async () => {
       const { error: failure } = await supabase.rpc("watch_ping", { target: roomId });
-      if (failure) setError(roomErrorMessage(failure.message));
+      if (failure) setError(t(roomErrorKey(failure.message)));
     };
     const leave = () => {
       void supabase.rpc("watch_leave", { target: roomId }).then(() => undefined);
@@ -249,58 +224,59 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
 
   // ---------------------------------------------------------------- the player
   useEffect(() => {
-    if (!videoId) return;
+    if (!videoKey || !videoId) return;
     let cancelled = false;
-    const wanted = videoId;
-    loadYouTubeApi().then(
-      () => {
+    const existing = playerRef.current;
+    if (existing && existing.kind === source) {
+      // Same kind of player, new video: keep the one player and load into it.
+      if (readyRef.current && wsRef.current && loadedRef.current !== videoKey) applyServer(wsRef.current);
+      return;
+    }
+    if (existing) {
+      existing.destroy();
+      playerRef.current = null;
+      readyRef.current = false;
+      setPlayerReady(false);
+    }
+    const host = hostRef.current;
+    if (!host) return;
+    const wanted = videoKey;
+    createPlayer(source, host, videoId, {
+      onReady: () => {
         if (cancelled) return;
-        if (playerRef.current) {
-          // Same player, new video: the page keeps one iframe.
-          if (readyRef.current && wsRef.current && loadedRef.current !== wanted) applyServer(wsRef.current);
-          return;
+        readyRef.current = true;
+        loadedRef.current = wanted;
+        setPlayerReady(true);
+        if (wsRef.current) {
+          // The player was made with this video; if the room's video changed meanwhile, switch to it.
+          if (keyOf(wsRef.current) !== wanted) loadedRef.current = null;
+          applyServer(wsRef.current);
         }
-        const host = hostRef.current;
-        if (!host || !window.YT) return;
-        const slot = document.createElement("div");
-        host.replaceChildren(slot);
-        playerRef.current = new window.YT.Player(slot, {
-          videoId: wanted,
-          playerVars: { playsinline: 1, rel: 0, origin: window.location.origin },
-          events: {
-            onReady: () => {
-              readyRef.current = true;
-              loadedRef.current = wanted;
-              setPlayerReady(true);
-              if (wsRef.current) {
-                // The player was created with the first video; if the video changed meanwhile, switch to it.
-                if (wsRef.current.videoId !== wanted) loadedRef.current = null;
-                applyServer(wsRef.current);
-              }
-            },
-            onStateChange: (e: YTEvent) => {
-              const p = playerRef.current;
-              if (!p) return;
-              if (e.data === 3) bufferingRef.current = true;
-              else bufferingRef.current = false;
-              if (e.data === 1) {
-                setBlocked(false);
-                // Someone pressed play on the video itself while the room is paused.
-                if (!guarded() && wsRef.current && !wsRef.current.playing) sendCommand("play", p.getCurrentTime());
-              }
-              if ((e.data === 2 || e.data === 0) && !guarded() && wsRef.current?.playing) {
-                // A pause is checked again after a moment: seeking can flicker through "paused".
-                clearTimeout(timers.current.pause);
-                timers.current.pause = setTimeout(() => {
-                  const state = playerRef.current?.getPlayerState();
-                  if (!guarded() && wsRef.current?.playing && (state === 2 || state === 0)) sendCommand("pause", playerRef.current?.getCurrentTime() ?? 0);
-                }, 350);
-              }
-            },
-            onError: (e: YTEvent) => setPlayerMsg(playerErrorMessage(e.data)),
-            onAutoplayBlocked: () => setBlocked(true),
-          },
-        });
+      },
+      onState: (code) => {
+        const pl = playerRef.current;
+        if (!pl) return;
+        bufferingRef.current = code === 3;
+        if (code === 1) {
+          setBlocked(false);
+          // Someone pressed play on the video itself while the room is paused.
+          if (!guarded() && wsRef.current && !wsRef.current.playing) sendCommand("play", pl.getCurrentTime());
+        }
+        if ((code === 2 || code === 0) && !guarded() && wsRef.current?.playing) {
+          // A pause is checked again after a moment: seeking can flicker through "paused".
+          clearTimeout(timers.current.pause);
+          timers.current.pause = setTimeout(() => {
+            const state = playerRef.current?.getPlayerState();
+            if (!guarded() && wsRef.current?.playing && (state === 2 || state === 0)) sendCommand("pause", playerRef.current?.getCurrentTime() ?? 0);
+          }, 350);
+        }
+      },
+      onError: (key) => setPlayerMsg(key),
+      onAutoplayBlocked: () => setBlocked(true),
+    }).then(
+      (made) => {
+        if (cancelled) made.destroy();
+        else playerRef.current = made;
       },
       () => {
         if (!cancelled) setApiFailed(true);
@@ -309,7 +285,22 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
     return () => {
       cancelled = true;
     };
-  }, [videoId, applyServer, sendCommand]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoKey, source, applyServer, sendCommand]);
+
+  // Keyboard: ← / → move 10 seconds for both (not while typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      if (!readyRef.current || !wsRef.current?.videoId) return;
+      e.preventDefault();
+      press("seek", e.key === "ArrowLeft" ? -10 : 10);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   // Twice a second: show the time, notice a seek made on the video itself, and every 2 s check the drift.
   useEffect(() => {
@@ -342,7 +333,7 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
         const remote = targetPosition(s, Date.now(), offsetRef.current);
         if (shouldCorrectDrift(remote, cur, now - lastCorrection.current)) {
           guard();
-          p.seekTo(remote, true);
+          p.seekTo(remote);
           lastCorrection.current = now;
         }
       }
@@ -355,8 +346,8 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
     event.preventDefault();
     const supabase = supabaseRef.current;
     if (!supabase || busy) return;
-    if (!parseYouTube(link)) {
-      setError("유튜브 링크가 아닌 것 같아요. 예: https://youtu.be/영상번호");
+    if (!parseVideo(link)) {
+      setError(t("err.videoLink"));
       return;
     }
     setBusy(true);
@@ -364,7 +355,7 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
     const { error: failure } = await supabase.rpc("watch_set_video", { target: roomId, link });
     setBusy(false);
     if (failure) {
-      setError(roomErrorMessage(failure.message));
+      setError(t(roomErrorKey(failure.message)));
       return;
     }
     setLink("");
@@ -378,87 +369,88 @@ export function WatchTogether({ roomId, hasPartner }: { roomId: string; hasPartn
     setBusy(true);
     const { error: failure } = await supabase.rpc("watch_ready", { target: roomId, is_ready: value });
     setBusy(false);
-    setError(failure ? roomErrorMessage(failure.message) : "");
+    setError(failure ? t(roomErrorKey(failure.message)) : "");
     await refresh();
   }
 
   // ---------------------------------------------------------------- what the screen says
   const mode = !ws?.videoId ? "idle" : ws.playing ? "playing" : "paused";
   const partnerLine = !hasPartner
-    ? "상대가 방에 들어오면 같이 볼 수 있어요."
+    ? t("watch.noPartner")
     : !ws?.partnerHere
-      ? "상대는 아직 이 화면에 오지 않았어요. 오면 이어서 같이 볼 수 있어요."
+      ? t("watch.partnerAway", { name: partnerName })
       : ws.partnerReady
-        ? "상대도 준비했어요."
-        : "상대가 와 있어요. 아직 준비 전이에요.";
+        ? t("watch.partnerReady", { name: partnerName })
+        : t("watch.partnerHere", { name: partnerName });
   const canReady = Boolean(ws?.videoId) && playerReady && !playerMsg && !busy;
 
   return (
-    <div className="watch" data-watch={mode} data-revision={ws?.revision ?? 0}>
-      <section className="sheet watch-pick" aria-label="영상 고르기">
-        <h2>같이 볼 영상</h2>
+    <div className="watch" data-watch={mode} data-revision={ws?.revision ?? 0} data-source={source}>
+      <section className="sheet watch-pick" aria-label={t("watch.pick")}>
+        <h2>{t("watch.pickTitle")}</h2>
         <form className="chat-form" onSubmit={submitLink}>
-          <label className="visually-hidden" htmlFor="watch-link">유튜브 링크</label>
-          <input id="watch-link" name="link" inputMode="url" autoComplete="off" placeholder="유튜브 링크를 붙여 넣어 주세요" value={link} onChange={(e) => setLink(e.target.value)} />
-          <button type="submit" className="button" disabled={busy || link.trim() === ""}>영상 정하기</button>
+          <label className="visually-hidden" htmlFor="watch-link">{t("watch.linkLabel")}</label>
+          <input id="watch-link" name="link" inputMode="url" autoComplete="off" placeholder={t("watch.linkPlaceholder")} value={link} onChange={(e) => setLink(e.target.value)} />
+          <button type="submit" className="button" disabled={busy || link.trim() === ""}>{t("watch.set")}</button>
         </form>
-        <p className="hint">공유 링크, 쇼츠, 라이브 링크도 돼요. 링크 속 시작 시간은 쓰지 않고 처음부터 시작해요.</p>
+        <p className="hint">{t("watch.linkHint")}</p>
       </section>
 
-      <section className="sheet watch-stage" aria-label="영상">
+      <section className="sheet watch-stage" aria-label={t("watch.stage")}>
         <div className="watch-frame" data-empty={!videoId}>
           <div ref={hostRef} className="watch-host" />
-          {!videoId && <p className="watch-empty">링크를 넣으면 여기에 영상이 나와요.</p>}
+          {!videoId && <p className="watch-empty">{t("watch.empty")}</p>}
         </div>
-        {apiFailed && (
-          <p role="alert" className="error">유튜브 플레이어를 불러오지 못했어요. 인터넷 연결이나 광고 차단 설정을 확인하고 새로고침해 주세요.</p>
+        {videoId && (
+          <div className="watch-bar" role="group" aria-label={t("watch.bar")}>
+            <button type="button" className="button ghost" aria-label={t("watch.back10Label")} disabled={!playerReady} onClick={() => press("seek", -10)}>{t("watch.back10")}</button>
+            <button type="button" className="button" disabled={!playerReady || mode === "playing"} onClick={() => press("play")}>{t("watch.play")}</button>
+            <button type="button" className="button" disabled={!playerReady || mode !== "playing"} onClick={() => press("pause")}>{t("watch.pause")}</button>
+            <button type="button" className="button ghost" aria-label={t("watch.fwd10Label")} disabled={!playerReady} onClick={() => press("seek", 10)}>{t("watch.fwd10")}</button>
+            <p className="watch-clock" role="timer" aria-label={t("watch.position")}>{formatClock(clock)}</p>
+          </div>
         )}
+        {videoId && <p className="hint">{t("watch.keys")}</p>}
+        {apiFailed && <p role="alert" className="error">{t("watch.apiFailed")}</p>}
         {playerMsg && (
           <p role="alert" className="error">
-            {playerMsg}{" "}
-            {videoId && <a href={"https://www.youtube.com/watch?v=" + videoId} target="_blank" rel="noopener noreferrer">유튜브에서 열기</a>}
+            {t(playerMsg)}{" "}
+            {videoId && <a href={videoPage(source, videoId)} target="_blank" rel="noopener noreferrer">{t("watch.openOriginal")}</a>}
           </p>
         )}
         {blocked && !playerMsg && (
           <div className="watch-blocked" role="status">
-            <p>브라우저가 자동 재생을 막았어요. 버튼을 누르면 상대와 같은 장면에서 이어져요.</p>
+            <p>{t("watch.blocked", { name: partnerName })}</p>
             <button
               type="button"
               className="button"
               onClick={() => {
-                const s = wsRef.current;
+                const st = wsRef.current;
                 const p = playerRef.current;
-                if (!s || !p) return;
+                if (!st || !p) return;
                 guard();
-                p.seekTo(targetPosition(s, Date.now(), offsetRef.current), true);
+                p.seekTo(targetPosition(st, Date.now(), offsetRef.current));
                 p.playVideo();
                 setBlocked(false);
               }}
             >
-              눌러서 같이 보기
+              {t("watch.blockedButton")}
             </button>
           </div>
         )}
       </section>
 
       {videoId && (
-        <section className="sheet watch-controls" aria-label="같이 보기 조작">
+        <section className="sheet watch-controls" aria-label={t("watch.controls")}>
           <p className="waiting" aria-live="polite">{partnerLine}</p>
-          {ws && !ws.playing && ws.positionSec > 0 && <p className="hint">마지막으로 본 곳 {formatClock(ws.positionSec)}에서 이어 봐요.</p>}
+          {ws && !ws.playing && ws.positionSec > 0 && <p className="hint">{t("watch.resume", { t: formatClock(ws.positionSec) })}</p>}
           <div className="draw-actions">
             <button type="button" className="button" disabled={!canReady || (ws?.meReady ?? false)} onClick={() => setReady(true)}>
-              {ws?.meReady ? "준비 완료" : "준비됐어요"}
+              {ws?.meReady ? t("watch.readyDone") : t("watch.ready")}
             </button>
-            {ws?.meReady && <button type="button" className="button ghost" disabled={busy} onClick={() => setReady(false)}>준비 취소</button>}
+            {ws?.meReady && <button type="button" className="button ghost" disabled={busy} onClick={() => setReady(false)}>{t("watch.readyCancel")}</button>}
           </div>
-          <p className="hint">둘 다 준비를 누르면 같은 순간에 시작돼요. 시작한 뒤에는 누구든 재생·멈춤·이동을 누르면 둘 다 따라가요.</p>
-          <div className="watch-buttons" role="group" aria-label="같이 조작">
-            <button type="button" className="button ghost" disabled={!playerReady} onClick={() => press("seek", -10)}>−10초</button>
-            <button type="button" className="button" disabled={!playerReady || mode === "playing"} onClick={() => press("play")}>같이 재생</button>
-            <button type="button" className="button" disabled={!playerReady || mode !== "playing"} onClick={() => press("pause")}>같이 멈춤</button>
-            <button type="button" className="button ghost" disabled={!playerReady} onClick={() => press("seek", 10)}>+10초</button>
-          </div>
-          <p className="watch-clock" role="timer" aria-label="재생 위치">{formatClock(clock)}</p>
+          <p className="hint">{t("watch.readyHint")}</p>
         </section>
       )}
       {error && <p role="alert" className="error">{error}</p>}
