@@ -1,0 +1,108 @@
+/* Post office stationery. Each alternate room mood keeps its own colour palette. */
+:root, [data-mood="berry"], html:has(.room[data-mood="berry"]) {
+  --color-paper: #fff8f7; --color-paper-2: #fbe5e9; --color-paper-3: #fffcfb;
+  --color-ink: #382331; --color-ink-2: #694854; --color-rule: #ead6da;
+  --color-accent: #a63960; --color-accent-2: #862546; --color-accent-wash: #f9dfe7;
+  --color-focus: #8c3158; --color-accent-ink: #fffaf8; --color-muted: #976e7b;
+}
+body { background-color: var(--color-paper); }
+body:not(:has(.wallpaper)) {
+  background-image: radial-gradient(ellipse 85% 520px at 15% 0%, var(--color-paper-2), transparent),
+    radial-gradient(ellipse 50% 450px at 100% 15%, color-mix(in srgb,var(--color-accent-wash) 70%,transparent), transparent);
+  background-repeat: no-repeat;
+}
+:root { --container: 1260px; --radius-card: 28px; --shadow-card: 0 12px 35px -20px var(--color-shadow); }
+.nav { background: color-mix(in srgb,var(--color-paper-3) 76%,transparent); }
+.brand { gap: 6px; font-size: 1.9rem; letter-spacing: -.04em; }
+.brand img { width: 61px; height: 41px; object-fit: contain; }
+.top { margin-bottom: 20px; }
+.hero { display: block; min-height: auto; padding-block: clamp(24px,5vw,66px) 0; }
+.hero-grid { grid-template-columns: minmax(0,.78fr) minmax(0,1.22fr); gap: clamp(25px,5vw,78px); }
+.hero-text { gap: 20px; }
+.hero-text h1 { color: var(--color-ink); font-size: clamp(3.3rem,6.1vw,5.9rem); line-height: 1.04; max-width: 10ch; letter-spacing: -.045em; }
+.hero-text .lead { max-width: 32ch; }
+.garden-print { position: relative; padding: 9px; background: #fffaf3; border: 1px solid #e7ccd0;
+  border-radius: 28px; transform: rotate(1.3deg); box-shadow: 0 15px 40px -15px #86425a50; }
+.garden-print img { width: 100%; aspect-ratio: 1.56; object-fit: cover; border-radius: 19px; }
+.garden-print::before { content: ""; position: absolute; width: 82px; height: 22px; top: -8px; left: 40%;
+  z-index: 1; transform: rotate(-5deg); background: repeating-linear-gradient(45deg,#eedbd5dd 0 4px,#f6e8e0dd 4px 8px); }
+.calendar-shelf { margin-top: clamp(30px,5vw,72px); }
+.hero-card { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 48px; align-items: start;
+  border: 1px solid var(--color-rule); padding: clamp(22px,3.5vw,46px); }
+.hero-card h2 { grid-column: 1 / -1; font-size: var(--text-2xl); }
+.hero-card .counter { grid-row: span 2; }
+.hero-card .fields { display: grid; grid-template-columns: 1fr; border: 0; padding-top: 0; }
+.hero-card .hint { grid-column: 2; }
+.hero-card .big strong, .room-count .big strong { font-size: clamp(3.8rem,7vw,6.7rem); }
+.rail li { min-height: 170px; box-shadow: var(--shadow-card); }
+.milestones, .together, .install-band { padding-block: clamp(46px,6vw,82px); }
+.room-tabs { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 4px; padding: 6px;
+  border: 1px solid var(--color-rule); border-radius: 22px; background: var(--color-paper-3); margin-bottom: 22px; box-shadow: var(--shadow-card); }
+.room-tabs a { border: 0; border-radius: 16px; gap: 7px; padding: 5px 8px; justify-content: center; }
+.room-tabs a:hover, .room-tabs a[aria-current="page"] { background: var(--color-accent-wash); color: var(--color-accent); }
+.room-tabs a[aria-current="page"] { box-shadow: inset 0 -2px color-mix(in srgb,var(--color-accent) 48%,transparent); }
+.tab-icon { font-size: 1.25rem; line-height: 1; }
+.daily-post { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.1fr); align-items: stretch;
+  padding: 0; gap: 0; overflow: hidden; border-radius: var(--radius-card); box-shadow: var(--shadow-card);
+  background: linear-gradient(110deg,var(--color-paper-3),var(--color-paper-2)); }
+.daily-art { order: 2; position: relative; min-height: clamp(200px,23vw,302px); }
+.daily-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 52%; }
+.daily-post > div:last-child { padding: clamp(22px,4vw,52px); display: grid; align-content: center; justify-items: start; }
+.room .daily-post h2 { color: var(--color-accent); font: 700 .95rem/1.3 var(--font-body); margin: 0 0 12px; }
+.daily-post p { font: var(--display-weight) clamp(1.7rem,3.1vw,3.1rem)/1.14 var(--font-display); max-width: 24ch; }
+.post-links { margin-top: 14px; }
+.post-links a { color: var(--color-accent); }
+.post-links a:first-child { border-radius: 999px; padding-inline: 18px; text-decoration: none; background: var(--color-accent); color: var(--color-accent-ink); }
+.room-grid { gap: 20px; }
+.room-grid > .plans, .sheet, .auth-card { padding: clamp(20px,3vw,34px); background-color: var(--color-paper-3);
+  border: 1px solid var(--color-rule); border-radius: var(--radius-card); box-shadow: var(--shadow-card); }
+.room-count .big { position: relative; padding-right: 82px; }
+.counter-birds { position: absolute; right: 0; bottom: 0; width: clamp(65px,7vw,92px); }
+.room-count .caption { margin-top: 4px; }
+.welcome-birds { margin: 0 auto 12px; }
+.auth-art { margin: -1px -1px 4px; border-radius: 18px; overflow: hidden; }
+.auth-art img { width: 100%; aspect-ratio: 2.9; object-fit: cover; object-position: 50% 51%; }
+.auth-page .auth-field > input, .auth-password { border: 1px solid var(--color-rule); border-radius: 14px;
+  padding-inline: 12px; background: var(--color-paper); }
+.auth-primary { border-radius: 999px; }
+.chat-wrap { margin-inline: auto; }
+.chat-empty::before { content: ""; display: block; width: 104px; height: 74px; margin: 0 auto 12px; background: url('/icons/postbirds.webp') center / contain no-repeat; }
+.game-switch a { background: var(--color-paper-3); }
+.post-game { margin-inline: auto; max-width: 760px; border-radius: 28px; gap: 18px; box-shadow: var(--shadow-card); }
+.post-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.post-heading img { width: clamp(65px,12vw,115px); flex: none; }
+.post-game .post-heading h2 { margin-bottom: 5px; }
+.post-heading p { color: var(--color-ink-2); font-size: var(--text-sm); }
+.post-scores { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.post-scores > div { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 18px;
+  background:var(--color-paper); border:1px solid var(--color-rule); border-radius:15px; overflow-wrap:anywhere; }
+.post-scores > div[data-current=true] { background: var(--color-accent-wash); border-color:var(--color-accent); }
+.post-scores strong { white-space:nowrap; }
+.post-turn { text-align:center; font-weight:700; color:var(--color-accent); }
+.post-board { grid-template-columns: repeat(7,minmax(0,1fr)); }
+.post-board button { aspect-ratio: .86; min-height: 46px; position:relative; }
+.post-board button:not([data-open=true]) { background: var(--color-accent-wash) url('/icons/postbirds.webp') center/80% auto no-repeat; border:1px solid var(--color-muted); }
+.post-board button:not([data-open=true]) span { visibility:hidden; }
+.post-board button[data-open=true] { background: var(--color-paper); }
+.post-board button[data-found=true] { background: var(--color-accent-wash); border:2px solid var(--color-accent); }
+.post-board button:disabled { color:var(--color-ink); opacity:1; cursor:default; }
+@media (max-width: 760px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 20px; }
+  .hero-text { gap: 10px; }
+  .hero-text h1 { font-size: clamp(2.65rem,9vw,4rem); max-width: none; }
+  .garden-print { margin-inline:4px; }
+  .garden-print img { aspect-ratio: 2.05; }
+  .hero-card { grid-template-columns:1fr; }
+  .hero-card .counter { grid-row:auto; }
+  .hero-card .hint { grid-column:auto; }
+  .room-tabs { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .daily-post { grid-template-columns: 1fr; }
+  .daily-art { order: 0; min-height: 0; aspect-ratio:2.3; }
+  .post-board { grid-template-columns: repeat(5,minmax(0,1fr)); }
+}
+@media (max-width: 410px) {
+  .post-board { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .room-tabs a { font-size:.88rem; padding-inline:3px; gap:4px; }
+  .brand { font-size:1.5rem; }
+  .brand img { width:42px; height:32px; }
+}

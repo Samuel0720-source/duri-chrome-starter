@@ -1,32 +1,47 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { attachCallAudio } from "./call-audio";
 import { useT } from "../../../i18n/client";
 import type { CallSession, View } from "./call-session";
 
-function StreamPlayer({ stream, local, audioOnly }: { stream: MediaStream; local?: boolean; audioOnly: boolean }) {
-  const video = useRef<HTMLVideoElement>(null);
+function PartnerAudio({ track }: { track: MediaStreamTrack }) {
+  const audio = useRef<HTMLAudioElement>(null);
+  const playback = useRef<ReturnType<typeof attachCallAudio> | null>(null);
   const [blocked, setBlocked] = useState(false);
   const { t } = useT();
   useEffect(() => {
-    const el = video.current;
-    if (!el) return;
-    el.srcObject = stream;
-    let active = true;
-    el.play().catch(() => { if (active) setBlocked(true); });
-    return () => { active = false; el.srcObject = null; };
-  }, [stream]);
-  return <div hidden={audioOnly && !blocked}>
-    <video ref={video} autoPlay muted={local} playsInline hidden={audioOnly} aria-label={t(local ? "call.self" : "call.partner")} />
-    {blocked && <button className="button" onClick={() => video.current?.play().then(() => setBlocked(false)).catch(() => {})}>{t("call.listen")}</button>}
-  </div>;
+    if (!audio.current) return;
+    const player = attachCallAudio(audio.current, track, setBlocked);
+    playback.current = player;
+    return () => { player.detach(); playback.current = null; };
+  }, [track]);
+  return <>
+    <audio ref={audio} autoPlay />
+    {blocked && <button type="button" className="button" onClick={() => playback.current?.play()}>{t("call.listen")}</button>}
+  </>;
 }
+
+function VideoPreview({ track, label }: { track: MediaStreamTrack; label: string }) {
+  const video = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const element = video.current;
+    if (!element) return;
+    element.srcObject = new MediaStream([track]);
+    return () => { element.srcObject = null; };
+  }, [track]);
+  return <div><video ref={video} muted autoPlay playsInline aria-label={label} /></div>;
+}
+
 export function CallControls({ session, view, ready }: { session: CallSession | null; view: View; ready: boolean }) {
   const { t } = useT();
   const [muted, setMuted] = useState(false);
   const [hidden, setHidden] = useState(false);
   useEffect(() => { setMuted(false); setHidden(false); }, [view.local]);
   const audioOnly = view.mode === "audio";
+  const remoteAudio = view.remote?.getAudioTracks()[0];
+  const remoteVideo = view.remote?.getVideoTracks()[0];
+  const localVideo = view.local?.getVideoTracks()[0];
   const status = view.phase === "idle" ? view.note : view.phase === "incoming" ? (audioOnly ? "incomingAudio" : "incomingVideo") : view.phase;
   return <section className="call-box" aria-label={t("call.title")}>
     <div className="call-top"><div><h2>{t("call.title")}</h2><p role="status">{t(`call.${status}`)}</p></div>
@@ -40,9 +55,10 @@ export function CallControls({ session, view, ready }: { session: CallSession | 
         </>}
       </div>
     </div>
-    {(view.local || view.remote) && <div className="call-streams">
-      {view.remote && <StreamPlayer stream={view.remote} audioOnly={audioOnly} />}
-      {view.local && !audioOnly && <StreamPlayer stream={view.local} local audioOnly={false} />}
+    {remoteAudio && <PartnerAudio track={remoteAudio} />}
+    {!audioOnly && (remoteVideo || localVideo) && <div className="call-streams">
+      {remoteVideo && <VideoPreview track={remoteVideo} label={t("call.partner")} />}
+      {localVideo && <VideoPreview track={localVideo} label={t("call.self")} />}
     </div>}
     {view.local && <div className="call-actions">
       <button aria-pressed={muted} onClick={() => { view.local?.getAudioTracks().forEach(tr => tr.enabled = muted); setMuted(!muted); }}>{t(muted ? "call.unmute" : "call.mute")}</button>
