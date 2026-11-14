@@ -91,7 +91,10 @@ export class CallSession {
     s.pc = pc;
     pc.ontrack = event => {
       if (s !== this.current) return;
-      this.remote = event.streams[0];
+      // Audio and video may arrive in separate events, with separate or empty stream lists.
+      // Keep the other kind when a browser delivers or replaces a receiver track.
+      const otherTracks = this.remote?.getTracks().filter(track => track.kind !== event.track.kind) ?? [];
+      this.remote = new MediaStream([...otherTracks, event.track]);
       this.show(s);
     };
     pc.onconnectionstatechange = () => {

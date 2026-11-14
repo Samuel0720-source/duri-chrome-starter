@@ -23,7 +23,7 @@ export default async function Home() {
       <header className="nav">
         <div className="container nav-row">
           <a className="brand" href="/">
-            <img alt="" width="36" height="36" src="/icons/icon-192.png" />
+            <img alt="" width="61" height="41" src="/icons/postbirds.webp" />
             {t("app.name")}
           </a>
           <nav className="nav-actions" aria-label={t("landing.account")}>
@@ -35,11 +35,11 @@ export default async function Home() {
       </header>
       <main>
         <HomeLive initialToday={roomToday(new Date(), defaultZone)}>
-          <img className="landing-birds" src="/icons/postbirds.webp" width="192" height="128" alt="" />
-          <h1>{t("landing.title")}</h1>
-          <p className="lead">{t("landing.lead")}</p>
+          <h1>{t("garden.title")}</h1>
+          <p className="lead">{t("garden.lead")}</p>
           <div className="actions">
-            <a className="button" href="/room">{t("landing.start")}</a>
+            <a className="button" href="/room">{t("garden.room")} <span aria-hidden="true">↗</span></a>
+            <a className="nav-link" href="#our-days">{t("garden.calendar")} ↓</a>
           </div>
         </HomeLive>
 
