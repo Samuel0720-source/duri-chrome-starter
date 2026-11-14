@@ -30,12 +30,13 @@ export async function AuthShell({ back, title, lead, children }: { back: string;
     <main className="wrap auth auth-page">
       <header className="top">
         <a className="brand" href="/">
-          <img alt="" width="32" height="32" src="/icons/icon-192.png" />
+          <img alt="" width="61" height="41" src="/icons/postbirds.webp" />
           {t("app.name")}
         </a>
         <LangSwitch back={back} />
       </header>
       <section className="auth-card" aria-labelledby="auth-title">
+        <div className="auth-art"><img src="/art/post-garden.webp" width="1080" height="720" alt="" /></div>
         <h1 id="auth-title" className="auth-title">{title}</h1>
         <p className="auth-lead">{lead}</p>
         {children}

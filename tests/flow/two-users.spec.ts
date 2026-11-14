@@ -441,6 +441,24 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageB.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.getByRole("button", { name: "준비됐어요" })).toBeEnabled({ timeout: 10_000 });
 
+  // Postcards share the first flip and rotate after the second, hit or miss.
+  await Promise.all([pageA, pageB].map(page => page.goto("/room/game?g=post")));
+  await expect(async () => {
+    await pageA.getByRole("button", { name: "대결 시작" }).click({ timeout: 2000 });
+    await expect(pageA.locator(".post-board button")).toHaveCount(14, { timeout: 2000 });
+  }).toPass({ timeout: 12_000 });
+  const boardA = pageA.locator(".post-board button");
+  const boardB = pageB.locator(".post-board button");
+  await expect(boardB.first()).toBeDisabled({ timeout: 15_000 });
+  await boardA.nth(0).click();
+  await expect(boardB.nth(0)).toHaveAttribute("data-open", "true", { timeout: 15_000 });
+  await boardA.nth(1).click();
+  await expect(boardB.nth(2)).toBeEnabled({ timeout: 15_000 });
+  await expect(boardA.nth(2)).toBeDisabled();
+  await pageB.reload();
+  await boardB.nth(2).click();
+  await expect(boardA.nth(2)).toHaveAttribute("data-open", "true", { timeout: 15_000 });
+
   // Gomoku: A starts, they alternate taps (preview, then confirm); A gets five in a row; the score shows; the rematch swaps who goes first.
   await pageA.goto("/room/game?g=gomoku");
   await pageB.goto("/room/game?g=gomoku");

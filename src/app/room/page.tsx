@@ -41,6 +41,7 @@ export default async function RoomPage({
         {left && <p role="status" className="notice">{t("home.left")}</p>}
         {!left && notice && <p role="status" className="notice">{t("home.partnerLeft")}</p>}
         <section className="sheet">
+          <img className="welcome-birds" src="/icons/postbirds.webp" width="136" height="91" alt="" />
           <h1>{t("home.create.title")}</h1>
           <form action={createRoom} className="stack">
             <label htmlFor="start">{t("settings.room.start")}</label>
@@ -82,7 +83,7 @@ export default async function RoomPage({
       <RoomLive roomId={room.id} />
       <RoomTabs active="home" />
       {full && <section className="daily-post" aria-labelledby="daily-heading">
-        <img src="/icons/postbirds.webp" width="144" height="96" alt="" />
+        <div className="daily-art"><img src="/art/post-garden.webp" width="1080" height="720" alt="" /></div>
         <div><h2 id="daily-heading">{t("post.daily")}</h2><p>{t(postcardQuestion(today))}</p>
           <div className="post-links"><a href="/room/chat?prompt=today">{t("post.reply")}</a>
             <a href="/room/game?g=post">{t("game.post")}</a></div>
@@ -95,7 +96,7 @@ export default async function RoomPage({
             <time dateTime={today}>{today.replaceAll("-", ". ")}</time>
           </div>
           <p className="caption">{calendar.status === "active" ? (calendar.milestoneToday ? t("home.milestoneToday") : t("home.together")) : t("home.untilStart")}</p>
-          <div className="big">
+          <div className="big"><img className="counter-birds" src="/icons/postbirds.webp" width="104" height="70" alt="" />
             <strong>{calendar.status === "active" ? num(calendar.day) : t("common.dMinus", { n: calendar.daysToStart })}</strong>
             {calendar.status === "active" && <span>{t("home.dayUnit")}</span>}
           </div>
