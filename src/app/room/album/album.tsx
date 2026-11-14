@@ -131,7 +131,7 @@ export function Album({ roomId, photos, wallpaper, partner }: { roomId: string; 
               {open.id === wallpaper ? (
                 <span className="hint" data-testid="album-is-wallpaper">{t("album.isWallpaper")}</span>
               ) : (
-                <form action={setWallpaper}>
+                <form action={setWallpaper} onSubmit={() => dialog.current?.close()}>
                   <input type="hidden" name="room" value={roomId} />
                   <input type="hidden" name="photo" value={open.id} />
                   <button type="submit">{t("album.setWallpaper")}</button>
@@ -143,7 +143,7 @@ export function Album({ roomId, photos, wallpaper, partner }: { roomId: string; 
               <button type="button" className="secondary" onClick={() => dialog.current?.close()}>{t("album.close")}</button>
             </div>
             {open.mine && sure && (
-              <form action={deletePhoto} className="album-confirm">
+              <form action={deletePhoto} className="album-confirm" onSubmit={() => dialog.current?.close()}>
                 <input type="hidden" name="photo" value={open.id} />
                 <p>{t("album.deleteConfirm")}</p>
                 <button type="submit" className="danger">{t("album.deleteYes")}</button>
