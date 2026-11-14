@@ -56,7 +56,7 @@ test("packaged popup UI and real website preserve inputs across windows, using a
 }, testInfo) => {
   const unpacked = await buildExtension(baseURL, testInfo.outputPath("ui-build"));
   const mime: Record<string, string> = {
-    ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png",
+    ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webp": "image/webp",
   };
   // Serve actual packaged files, only inside this test's browser context.
   await context.route("http://popup.test/**", async (route) => {
