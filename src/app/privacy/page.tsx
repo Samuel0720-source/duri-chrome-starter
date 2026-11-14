@@ -35,6 +35,8 @@ function Ko() {
       <h2>쓰는 곳</h2>
       <p>로그인, 두 사람의 방 연결, 기념일 계산, 대화와 게임, 함께 보기, 그리고 상대 화면을 바로 바꾸는 데만 써요. 정보를 팔거나 광고에 쓰지 않아요.</p>
 
+      <h2>음성·영상 통화</h2>
+      <p>상대가 전화를 받은 뒤 브라우저가 마이크 사용을 요청해요. 영상 통화는 카메라도 사용해요. 음성과 영상은 두 기기 사이에서 전송되고 둘이는 녹음하거나 녹화하지 않아요. 연결 정보는 Supabase의 비공개 방 채널을 거쳐요. Google의 STUN 서버와 통화 상대에게 내 기기의 네트워크 주소가 보일 수 있어요.</p>
       <h2>맡기는 곳</h2>
       <ul>
         <li><strong>Supabase</strong> (미국 동부): 로그인, 데이터베이스, 앨범 사진 저장</li>
@@ -74,6 +76,8 @@ function En() {
       <h2>How we use it</h2>
       <p>Only to sign you in, connect the two of you, count anniversaries, run chat, games and Watch together, and update your partner's screen right away. We never sell it or use it for advertising.</p>
 
+      <h2>Voice and video calls</h2>
+      <p>After your partner accepts, your browser requests microphone access and, for video calls, camera access. Your devices exchange audio and video directly. Duri does not record calls. Connection details pass through your private Supabase room channel. Google's STUN server and your partner may see your network address.</p>
       <h2>Who we rely on</h2>
       <ul>
         <li><strong>Supabase</strong> (US East): sign-in, the database and album photo storage</li>

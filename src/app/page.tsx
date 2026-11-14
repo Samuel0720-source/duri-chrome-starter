@@ -35,6 +35,7 @@ export default async function Home() {
       </header>
       <main>
         <HomeLive initialToday={roomToday(new Date(), defaultZone)}>
+          <img className="landing-birds" src="/icons/postbirds.webp" width="192" height="128" alt="" />
           <h1>{t("landing.title")}</h1>
           <p className="lead">{t("landing.lead")}</p>
           <div className="actions">

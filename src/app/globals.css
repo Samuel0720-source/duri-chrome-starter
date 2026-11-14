@@ -554,3 +554,35 @@ small { display: block; margin-top: var(--space-3xs); font-weight: 400; color: v
 .watch-netflix-status { margin: 0; font-weight: 650; }
 .watch-netflix[data-nf="linked"] .watch-netflix-status { color: var(--color-success); }
 .watch-netflix[data-nf="noext"] .watch-netflix-status { color: var(--color-error); }
+
+.landing-birds { width: clamp(112px, 12vw, 192px); margin-bottom: var(--space-sm); }
+.daily-post, .post-game, .call-box {
+  color: var(--color-ink); background: var(--color-paper-3);
+  border: 1px solid var(--color-rule); border-radius: 18px; padding: clamp(16px, 3vw, 30px);
+}
+.daily-post { display: flex; align-items: center; gap: clamp(12px, 3vw, 30px); margin-bottom: 24px;
+  background: linear-gradient(110deg, #f8e7df, #fff9ee 65%); }
+.daily-post img { flex: none; width: clamp(65px, 13vw, 144px); }
+.daily-post h2, .call-box h2 { font-size: var(--text-lg); margin-bottom: 4px; }
+.daily-post p { font-weight: 600; }
+.post-links, .call-actions { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.post-links a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; color: #6e304b; }
+.post-game { max-width: 32rem; display: grid; gap: 12px; }
+.post-game img { justify-self: center; }
+.post-game h2 { font-size: var(--text-2xl); }
+.post-count { font-variant-numeric: tabular-nums; font-weight: 700; }
+.post-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.post-board button { aspect-ratio: 1; border-radius: 12px; border: 1px solid #b17c87; color: #72394d;
+  cursor: pointer; background: repeating-linear-gradient(135deg,#fbeee7 0 5px,#f5e4dc 5px 7px);
+  font-size: clamp(23px, 5vw, 36px); }
+.post-board button[data-found=true] { background: #edf2e9; border-color: #90a98d; }
+.call-box { margin-bottom: 14px; padding: 14px 18px; }
+.call-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.call-top p { font-size: var(--text-sm); }
+.call-actions button, .draft-question button { border: 1px solid var(--color-rule); background: var(--color-paper-3); color: var(--color-accent);
+  cursor: pointer; font-weight: 650; border-radius: 999px; min-height: 44px; padding-inline: 14px; }
+.call-actions button:disabled { opacity: .55; cursor: default; }
+.call-streams { display: flex; gap: 8px; }
+.call-streams > div { max-width: 65%; min-width: 0; }
+.call-streams video { margin-block: 8px; border-radius: 12px; max-height: 290px; }
+.draft-question { display: flex; align-items: center; gap: 8px; justify-content: space-between; font-size: var(--text-sm); }
