@@ -142,6 +142,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageB.getByRole("heading", { name: "설정", exact: true })).toBeVisible();
   // A click before hydration is lost, so repeat it until the picker reacts.
   const applyTheme = pageB.getByRole("button", { name: "이 테마로 바꾸기" });
+  // RoomLive sets this attribute from an effect, so it also tells us the page has hydrated.
+  await expect(pageB.locator("html")).toHaveAttribute("data-room-live", "on", { timeout: 30_000 }).catch(() => console.log("settings: room-live never on"));
   try {
     await expect(async () => {
       await pageB.locator('label.mood-option[data-mood="night"]').click();
@@ -151,7 +153,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
     console.log("theme form:", await pageB.evaluate(() => {
       const f = document.querySelector(".mood-form");
       const checked = f?.querySelector<HTMLInputElement>("input[name=mood]:checked")?.value;
-      return JSON.stringify({ url: location.href, checked, button: f?.querySelector("button")?.outerHTML, room: document.querySelector(".room")?.getAttribute("data-mood"), forms: document.querySelectorAll(".mood-form").length });
+      const radio = f?.querySelector("input[name=mood]");
+      return JSON.stringify({ hydrated: radio ? Object.keys(radio).some((k) => k.startsWith("__reactProps")) : null, live: document.documentElement.dataset.roomLive, scripts: document.scripts.length, url: location.href, checked, button: f?.querySelector("button")?.outerHTML, room: document.querySelector(".room")?.getAttribute("data-mood"), forms: document.querySelectorAll(".mood-form").length });
     }));
     throw e;
   }
