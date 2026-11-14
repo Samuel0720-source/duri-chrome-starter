@@ -254,6 +254,24 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   // A reload shows the same conversation from the server.
   await pageA.reload();
   await expect(pageA.locator(".chat-list .bubble")).toHaveCount(2);
+  // Postcards share the first flip and rotate after the second, hit or miss.
+  await Promise.all([pageA, pageB].map(page => page.goto("/room/game?g=post")));
+  await expect(async () => {
+    await pageA.getByRole("button", { name: "대결 시작" }).click({ timeout: 2000 });
+    await expect(pageA.locator(".post-board button")).toHaveCount(14, { timeout: 2000 });
+  }).toPass({ timeout: 12_000 });
+  const boardA = pageA.locator(".post-board button");
+  const boardB = pageB.locator(".post-board button");
+  await expect(boardB.first()).toBeDisabled({ timeout: 15_000 });
+  await boardA.nth(0).click();
+  await expect(boardB.nth(0)).toHaveAttribute("data-open", "true", { timeout: 15_000 });
+  await boardA.nth(1).click();
+  await expect(boardB.nth(2)).toBeEnabled({ timeout: 15_000 });
+  await expect(boardA.nth(2)).toBeDisabled();
+  await pageB.reload();
+  await boardB.nth(2).click();
+  await expect(boardA.nth(2)).toHaveAttribute("data-open", "true", { timeout: 15_000 });
+
   // 3d. Guess game. A starts; B's page shows the rounds live.
   await pageA.getByRole("link", { name: "게임", exact: true }).click();
   await pageB.getByRole("link", { name: "게임", exact: true }).click();
@@ -362,7 +380,9 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageB.getByTestId("draw-final")).toHaveText("1개", { timeout: 15_000 });
   await expect(pageA.locator(".draw-records")).toContainText("1개");
   // One more round where A chooses that B draws.
-  await pageA.getByText("곰돌이가 그려요").click();
+  const partnerDraws = pageA.getByRole("radio", { name: "곰돌이가 그려요" });
+  await partnerDraws.check();
+  await expect(partnerDraws).toBeChecked();
   await pageA.getByRole("button", { name: "한 판 더" }).click();
   await expect(pageA.getByText("나는 맞히는 사람")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.getByText("나는 그리는 사람")).toBeVisible({ timeout: 10_000 });
@@ -440,24 +460,6 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageA.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.locator(".watch[data-watch=paused]")).toBeVisible({ timeout: 10_000 });
   await expect(pageB.getByRole("button", { name: "준비됐어요" })).toBeEnabled({ timeout: 10_000 });
-
-  // Postcards share the first flip and rotate after the second, hit or miss.
-  await Promise.all([pageA, pageB].map(page => page.goto("/room/game?g=post")));
-  await expect(async () => {
-    await pageA.getByRole("button", { name: "대결 시작" }).click({ timeout: 2000 });
-    await expect(pageA.locator(".post-board button")).toHaveCount(14, { timeout: 2000 });
-  }).toPass({ timeout: 12_000 });
-  const boardA = pageA.locator(".post-board button");
-  const boardB = pageB.locator(".post-board button");
-  await expect(boardB.first()).toBeDisabled({ timeout: 15_000 });
-  await boardA.nth(0).click();
-  await expect(boardB.nth(0)).toHaveAttribute("data-open", "true", { timeout: 15_000 });
-  await boardA.nth(1).click();
-  await expect(boardB.nth(2)).toBeEnabled({ timeout: 15_000 });
-  await expect(boardA.nth(2)).toBeDisabled();
-  await pageB.reload();
-  await boardB.nth(2).click();
-  await expect(boardA.nth(2)).toHaveAttribute("data-open", "true", { timeout: 15_000 });
 
   // Gomoku: A starts, they alternate taps (preview, then confirm); A gets five in a row; the score shows; the rematch swaps who goes first.
   await pageA.goto("/room/game?g=gomoku");
