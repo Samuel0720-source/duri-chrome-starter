@@ -138,8 +138,13 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   // Settings. B switches the shared theme there; A's home page takes it live.
   await pageB.getByRole("link", { name: "설정", exact: true }).click();
   await expect(pageB.getByRole("heading", { name: "설정", exact: true })).toBeVisible();
-  await pageB.locator('label.mood-option[data-mood="night"]').click();
-  await pageB.getByRole("button", { name: "이 테마로 바꾸기" }).click();
+  // A click before hydration is lost, so repeat it until the picker reacts.
+  const applyTheme = pageB.getByRole("button", { name: "이 테마로 바꾸기" });
+  await expect(async () => {
+    await pageB.locator('label.mood-option[data-mood="night"]').click();
+    await expect(applyTheme).toBeEnabled({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+  await applyTheme.click();
   await expect(pageB.locator('.room[data-mood="night"]')).toHaveCount(1);
   await expect(pageA.locator('.room[data-mood="night"]')).toHaveCount(1, { timeout: 10_000 });
   // A gives B a nickname; B's settings show what A calls B.
