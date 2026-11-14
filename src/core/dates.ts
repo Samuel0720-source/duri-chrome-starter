@@ -66,15 +66,17 @@ export function coupleCalendar(start: string, today: string) {
   };
 }
 
-export type Milestone = { label: string; date: string; daysLeft: number };
+// kind + n let each screen name the day in its own language (label stays Korean for the extension popup).
+export type MilestoneKind = "days" | "years" | "valentine" | "white" | "girlfriend" | "boyfriend" | "christmas";
+export type Milestone = { label: string; kind: MilestoneKind; n?: number; date: string; daysLeft: number };
 
 // Couple days that fall on the same date every year.
 export const specialDays = [
-  { label: "발렌타인데이", monthDay: "02-14" },
-  { label: "화이트데이", monthDay: "03-14" },
-  { label: "여자친구의 날", monthDay: "08-01" },
-  { label: "남자친구의 날", monthDay: "10-03" },
-  { label: "크리스마스", monthDay: "12-25" },
+  { label: "발렌타인데이", kind: "valentine", monthDay: "02-14" },
+  { label: "화이트데이", kind: "white", monthDay: "03-14" },
+  { label: "여자친구의 날", kind: "girlfriend", monthDay: "08-01" },
+  { label: "남자친구의 날", kind: "boyfriend", monthDay: "10-03" },
+  { label: "크리스마스", kind: "christmas", monthDay: "12-25" },
 ] as const;
 
 // The next hundred-day mark and the next anniversary, plus any special day
@@ -85,12 +87,12 @@ export function upcomingMilestones(start: string, today: string): Milestone[] {
   const items: Milestone[] = [];
   // Day 1 is the first day, so day k falls on s + k - 1.
   const k = Math.max(1, Math.ceil((t - s + 1) / 100)) * 100;
-  items.push({ label: k.toLocaleString("ko-KR") + "일", date: dateAt(s + k - 1), daysLeft: s + k - 1 - t });
+  items.push({ label: k.toLocaleString("ko-KR") + "일", kind: "days", n: k, date: dateAt(s + k - 1), daysLeft: s + k - 1 - t });
   const startYear = Number(start.slice(0, 4));
   for (let n = 1; ; n++) {
     const date = annualOccurrence(start, startYear + n);
     if (dayNumber(date) < t) continue;
-    items.push({ label: n + "주년", date, daysLeft: dayNumber(date) - t });
+    items.push({ label: n + "주년", kind: "years", n, date, daysLeft: dayNumber(date) - t });
     break;
   }
   const year = Number(today.slice(0, 4));
@@ -98,7 +100,7 @@ export function upcomingMilestones(start: string, today: string): Milestone[] {
     for (const y of [year, year + 1]) {
       const date = y + "-" + day.monthDay;
       const left = dayNumber(date) - t;
-      if (left >= 0 && left <= 100) items.push({ label: day.label, date, daysLeft: left });
+      if (left >= 0 && left <= 100) items.push({ label: day.label, kind: day.kind, date, daysLeft: left });
     }
   }
   return items.sort((a, b) => a.daysLeft - b.daysLeft);

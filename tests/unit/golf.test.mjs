@@ -52,8 +52,10 @@ test("slingshot flies opposite to the pull; tiny pulls do nothing; power caps at
   assert.equal(aimFromDrag(b, { x: -500, y: 100 }).power, 1);
 });
 
-test("live counter adds finished holes; records text", () => {
+test("live counter adds finished holes; records text", async () => {
   assert.equal(runningStrokes(ball({ total: 3, strokes: 2 })), 5);
-  assert.match(bestLine({}), /아직 기록이 없어요/);
-  assert.equal(bestLine({ 3: 12, 9: 45 }), "우리 최고 기록 (둘이 합친 타수): 3홀 12타 · 9홀 45타");
+  const { makeT } = await import("../../src/i18n/dict.ts");
+  assert.match(bestLine({}, makeT("ko")), /아직 기록이 없어요/);
+  assert.equal(bestLine({ 3: 12, 9: 45 }, makeT("ko")), "우리 최고 기록 (둘이 합친 타수): 3홀 12타 · 9홀 45타");
+  assert.equal(bestLine({ 3: 12 }, makeT("en")), "Our best (strokes together): 3 holes: 12");
 });

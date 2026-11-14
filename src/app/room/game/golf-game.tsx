@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { browserClient } from "../../../lib/supabase/browser";
-import { roomErrorMessage } from "../../../core/auth-paths";
+import { roomErrorKey } from "../../../core/auth-paths";
+import { simulateShot } from "../../../core/golf-physics";
+import { useT } from "../../../i18n/client";
 import {
   aimFromDrag,
   ballAt,
@@ -47,7 +49,8 @@ type Phase = { meMoving: boolean; partnerMoving: boolean };
 
 // 동시 미니골프. The database rolls each ball once and stores the path; this screen replays it on the shared
 // database clock and turns a drag (anywhere on the course) into an angle and a power.
-export function GolfGame({ roomId, initial }: { roomId: string; initial: GolfState }) {
+export function GolfGame({ roomId, initial, partnerName }: { roomId: string; initial: GolfState; partnerName: string }) {
+  const { t } = useT();
   const [state, setState] = useState<GolfState>(initial);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -58,6 +61,10 @@ export function GolfGame({ roomId, initial }: { roomId: string; initial: GolfSta
   const stateRef = useRef<GolfState>(initial);
   const clockRef = useRef<Clock>({ offset: initial.nowMs - Date.now(), rtt: 10_000, at: Date.now() });
   const delayRef = useRef<Map<string, number>>(new Map()); // "me:3" -> ms the replay was shifted
+  // My own shots replay from the moment I let go (database clock), not from the database's start, so the
+  // ball moves at once and never jumps back when the answer arrives.
+  const localStartRef = useRef<Map<string, number>>(new Map());
+  const labelsRef = useRef({ me: "", partner: "" });
   const dragRef = useRef<{ from: { x: number; y: number }; to: { x: number; y: number } } | null>(null);
   const phaseRef = useRef<Phase>({ meMoving: false, partnerMoving: false });
 
@@ -164,19 +171,22 @@ export function GolfGame({ roomId, initial }: { roomId: string; initial: GolfSta
       drawFlag(ctx, c, now);
 
       const at = (who: "me" | "pa", b: GolfBall) => {
-        const delay = delayRef.current.get(`${who}:${st.game}:${st.hole}:${b.shotNo}`) ?? 0;
-        const elapsed = b.startedMs === null ? Infinity : now - b.startedMs - delay;
+        const key = `${who}:${st.game}:${st.hole}:${b.shotNo}`;
+        const local = localStartRef.current.get(key);
+        const delay = delayRef.current.get(key) ?? 0;
+        const elapsed = b.startedMs === null ? Infinity : local !== undefined ? now - local : now - b.startedMs - delay;
         return { ...ballAt(b, elapsed), elapsed, duration: b.startedMs === null ? 0 : b.untilMs - b.startedMs };
       };
       const mine = at("me", st.me);
       const theirs = at("pa", st.partner);
-      for (const [b, p, fill, label] of [[st.partner, theirs, C.ballPartner, "상대"], [st.me, mine, C.ballMe, "나"]] as const) {
+      const names = labelsRef.current;
+      for (const [b, p, fill, label, mineBall] of [[st.partner, theirs, C.ballPartner, names.partner, false], [st.me, mine, C.ballMe, names.me, true]] as const) {
         if (b.water && b.path && p.elapsed >= p.duration && p.elapsed < p.duration + 900) {
           const [lx, ly] = b.path[b.path.length - 1];
           drawRipple(ctx, lx, ly, (p.elapsed - p.duration) / 900);
         }
         if (b.holed && !p.moving) continue; // in the cup
-        drawBall(ctx, p.x, p.y, c.ball, fill, label);
+        drawBall(ctx, p.x, p.y, c.ball, fill, label, mineBall);
       }
 
       const d = dragRef.current;
@@ -197,22 +207,40 @@ export function GolfGame({ roomId, initial }: { roomId: string; initial: GolfSta
 
   async function send(aim: { angle: number; power: number }) {
     const supabase = supabaseRef.current;
-    const st = stateRef.current;
-    if (!supabase || !st.game) return;
-    setBusy(true);
-    const { data, error: failure } = await supabase.rpc("golf_shot", { game: st.game, shot: crypto.randomUUID(), angle: aim.angle, power: aim.power });
-    setError(failure ? roomErrorMessage(failure.message) : "");
-    // Start my replay right away from the answer; the full state follows.
+    if (!supabase || !stateRef.current.game) return;
+    // The database's clock for my last roll started a moment after my screen's; wait out that difference.
+    const wait = (stateRef.current.game ? stateRef.current.me.untilMs : 0) - (Date.now() + clockRef.current.offset) + 40;
+    if (wait > 0) await new Promise((r) => setTimeout(r, Math.min(wait, 1500)));
     const cur = stateRef.current;
-    if (data && cur.game && data.status === "ok") {
+    if (!cur.game) return;
+    // 1) Roll at once with the same physics the database uses.
+    const startDb = Date.now() + clockRef.current.offset;
+    const sim = simulateShot(cur.course, cur.me.x, cur.me.y, aim.angle, aim.power);
+    const shotNo = cur.me.shotNo + 1;
+    const key = `me:${cur.game}:${cur.hole}:${shotNo}`;
+    const strokes = Math.min(10, cur.me.strokes + 1 + (sim.water ? 1 : 0));
+    localStartRef.current.set(key, startDb);
+    apply({
+      ...cur,
+      me: { ...cur.me, path: sim.path, startedMs: startDb, untilMs: startDb + sim.ms, strokes, holed: sim.holed || strokes >= 10, water: sim.water, shotNo, x: sim.x, y: sim.y },
+    });
+    // 2) The database decides. Its path replaces the prediction on the same timeline.
+    setBusy(true);
+    const { data, error: failure } = await supabase.rpc("golf_shot", { game: cur.game, shot: crypto.randomUUID(), angle: aim.angle, power: aim.power });
+    setBusy(false);
+    if (failure || !data || data.status !== "ok") {
+      localStartRef.current.delete(key);
+      setError(failure ? t(roomErrorKey(failure.message)) : "");
+      void refresh();
+      return;
+    }
+    setError("");
+    const now = stateRef.current;
+    if (now.game === cur.game && now.hole === cur.hole && now.me.shotNo === shotNo) {
       const path = data.path as [number, number][];
       const end = data.water ? path[0] : path[path.length - 1];
-      apply({
-        ...cur,
-        me: { ...cur.me, path, startedMs: data.startedMs, untilMs: data.untilMs, strokes: data.n, holed: data.holed, water: data.water, shotNo: cur.me.shotNo + 1, x: end[0], y: end[1] },
-      });
+      apply({ ...now, me: { ...now.me, path, startedMs: data.startedMs, untilMs: data.untilMs, strokes: data.n, holed: data.holed, water: data.water, x: end[0], y: end[1] } });
     }
-    setBusy(false);
     void refresh();
   }
 
@@ -244,7 +272,7 @@ export function GolfGame({ roomId, initial }: { roomId: string; initial: GolfSta
     if (!supabase || busy) return;
     setBusy(true);
     const { error: failure } = await supabase.rpc("start_golf", { target: roomId, hole_count: holes });
-    setError(failure ? roomErrorMessage(failure.message) : "");
+    setError(failure ? t(roomErrorKey(failure.message)) : "");
     setSure(false);
     await refresh();
     setBusy(false);
@@ -254,45 +282,46 @@ export function GolfGame({ roomId, initial }: { roomId: string; initial: GolfSta
     if (!supabase || !s) return;
     setBusy(true);
     const { error: failure } = await supabase.rpc("cancel_golf", { game: s.game });
-    setError(failure ? roomErrorMessage(failure.message) : "");
+    setError(failure ? t(roomErrorKey(failure.message)) : "");
     setSure(false);
     await refresh();
     setBusy(false);
   }
 
+  labelsRef.current = { me: t("common.me"), partner: partnerName.length > 8 ? partnerName.slice(0, 7) + "…" : partnerName };
   const ballNote = (b: GolfBall, moving: boolean) =>
-    b.holed && !moving ? "컵인!" : moving ? "굴러가는 중" : b.water ? "풍덩! +1타" : `이번 홀 ${b.strokes}타`;
+    b.holed && !moving ? t("golf.in") : moving ? t("golf.rolling") : b.water ? t("golf.splash") : t("golf.thisHole", { n: b.strokes });
 
   const headline = !s
-    ? "아직 시작한 판이 없어요. 홀 수를 골라 시작해 보세요."
+    ? t("golf.none")
     : s.status === "done"
-      ? `끝! 둘이 합쳐 ${s.me.total + s.partner.total}타예요.`
+      ? t("golf.done", { n: s.me.total + s.partner.total })
       : s.status === "cancelled"
-        ? "이 판은 그만뒀어요."
+        ? t("golf.cancelled")
         : s.me.holed && s.partner.holed
-          ? "둘 다 컵인! 곧 다음 홀로 가요."
+          ? t("golf.bothIn")
           : s.me.holed
-            ? "컵인! 상대를 기다려요."
+            ? t("golf.waitPartner", { name: partnerName })
             : phase.meMoving
-              ? "공이 굴러가는 중이에요."
-              : "코스 아무 곳이나 눌러 뒤로 끌었다 놓으면 쳐요. 둘이 동시에 칠 수 있어요.";
+              ? t("golf.myRolling")
+              : t("golf.how");
 
   return (
     <div className="golf" data-status={s ? s.status : "none"} data-hole={s ? s.hole : ""}>
       <section className="golf-head">
         <div>
-          <h2>동시 미니골프</h2>
-          {s && open && <p className="golf-hole">{s.hole}번 홀 / {s.holes} · {s.course.name}</p>}
+          <h2>{t("golf.title")}</h2>
+          {s && open && <p className="golf-hole">{t("golf.hole", { n: s.hole, of: s.holes, name: t(`golf.hole.${s.hole}` as "golf.hole.1") })}</p>}
         </div>
         {s && (
-          <div className="golf-score" aria-label="타수">
+          <div className="golf-score" aria-label={t("golf.strokes")}>
             <div className="golf-count" data-who="me">
-              <span className="golf-count-name">나</span>
+              <span className="golf-count-name">{t("common.me")}</span>
               <strong key={`me-${runningStrokes(s.me)}`} data-testid="golf-count-me">{runningStrokes(s.me)}</strong>
               <span className="golf-count-note">{ballNote(s.me, phase.meMoving)}</span>
             </div>
             <div className="golf-count" data-who="partner">
-              <span className="golf-count-name">상대</span>
+              <span className="golf-count-name">{partnerName}</span>
               <strong key={`pa-${runningStrokes(s.partner)}`} data-testid="golf-count-partner">{runningStrokes(s.partner)}</strong>
               <span className="golf-count-note">{ballNote(s.partner, phase.partnerMoving)}</span>
             </div>
@@ -302,13 +331,13 @@ export function GolfGame({ roomId, initial }: { roomId: string; initial: GolfSta
       <p className="waiting" role="status" aria-live="polite">{headline}</p>
 
       {s && (
-        <section className="golf-wrap" aria-label="미니골프 코스">
+        <section className="golf-wrap" aria-label={t("golf.course")}>
           <canvas
             ref={canvasRef}
             className="golf-canvas"
             data-testid="golf-canvas"
             role="img"
-            aria-label="미니골프 코스. 흰 공이 내 공, 노란 공이 상대 공이에요. 뒤로 끌었다 놓으면 반대 방향으로 굴러가요."
+            aria-label={t("golf.canvas", { name: partnerName })}
             data-can-shoot={String(canShoot)}
             data-me-moving={String(phase.meMoving)}
             data-partner-moving={String(phase.partnerMoving)}
@@ -317,7 +346,7 @@ export function GolfGame({ roomId, initial }: { roomId: string; initial: GolfSta
             onPointerUp={up}
             onPointerCancel={() => { dragRef.current = null; }}
           />
-          <p className="hint">모래는 공을 느리게 하고, 물에 빠지면 친 자리로 돌아오며 1타가 더해져요. 한 홀은 최대 10타예요.</p>
+          <p className="hint">{t("golf.rules")}</p>
         </section>
       )}
 
@@ -325,17 +354,17 @@ export function GolfGame({ roomId, initial }: { roomId: string; initial: GolfSta
         {!open && (
           <div className="draw-actions">
             {HOLE_CHOICES.map((n, i) => (
-              <button key={n} type="button" className={i === 0 ? "button" : "button ghost"} disabled={busy} onClick={() => start(n)}>{n}홀 시작</button>
+              <button key={n} type="button" className={i === 0 ? "button" : "button ghost"} disabled={busy} onClick={() => start(n)}>{t("golf.start", { n })}</button>
             ))}
           </div>
         )}
-        <p className="hint">{bestLine(state.best)}</p>
-        {open && !sure && <button type="button" className="link" onClick={() => setSure(true)}>이 판 그만두기</button>}
+        <p className="hint">{bestLine(state.best, t)}</p>
+        {open && !sure && <button type="button" className="link" onClick={() => setSure(true)}>{t("golf.stop")}</button>}
         {open && sure && (
           <div className="draw-actions">
-            <span>정말 그만둘까요? 기록은 남지 않아요.</span>
-            <button type="button" className="button ghost" disabled={busy} onClick={cancel}>그만둘게요</button>
-            <button type="button" className="link" onClick={() => setSure(false)}>계속하기</button>
+            <span>{t("golf.stopSure")}</span>
+            <button type="button" className="button ghost" disabled={busy} onClick={cancel}>{t("golf.stopYes")}</button>
+            <button type="button" className="link" onClick={() => setSure(false)}>{t("gomoku.keepPlaying")}</button>
           </div>
         )}
         {error && <p role="alert" className="error">{error}</p>}
@@ -438,7 +467,7 @@ function drawFlag(g: CanvasRenderingContext2D, c: GolfCourse, now: number) {
   g.fillText(String(c.n), px + 16, top + 19 + wave * 0.3);
 }
 
-function drawBall(g: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string, label: string) {
+function drawBall(g: CanvasRenderingContext2D, x: number, y: number, r: number, fill: string, label: string, mine: boolean) {
   g.fillStyle = C.shadow;
   g.beginPath(); g.ellipse(x + 3, y + 5, r, r * 0.7, 0, 0, Math.PI * 2); g.fill();
   const grad = g.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.2, x, y, r);
@@ -448,7 +477,7 @@ function drawBall(g: CanvasRenderingContext2D, x: number, y: number, r: number, 
   g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
   g.strokeStyle = "rgba(0,0,0,0.35)"; g.lineWidth = 1.5; g.stroke();
   // My name sits above my ball, the partner's below theirs, so they never cover each other.
-  const ly = label === "나" ? y - r - 8 : y + r + 20;
+  const ly = mine ? y - r - 8 : y + r + 20;
   g.font = "bold 16px system-ui, sans-serif"; g.textAlign = "center";
   g.lineWidth = 4; g.strokeStyle = C.ink; g.strokeText(label, x, ly);
   g.fillStyle = fill; g.fillText(label, x, ly);

@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { browserClient } from "../../../lib/supabase/browser";
-import { roomErrorMessage } from "../../../core/auth-paths";
+import { roomErrorKey } from "../../../core/auth-paths";
+import { ago, lastMineId, seenStatus, startsGroup } from "../../../core/chat";
+import { useT } from "../../../i18n/client";
 
 export type Message = { id: number; sender: string | null; body: string; created_at: string };
 type Shown = Message & { state?: "sending" | "failed"; request?: string };
@@ -14,8 +16,16 @@ function order(list: Shown[]): Shown[] {
 
 // Live chat for the two partners. New messages arrive over the room's private channel
 // as a signal; the list then reads only rows after the last one it has.
-export function Chat({ roomId, me, zone, initial }: { roomId: string; me: string; zone: string; initial: Message[] }) {
+export type ReadMark = { upto: number; atMs: number | null };
+
+export function Chat({ roomId, me, zone, initial, partnerName, initialPartnerRead, initialMyRead }: {
+  roomId: string; me: string; zone: string; initial: Message[]; partnerName: string; initialPartnerRead: ReadMark; initialMyRead: number;
+}) {
+  const { t, locale } = useT();
   const [messages, setMessages] = useState<Shown[]>(initial);
+  const [partnerRead, setPartnerRead] = useState<ReadMark>(initialPartnerRead);
+  const [now, setNow] = useState(() => Date.now());
+  const myReadRef = useRef(initialMyRead);
   const [text, setText] = useState("");
   const [error, setError] = useState("");
   const listRef = useRef<HTMLOListElement>(null);
@@ -40,6 +50,14 @@ export function Chat({ roomId, me, zone, initial }: { roomId: string; me: string
     merge(data ?? []);
   }, [roomId, merge]);
 
+  const loadPartnerRead = useCallback(async () => {
+    const supabase = supabaseRef.current;
+    if (!supabase) return;
+    const { data } = await supabase.from("member_prefs").select("user_id, read_upto, read_at").eq("room_id", roomId).neq("user_id", me).maybeSingle();
+    if (data) setPartnerRead({ upto: Number(data.read_upto), atMs: data.read_at ? Date.parse(data.read_at) : null });
+    setNow(Date.now());
+  }, [roomId, me]);
+
   const reload = useCallback(async () => {
     const supabase = supabaseRef.current;
     if (!supabase) return;
@@ -63,18 +81,45 @@ export function Chat({ roomId, me, zone, initial }: { roomId: string; me: string
       channel = supabase
         .channel("room:" + roomId, { config: { private: true } })
         .on("broadcast", { event: "messages" }, ({ payload }) => (payload?.change === "delete" ? reload() : pull()))
+        .on("broadcast", { event: "prefs" }, () => loadPartnerRead())
         .on("broadcast", { event: "members" }, () => window.location.reload())
         .subscribe((status) => {
           document.documentElement.dataset.roomLive = status === "SUBSCRIBED" ? "on" : "off";
           // After a reconnect, catch up on anything missed while offline.
-          if (status === "SUBSCRIBED") pull();
+          if (status === "SUBSCRIBED") { pull(); loadPartnerRead(); }
         });
     })();
     return () => {
       active = false;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomId, pull, reload]);
+  }, [roomId, pull, reload, loadPartnerRead]);
+
+  // Tell the database how far I have read, but only while this screen is really in front of me.
+  const markRead = useCallback(async () => {
+    const supabase = supabaseRef.current;
+    if (!supabase || document.visibilityState !== "visible" || !document.hasFocus()) return;
+    const upto = lastId.current;
+    if (upto <= myReadRef.current) return;
+    myReadRef.current = upto;
+    const { error: failure } = await supabase.rpc("mark_chat_read", { target: roomId, upto });
+    if (failure) myReadRef.current = 0;
+  }, [roomId]);
+  useEffect(() => {
+    const id = setTimeout(() => void markRead(), 400);
+    return () => clearTimeout(id);
+  }, [messages, markRead]);
+  useEffect(() => {
+    const again = () => void markRead();
+    document.addEventListener("visibilitychange", again);
+    window.addEventListener("focus", again);
+    const tick = setInterval(() => setNow(Date.now()), 30_000);
+    return () => {
+      document.removeEventListener("visibilitychange", again);
+      window.removeEventListener("focus", again);
+      clearInterval(tick);
+    };
+  }, [markRead]);
 
   useEffect(() => {
     listRef.current?.lastElementChild?.scrollIntoView({ block: "end" });
@@ -85,7 +130,7 @@ export function Chat({ roomId, me, zone, initial }: { roomId: string; me: string
     if (!supabase) return;
     const { data, error: failure } = await supabase.rpc("send_room_message", { target: roomId, request, message: body });
     if (failure || typeof data !== "number") {
-      setError(roomErrorMessage(failure?.message));
+      setError(t(roomErrorKey(failure?.message)));
       setMessages((old) => old.map((m) => (m.id === tempId ? { ...m, state: "failed" } : m)));
       return;
     }
@@ -118,42 +163,51 @@ export function Chat({ roomId, me, zone, initial }: { roomId: string; me: string
     const supabase = supabaseRef.current;
     if (!supabase) return;
     const { error: failure } = await supabase.rpc("delete_my_message", { message_id: id });
-    if (failure) setError(roomErrorMessage(failure.message));
+    if (failure) setError(t(roomErrorKey(failure.message)));
     else setMessages((old) => old.filter((m) => m.id !== id));
   }
 
-  const time = new Intl.DateTimeFormat("ko-KR", { timeZone: zone, hour: "numeric", minute: "2-digit" });
+  const time = new Intl.DateTimeFormat(locale === "ko" ? "ko-KR" : "en-CA", { timeZone: zone, hour: "numeric", minute: "2-digit" });
+  const mineLast = lastMineId(messages, me);
+  const seen = seenStatus(mineLast, partnerRead.upto);
+  const when = partnerRead.atMs ? ago(now, partnerRead.atMs) : { key: "rel.now" as const, n: 0 };
 
   return (
     <div className="chat">
-      <ol className="chat-list" ref={listRef} aria-label="대화 내용" aria-live="polite">
-        {messages.length === 0 && <li className="chat-empty">첫 메시지를 보내 보세요.</li>}
-        {messages.map((m) => (
+      <ol className="chat-list" ref={listRef} aria-label={t("chat.list")} aria-live="polite">
+        {messages.length === 0 && <li className="chat-empty">{t("chat.empty")}</li>}
+        {messages.map((m, i) => (
           <li key={m.id} className={m.sender === me ? "mine" : "theirs"} data-state={m.state}>
+            {m.sender !== me && startsGroup(messages, i) && <span className="chat-name">{partnerName}</span>}
             <p className="bubble">{m.body}</p>
             <span className="chat-meta">
-              {m.state === "sending" ? "보내는 중" : m.state === "failed" ? "보내지 못했어요" : time.format(new Date(m.created_at))}
+              {m.state === "sending" ? t("chat.sending") : m.state === "failed" ? t("chat.failed") : time.format(new Date(m.created_at))}
               {m.state === "failed" && (
-                <button type="button" className="chat-action" onClick={() => retry(m)}>다시 보내기</button>
+                <button type="button" className="chat-action" onClick={() => retry(m)}>{t("chat.retry")}</button>
               )}
               {m.sender === me && !m.state && m.id > 0 && (
-                <button type="button" className="chat-action" onClick={() => remove(m.id)} aria-label="이 메시지 지우기">지우기</button>
+                <button type="button" className="chat-action" onClick={() => remove(m.id)} aria-label={t("chat.removeLabel")}>{t("chat.remove")}</button>
               )}
             </span>
+            {m.id === mineLast && seen !== "none" && (
+              <span className="chat-seen" data-testid="chat-seen" data-seen={seen}>
+                {seen === "seen" ? t("chat.seen", { when: t(when.key, { n: when.n }) }) : t("chat.unseen")}
+              </span>
+            )}
           </li>
         ))}
       </ol>
       <form className="chat-form" onSubmit={send}>
-        <label htmlFor="chat-input" className="visually-hidden">메시지</label>
+        <label htmlFor="chat-input" className="visually-hidden">{t("chat.input")}</label>
         <input
           id="chat-input"
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={1000}
           autoComplete="off"
-          placeholder="메시지를 입력하세요"
+          placeholder={t("chat.placeholder")}
         />
-        <button type="submit" disabled={!text.trim()}>보내기</button>
+        <button type="submit" disabled={!text.trim()}>{t("chat.send")}</button>
       </form>
       {error && <p role="alert" className="error">{error}</p>}
     </div>

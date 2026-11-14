@@ -3,6 +3,7 @@ import { useState, useEffect, type ReactNode } from "react";
 import { coupleCalendar, roomToday, upcomingMilestones } from "../core/dates";
 import { defaultZone, exampleStart, previewPath, readSelection, zones } from "../core/preview";
 import { MilestoneRail } from "./milestone-rail";
+import { useT } from "../i18n/client";
 
 // The public calculator's state: first day, time zone and "today" in that zone.
 function usePreview(initialToday: string) {
@@ -41,31 +42,33 @@ function usePreview(initialToday: string) {
 type Preview = ReturnType<typeof usePreview>;
 
 function Counter({ today, calendar }: Pick<Preview, "today" | "calendar">) {
+  const { t, locale } = useT();
+  const num = (n: number) => n.toLocaleString(locale === "ko" ? "ko-KR" : "en-CA");
   return (
-    <div className="counter" aria-label="기념일 계산 결과" aria-live="polite">
+    <div className="counter" aria-label={t("preview.result")} aria-live="polite">
       <div className="dateline">
-        <span>오늘</span>
+        <span>{t("common.today")}</span>
         <time dateTime={today}>{today.replaceAll("-", ". ")}</time>
       </div>
       {calendar?.status === "active" ? (
         <>
-          <p className="caption">{calendar.milestoneToday ? "오늘은 우리의 기념일" : "함께한 지"}</p>
+          <p className="caption">{calendar.milestoneToday ? t("home.milestoneToday") : t("home.together")}</p>
           <div className="big">
-            <strong>{calendar.day.toLocaleString("ko-KR")}</strong>
-            <span>일째</span>
+            <strong>{num(calendar.day)}</strong>
+            <span>{t("home.dayUnit")}</span>
           </div>
           <dl>
             <div>
-              <dt>우리의 {calendar.nextHundred}일</dt>
+              <dt>{t("home.ourHundred", { n: num(calendar.nextHundred) })}</dt>
               <dd>
-                D−{calendar.daysUntilHundred}
+                {t("common.dMinus", { n: num(calendar.daysUntilHundred) })}
                 <small>{calendar.hundredDate}</small>
               </dd>
             </div>
             <div>
-              <dt>연애 기념일</dt>
+              <dt>{t("home.annual")}</dt>
               <dd>
-                {calendar.daysUntilAnnual === 0 ? "오늘" : "D−" + calendar.daysUntilAnnual}
+                {calendar.daysUntilAnnual === 0 ? t("common.today") : t("common.dMinus", { n: num(calendar.daysUntilAnnual) })}
                 <small>{calendar.annual}</small>
               </dd>
             </div>
@@ -73,54 +76,55 @@ function Counter({ today, calendar }: Pick<Preview, "today" | "calendar">) {
         </>
       ) : calendar?.status === "upcoming" ? (
         <>
-          <p className="caption">첫날까지</p>
+          <p className="caption">{t("home.untilStart")}</p>
           <div className="big">
-            <strong>D−{calendar.daysToStart}</strong>
+            <strong>{t("common.dMinus", { n: calendar.daysToStart })}</strong>
           </div>
         </>
       ) : (
-        <p className="caption">시작일을 골라 주세요.</p>
+        <p className="caption">{t("preview.pickStart")}</p>
       )}
     </div>
   );
 }
 
 function Fields({ start, setStart, zone, setZone }: Pick<Preview, "start" | "setStart" | "zone" | "setZone">) {
+  const { t } = useT();
   return (
     <div className="fields">
       <div className="field">
-        <label htmlFor="start">함께한 첫날</label>
+        <label htmlFor="start">{t("settings.room.start")}</label>
         <input id="start" type="date" min="1900-01-01" max="9998-12-31" value={start} onChange={(e) => setStart(e.target.value)} />
       </div>
       <div className="field">
-        <label htmlFor="zone">기준 시간대</label>
+        <label htmlFor="zone">{t("settings.room.zone")}</label>
         <select id="zone" value={zone} onChange={(e) => setZone(e.target.value)}>
-          {zones.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+          {zones.map(({ value }) => <option key={value} value={value}>{t(`zone.${value}` as "zone.Asia/Seoul")}</option>)}
         </select>
       </div>
     </div>
   );
 }
 
-const hint = "공개 미리보기예요. 날짜를 바꿔도 커플방에는 저장되지 않아요.";
 
 // The small window (/compact): counter and settings side by side, as before.
 export function CalendarPreview({ initialToday, compact = false }: { initialToday: string; compact?: boolean }) {
+  const { t } = useT();
   const p = usePreview(initialToday);
   return (
     <div className="calendar-grid">
       {compact && (
         <a className="open-full" href={previewPath("/", p.start, p.zone)} target="_blank" rel="noopener noreferrer">
-          전체 웹앱 열기
+          {t("preview.openFull")}
         </a>
       )}
       <section className="sheet">
         <Counter today={p.today} calendar={p.calendar} />
       </section>
       <section className="settings">
-        <h2>날짜 설정</h2>
+        <h2>{t("preview.dateSettings")}</h2>
         <Fields {...p} />
-        <p className="hint">{hint}</p>
+        <p className="hint">{t("preview.hint")}</p>
       </section>
     </div>
   );
@@ -128,6 +132,7 @@ export function CalendarPreview({ initialToday, compact = false }: { initialToda
 
 // The home page: the hero's live counter, then the next anniversaries from the same date.
 export function HomeLive({ initialToday, children }: { initialToday: string; children: ReactNode }) {
+  const { t } = useT();
   const p = usePreview(initialToday);
   let milestones: ReturnType<typeof upcomingMilestones> = [];
   try {
@@ -143,15 +148,15 @@ export function HomeLive({ initialToday, children }: { initialToday: string; chi
           <div className="sheet hero-card">
             <Counter today={p.today} calendar={p.calendar} />
             <Fields {...p} />
-            <p className="hint">{hint}</p>
+            <p className="hint">{t("preview.hint")}</p>
           </div>
         </div>
       </section>
       <section className="milestones" aria-labelledby="milestones-head">
         <div className="container">
           <div className="head-split">
-            <h2 id="milestones-head">다가오는 기념일</h2>
-            <p className="lead">다음 n00일과 주년, 100일 안에 오는 커플 데이를 보여요.</p>
+            <h2 id="milestones-head">{t("home.upcoming")}</h2>
+            <p className="lead">{t("landing.upcomingLead")}</p>
           </div>
           <MilestoneRail milestones={milestones} />
         </div>

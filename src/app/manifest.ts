@@ -1,12 +1,14 @@
 import type { MetadataRoute } from "next";
+import { getT } from "../i18n/server";
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const { t, locale } = await getT();
   return {
     id: "/",
-    name: "둘이 | 우리 기념일",
-    short_name: "둘이",
-    lang: "ko",
-    description: "우리의 시작일과 다가오는 기념일을 확인해요.",
+    name: t("app.title"),
+    short_name: t("app.name"),
+    lang: locale,
+    description: t("manifest.description"),
     start_url: "/",
     scope: "/",
     display: "standalone",

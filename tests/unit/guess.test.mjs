@@ -13,3 +13,14 @@ test("the bank matches what the database picks from: 120 different questions of 
   assert.match(sql, /generate_series\(0, 11\)/);
   assert.match(sql, /own_choice between 0 and 3/);
 });
+
+test("the English bank lines up with the Korean one", async () => {
+  const { guessQuestionsEn } = await import("../../src/core/guess-en.ts");
+  assert.equal(guessQuestionsEn.length, guessQuestions.length);
+  for (const item of guessQuestionsEn) {
+    assert.equal(item.options.length, 4, item.q);
+    assert.equal(new Set(item.options).size, 4, item.q);
+    assert.ok(!/[가-힣]/.test(item.q + item.options.join("")), item.q);
+  }
+  assert.equal(new Set(guessQuestionsEn.map((x) => x.q)).size, 120);
+});

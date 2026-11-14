@@ -11,6 +11,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "extension:build": "node scripts/build-extension.mjs",
+    "extension:release": "node scripts/release-extension.mjs",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "npm run test:unit && npm run test:db && npm run build && npm run test:e2e",
     "test:unit": "node --test tests/unit/*.test.mjs",

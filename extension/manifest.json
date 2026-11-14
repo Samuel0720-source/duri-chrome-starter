@@ -1,13 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "둘이 · 기념일",
-  "version": "0.1.0",
-  "description": "도구 모음에서 기념일을 계산하고 같은 날짜로 작은 창이나 전체 웹앱을 열어요.",
-  "permissions": ["storage"],
-  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "name": "__MSG_name__",
+  "version": "0.2.0",
+  "description": "__MSG_description__",
+  "permissions": [
+    "storage"
+  ],
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
   "action": {
-    "default_title": "둘이 · 기념일",
+    "default_title": "__MSG_name__",
     "default_popup": "popup.html",
-    "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png" }
-  }
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png",
+      "48": "icons/48.png"
+    }
+  },
+  "default_locale": "en"
 }

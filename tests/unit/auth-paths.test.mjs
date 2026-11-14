@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { invitePath, isEmail, isInviteToken, roomErrorMessage, safeNext } from "../../src/core/auth-paths.ts";
+import { invitePath, isEmail, isInviteToken, roomErrorKey, safeNext } from "../../src/core/auth-paths.ts";
+import { makeT } from "../../src/i18n/dict.ts";
+const ko = makeT("ko");
+const en = makeT("en");
+const roomErrorMessage = (m) => ko(roomErrorKey(m));
 
 test("sign-in only returns to a path on this site", () => {
   assert.equal(safeNext("/invite/abc"), "/invite/abc");
@@ -18,7 +22,7 @@ test("invite tokens are exactly 64 lowercase hex characters", () => {
   }
 });
 
-test("emails are checked loosely and database errors become short Korean messages", () => {
+test("emails are checked loosely and database errors become a dictionary key, shown in either language", () => {
   assert.equal(isEmail("sam@example.com"), true);
   assert.equal(isEmail("sam@example"), false);
   assert.equal(isEmail("a b@example.com"), false);
@@ -28,4 +32,8 @@ test("emails are checked loosely and database errors become short Korean message
   assert.doesNotMatch(roomErrorMessage("internal: relation secret_table"), /secret_table/);
   assert.match(roomErrorMessage("Invalid plan"), /1~60자/);
   assert.match(roomErrorMessage("Plan unavailable"), /약속/);
+  assert.equal(roomErrorKey("Ball moving"), "err.ballMoving");
+  assert.equal(roomErrorKey("internal: relation secret_table"), "err.unknown");
+  assert.match(en(roomErrorKey("Room full")), /two people/);
+  assert.match(en(roomErrorKey("Invalid nickname")), /1-20 characters/);
 });

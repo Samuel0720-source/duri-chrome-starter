@@ -1,19 +1,22 @@
+import type { T } from "../i18n/dict.ts";
+
 // "100초 그림 퀴즈" shared types and small pure helpers.
 // The word bank is NOT here: it lives only in the database (duri_private.draw_word_bank),
 // so the browser bundle never contains the list of possible answers.
 
+// Names come from the dictionary (draw.cat.<value>).
 export const drawCategories = [
-  { value: "food", label: "음식" },
-  { value: "animal", label: "동물" },
-  { value: "thing", label: "사물" },
-  { value: "place", label: "장소" },
-  { value: "date", label: "데이트 활동" },
-  { value: "mix", label: "전부 섞기" },
+  { value: "food" },
+  { value: "animal" },
+  { value: "thing" },
+  { value: "place" },
+  { value: "date" },
+  { value: "mix" },
 ] as const;
 export type DrawCategory = (typeof drawCategories)[number]["value"];
 
-export function categoryLabel(value: string): string {
-  return drawCategories.find((c) => c.value === value)?.label ?? value;
+export function categoryLabel(value: string, t: T): string {
+  return drawCategories.some((c) => c.value === value) ? t(`draw.cat.${value as DrawCategory}`) : value;
 }
 
 export const DRAW_SECONDS = 100;
@@ -23,7 +26,7 @@ export const BOARD_H = 750;
 
 // Best number of words solved in 100 seconds, per category.
 export type DrawRecords = Partial<Record<DrawCategory, number>>;
-export type DrawWord = { n: number; word: string; outcome: "correct" | "pass" | null };
+export type DrawWord = { n: number; word: string; wordEn?: string | null; outcome: "correct" | "pass" | null };
 export type DrawState =
   | { game: null; nowMs: number; records: DrawRecords }
   | {
@@ -41,12 +44,18 @@ export type DrawState =
       passes: number;
       wordNo: number;
       word: string | null; // the current word, for the drawer only
+      wordEn?: string | null; // the same word in English, for the drawer only
       words: DrawWord[]; // earlier words (both see them); every word once the round is over
       records: DrawRecords;
     };
 
-export function recordText(value: number | undefined): string {
-  return value === undefined ? "없음" : `${value}개`;
+export function recordText(value: number | undefined, t: T): string {
+  return value === undefined ? t("draw.records.none") : t("draw.records.n", { n: value });
+}
+
+// The word in the screen's language (English falls back to Korean for an old round without one).
+export function wordIn(locale: string, word: string | null | undefined, wordEn: string | null | undefined): string {
+  return (locale === "en" ? wordEn || word : word) ?? "";
 }
 
 export type Point = [number, number];
@@ -54,11 +63,7 @@ export type Stroke = { seq: number; stroke: string; segment?: string; color: str
 export type DrawGuess = { id: number; player: string; guess: string; correct: boolean };
 
 export const penColors = ["#2a1f26", "#d6336c", "#e8590c", "#f2b705", "#2f9e44", "#1c7ed6", "#7048e8"] as const;
-export const penWidths = [
-  { value: 4, label: "가늘게" },
-  { value: 10, label: "보통" },
-  { value: 22, label: "굵게" },
-] as const;
+export const penWidths = [{ value: 4 }, { value: 10 }, { value: 22 }] as const;
 
 // Difference between the database clock and this device's clock. Both screens count down
 // against the database's deadline, so a wrong device clock cannot add or remove time.
@@ -100,8 +105,4 @@ export function isValidSegment(points: Point[], color: string, width: number): b
     points.length <= 250 &&
     points.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x <= 1000 && y >= 0 && y <= 1000)
   );
-}
-
-export function formatSeconds(value: number): string {
-  return (Math.round(value * 10) / 10).toString() + "초";
 }

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
-  drawCategories, categoryLabel, clockOffset, secondsLeft, timeShare, strokesToPaths, isValidSegment, formatSeconds, recordText, DRAW_SECONDS,
+  drawCategories, categoryLabel, clockOffset, secondsLeft, timeShare, strokesToPaths, isValidSegment, recordText, wordIn, DRAW_SECONDS,
 } from "../../src/core/draw.ts";
 
 test("categories match the database and every category has 60 words", async () => {
@@ -17,10 +17,17 @@ test("categories match the database and every category has 60 words", async () =
       .filter((w) => !drawCategories.some((c) => c.value === w)); // skip "check (category in ('food', 'animal', ...))"
     assert.equal(new Set(words).size, 60, value + " has " + new Set(words).size);
   }
-  assert.equal(categoryLabel("date"), "데이트 활동");
-  assert.equal(categoryLabel("mix"), "전부 섞기");
-  assert.equal(recordText(undefined), "없음");
-  assert.equal(recordText(7), "7개");
+  const { makeT } = await import("../../src/i18n/dict.ts");
+  const t = makeT("ko"), en = makeT("en");
+  assert.equal(categoryLabel("date", t), "데이트 활동");
+  assert.equal(categoryLabel("mix", t), "전부 섞기");
+  assert.equal(categoryLabel("mix", en), "Mix of all");
+  assert.equal(recordText(undefined, t), "없음");
+  assert.equal(recordText(7, t), "7개");
+  assert.equal(recordText(7, en), "7");
+  assert.equal(wordIn("en", "고양이", "cat"), "cat");
+  assert.equal(wordIn("ko", "고양이", "cat"), "고양이");
+  assert.equal(wordIn("en", "고양이", null), "고양이");
   assert.match(sql, /interval '100 seconds'/);
   assert.equal(DRAW_SECONDS, 100);
 });
@@ -60,6 +67,4 @@ test("the pen checks what the server checks", () => {
   assert.equal(isValidSegment([[0, 0]], "#AABBCC", 4), false, "lower-case hex only");
   assert.equal(isValidSegment([[0, 0]], "#aabbcc", 41), false);
   assert.equal(isValidSegment(Array.from({ length: 251 }, () => [1, 1]), "#aabbcc", 4), false);
-  assert.equal(formatSeconds(12.34), "12.3초");
-  assert.equal(formatSeconds(7), "7초");
 });

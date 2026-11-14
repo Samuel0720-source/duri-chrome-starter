@@ -1,3 +1,5 @@
+import type { T } from "../i18n/dict.ts";
+
 // 미니골프 types and small pure helpers. The physics (one roll per shot) runs in the database;
 // the browser only replays the stored path and turns a finger drag into an angle and a power.
 export type Point = [number, number];
@@ -90,7 +92,7 @@ export function runningStrokes(ball: GolfBall): number {
   return ball.total + ball.strokes;
 }
 
-export function bestLine(best: Record<string, number>): string {
-  const parts = HOLE_CHOICES.filter((n) => best[String(n)] !== undefined).map((n) => `${n}홀 ${best[String(n)]}타`);
-  return parts.length ? `우리 최고 기록 (둘이 합친 타수): ${parts.join(" · ")}` : "아직 기록이 없어요. 한 판 끝내 보세요!";
+export function bestLine(best: Record<string, number>, t: T): string {
+  const parts = HOLE_CHOICES.filter((n) => best[String(n)] !== undefined).map((n) => t("golf.bestItem", { n, s: best[String(n)] }));
+  return parts.length ? t("golf.best", { list: parts.join(" · ") }) : t("golf.noBest");
 }

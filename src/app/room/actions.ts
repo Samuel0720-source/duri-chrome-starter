@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { invitePath, isInviteToken, roomErrorMessage } from "../../core/auth-paths";
+import { invitePath, isInviteToken, roomErrorKey } from "../../core/auth-paths";
 import { isPreviewStart, zones } from "../../core/preview";
 import { isMood } from "../../core/moods";
 import { appOrigin, serverClient } from "../../lib/supabase/server";
@@ -23,15 +23,16 @@ export async function createRoom(formData: FormData) {
   redirect(error ? "/room?error=create" : "/room");
 }
 
+// error is a dictionary key (err.*), shown by the invite box in the chosen language.
 export type InviteState = { link?: string; error?: string };
 
 // Returns the link to the page instead of putting the secret token in a redirect URL.
 export async function issueInvite(_previous: InviteState, formData: FormData): Promise<InviteState> {
   const room = String(formData.get("room") ?? "");
   const { supabase, user } = await signedIn();
-  if (!user) return { error: roomErrorMessage("Sign in required") };
+  if (!user) return { error: roomErrorKey("Sign in required") };
   const { data, error } = await supabase.rpc("issue_couple_invite", { target: room });
-  if (error || typeof data !== "string" || !isInviteToken(data)) return { error: roomErrorMessage(error?.message) };
+  if (error || typeof data !== "string" || !isInviteToken(data)) return { error: roomErrorKey(error?.message) };
   return { link: appOrigin() + invitePath(data) };
 }
 
@@ -51,20 +52,22 @@ export async function acceptInvite(formData: FormData) {
 // Leaving closes the room for both partners; the partner sees a notice next visit.
 export async function leaveRoom(formData: FormData) {
   const room = String(formData.get("room") ?? "");
-  if (formData.get("confirm") !== "yes") redirect("/room?error=confirm");
+  if (formData.get("confirm") !== "yes") redirect("/room/settings?error=leave#account");
   const { supabase, user } = await signedIn();
   if (!user) redirect("/login?next=/room");
   const { error } = await supabase.rpc("leave_couple_room", { target: room });
-  redirect(error ? "/room?error=leave" : "/room?left=1");
+  redirect(error ? "/room/settings?error=leave#account" : "/room?left=1");
 }
 
 // Deletes the account and all of its rows in one database transaction.
 export async function deleteAccount(formData: FormData) {
-  if (formData.get("confirm") !== "yes") redirect("/room?error=delete");
+  // A person without a room deletes from /room; everyone else from the settings page.
+  const back = formData.get("back") === "/room" ? "/room?error=delete" : "/room/settings?error=delete#account";
+  if (formData.get("confirm") !== "yes") redirect(back);
   const { supabase, user } = await signedIn();
   if (!user) redirect("/login?next=/room");
   const { error } = await supabase.rpc("delete_my_account");
-  if (error) redirect("/room?error=delete");
+  if (error) redirect(back);
   // The account is gone; clear this browser's session cookies too.
   await supabase.auth.signOut({ scope: "local" });
   redirect("/login?deleted=1");
@@ -74,22 +77,33 @@ export async function deleteAccount(formData: FormData) {
 export async function setMood(formData: FormData) {
   const room = String(formData.get("room") ?? "");
   const mood = formData.get("mood");
-  if (!isMood(mood)) redirect("/room?error=mood");
+  if (!isMood(mood)) redirect("/room/settings?error=room#room");
   const { supabase, user } = await signedIn();
   if (!user) redirect("/login?next=/room");
   const { error } = await supabase.rpc("set_room_mood", { target: room, new_mood: mood });
-  redirect(error ? "/room?error=mood" : "/room");
+  redirect(error ? "/room/settings?error=room#room" : "/room/settings?saved=room#room");
 }
 
 export async function setStart(formData: FormData) {
   const room = String(formData.get("room") ?? "");
   const start = String(formData.get("start") ?? "");
   const zone = String(formData.get("zone") ?? "");
-  if (!isPreviewStart(start) || !zones.some((item) => item.value === zone)) redirect("/room?error=start");
+  if (!isPreviewStart(start) || !zones.some((item) => item.value === zone)) redirect("/room/settings?error=room#room");
   const { supabase, user } = await signedIn();
   if (!user) redirect("/login?next=/room");
   const { error } = await supabase.rpc("set_room_start", { target: room, first_day: start, zone });
-  redirect(error ? "/room?error=start" : "/room");
+  redirect(error ? "/room/settings?error=room#room" : "/room/settings?saved=room#room");
+}
+
+// The nickname I use for my partner (empty clears it). The database checks length and membership.
+export async function setNickname(formData: FormData) {
+  const room = String(formData.get("room") ?? "");
+  const nick = String(formData.get("nick") ?? "").trim();
+  if (nick.length > 20 || /[\u0000-\u001f\u007f]/.test(nick)) redirect("/room/settings?error=nick#nick");
+  const { supabase, user } = await signedIn();
+  if (!user) redirect("/login?next=/room/settings");
+  const { error } = await supabase.rpc("set_partner_nickname", { target: room, nick });
+  redirect(error ? "/room/settings?error=nick#nick" : "/room/settings?saved=nick#nick");
 }
 
 export async function addPlan(formData: FormData) {

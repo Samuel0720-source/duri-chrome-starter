@@ -209,6 +209,33 @@ before(async () => {
       "utf8",
     ),
   );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611140001_member_prefs.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611140002_draw_english.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  await admin.query(
+    await readFile(
+      new URL(
+        "../../supabase/migrations/202611140003_watch_sources.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
 });
 after(async () => {
   admin?.release();
@@ -588,7 +615,7 @@ test("draw quiz: 100 seconds, many words, the guesser never gets the current wor
   assert.equal(s1.phase, "live", "the round goes on");
   assert.equal(s1.score, 1);
   assert.equal(s1.wordNo, 2);
-  assert.deepEqual(s1.words, [{ n: 1, word: w1, outcome: "correct" }]);
+  assert.deepEqual(s1.words.map(({ n, word, outcome }) => ({ n, word, outcome })), [{ n: 1, word: w1, outcome: "correct" }]);
   const w2 = await current(game);
   assert.notEqual(w2, w1);
   assert.equal((await state(b)).word, w2, "the drawer gets the next word");
@@ -1222,4 +1249,127 @@ test("guess bank: 40 games in a row use all 120 questions once, then they start 
   const [{ g }] = await asUser(a, "select public.start_guess_game($1) as g", [id]);
   const { rows } = await admin.query("select questions from public.guess_games where id=$1", [g]);
   assert.deepEqual([...rows[0].questions].sort((x, y) => x - y), [...seen.slice(0, 3)].sort((x, y) => x - y), "the 41st game reuses the oldest three");
+});
+
+test("member prefs: nicknames for each other, chat read position moves forward only, strangers refused", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user(),
+    c = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const nick = async (who, n) => (await asUser(who, "select public.set_partner_nickname($1,$2) as n", [id, n]))[0].n;
+  const read = async (who, upto) => Number((await asUser(who, "select public.mark_chat_read($1,$2) as r", [id, upto]))[0].r);
+  const prefs = async (who) => asUser(who, "select user_id, partner_nickname, read_upto, read_at from public.member_prefs where room_id=$1 order by user_id", [id]);
+
+  // Nicknames: trimmed, 20 characters at most, empty clears; each sets their own row only.
+  assert.equal(await nick(a, "  곰돌이  "), "곰돌이");
+  assert.equal(await nick(b, "자기"), "자기");
+  await assert.rejects(nick(a, "가".repeat(21)), /Invalid nickname/);
+  await assert.rejects(nick(a, "줄\n바꿈"), /Invalid nickname/);
+  let rows = await prefs(b);
+  assert.equal(rows.length, 2, "both partners see both rows");
+  assert.equal(rows.find((r) => r.user_id === a).partner_nickname, "곰돌이", "B sees what A calls B");
+  assert.equal(await nick(a, "   "), null, "empty clears");
+  assert.equal((await prefs(a)).find((r) => r.user_id === a).partner_nickname, null);
+  await assert.rejects(asUser(a, "update public.member_prefs set partner_nickname='x'"), /permission denied/);
+  await assert.rejects(asUser(a, "insert into public.member_prefs(room_id,user_id) values($1,$2)", [id, a]), /permission denied/);
+
+  // Read position: never past the newest message, never backwards.
+  const send = async (who, text) => Number((await asUser(who, "select public.send_room_message($1,$2,$3) as m", [id, randomUUID(), text]))[0].m);
+  const m1 = await send(a, "안녕");
+  const m2 = await send(a, "보고 싶어");
+  assert.equal(await read(b, m1), m1);
+  rows = await prefs(a);
+  const bRow = rows.find((r) => r.user_id === b);
+  assert.equal(Number(bRow.read_upto), m1, "A sees how far B has read");
+  assert.ok(bRow.read_at, "with the time");
+  assert.equal(await read(b, m2 + 999), m2, "capped at the newest message");
+  assert.equal(await read(b, m1), m2, "never backwards");
+  await assert.rejects(read(b, -1), /Invalid position/);
+
+  // Strangers: no rows, no writes; signals carry no names.
+  assert.deepEqual(await asUser(c, "select * from public.member_prefs"), []);
+  await assert.rejects(nick(c, "x"), /Room unavailable/);
+  await assert.rejects(read(c, 1), /Room unavailable/);
+  const signals = (await admin.query("select payload from realtime.sent where topic=$1 and event='prefs'", ["room:" + id])).rows;
+  assert.ok(signals.length >= 3);
+  assert.ok(signals.every((x) => Object.keys(x.payload).join() === "change"));
+  assert.ok(!JSON.stringify(signals).includes("곰돌이"));
+  // Leaving the room: the prefs go with it.
+  await asUser(a, "select public.leave_couple_room($1)", [id]);
+  assert.equal((await admin.query("select count(*)::int n from public.member_prefs where room_id=$1", [id])).rows[0].n, 2, "kept with the closed room until it is deleted");
+  await assert.rejects(nick(b, "x"), /Room unavailable/);
+});
+
+test("draw quiz in English: every word has an English name, the guesser may answer in either language, and still never sees it", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const missing = (await admin.query("select count(*)::int n from duri_private.draw_word_bank where word_en is null or word_en = '' or word_en ~ '[가-힣]'")).rows[0].n;
+  assert.equal(missing, 0, "all 300 words have an English name");
+  const [{ g }] = await asUser(a, "select public.start_draw_game($1,'animal',true) as g", [id]);
+  await asUser(a, "select public.ready_draw_game($1)", [g]);
+  await asUser(b, "select public.ready_draw_game($1)", [g]);
+  const cur = async () => (await admin.query("select w.word, w.word_en, w.alts_en from duri_private.draw_words w join public.draw_games d on d.id=w.game_id and w.n=d.word_no where d.id=$1", [g])).rows[0];
+  const guess = async (text) => (await asUser(b, "select public.guess_draw($1,$2) as r", [g, text]))[0].r;
+  const w1 = await cur();
+  const sa = (await asUser(a, "select public.draw_state($1) as s", [id]))[0].s;
+  assert.equal(sa.word, w1.word);
+  assert.equal(sa.wordEn, w1.word_en, "the drawer gets both, the screen shows its own language");
+  const sb = (await asUser(b, "select public.draw_state($1) as s", [id]))[0].s;
+  assert.equal(sb.wordEn, null);
+  assert.ok(!JSON.stringify(sb).toLowerCase().includes(w1.word_en.toLowerCase()), "the guesser gets no English word either");
+  // English answer, any case and spacing.
+  assert.equal(await guess("  " + w1.word_en.toUpperCase() + " "), "correct");
+  const w2 = await cur();
+  assert.equal(await guess(w2.word), "correct", "Korean still works");
+  const s2 = (await asUser(b, "select public.draw_state($1) as s", [id]))[0].s;
+  assert.deepEqual(s2.words.map((w) => w.wordEn), [w1.word_en, w2.word_en], "past words come in both languages");
+});
+
+test("golf: the browser's instant prediction matches the database's roll", async () => {
+  const { simulateShot } = await import("../../src/core/golf-physics.ts");
+  let same = 0, total = 0, worst = 0;
+  for (let h = 1; h <= 9; h++) {
+    const course = (await admin.query("select duri_private.golf_course($1) as c", [h])).rows[0].c;
+    for (let i = 0; i < 30; i++) {
+      const ang = (i / 30) * Math.PI * 2 + h * 0.01, pw = 0.1 + (i % 9) * 0.1;
+      const db = (await admin.query("select duri_private.golf_simulate($1,$2,$3,$4,$5) as r", [h, course.tee[0], course.tee[1], ang, pw])).rows[0].r;
+      const js = simulateShot(course, course.tee[0], course.tee[1], ang, pw);
+      total++;
+      if (JSON.stringify(js.path) === JSON.stringify(db.path) && js.holed === db.holed && js.water === db.water && js.ms === db.ms) same++;
+      worst = Math.max(worst, Math.hypot(js.x - db.x, js.y - db.y));
+    }
+  }
+  console.log(`PREDICT ${same}/${total} identical, worst end distance ${worst.toFixed(3)} px`);
+  assert.equal(same, total, `${same}/${total} identical`);
+});
+
+test("watch together: YouTube, Vimeo and https video files; everything else is refused", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const parse = async (link) => (await admin.query("select * from duri_private.parse_video($1)", [link])).rows[0];
+  assert.deepEqual(await parse("https://youtu.be/dQw4w9WgXcQ?t=40"), { source: "youtube", ref: "dQw4w9WgXcQ" });
+  assert.deepEqual(await parse("https://vimeo.com/76979871"), { source: "vimeo", ref: "76979871" });
+  assert.deepEqual(await parse("https://vimeo.com/123456789/AbCdEf1234"), { source: "vimeo", ref: "123456789:abcdef1234" });
+  assert.deepEqual(await parse("https://player.vimeo.com/video/123456789?h=abcdef12&autoplay=1"), { source: "vimeo", ref: "123456789:abcdef12" });
+  assert.deepEqual(await parse("https://example.com/clips/our trip.mp4"), { source: null, ref: null }, "spaces are refused");
+  assert.deepEqual(await parse("https://cdn.example.com/clips/trip.MP4?sig=abc"), { source: "file", ref: "https://cdn.example.com/clips/trip.MP4?sig=abc" });
+  assert.deepEqual(await parse("https://example.com/video.webm"), { source: "file", ref: "https://example.com/video.webm" });
+  for (const bad of ["http://example.com/a.mp4", "https://example.com/a.exe", "javascript:alert(1)//a.mp4", "https://evil.com/\"><script>.mp4", "https://www.netflix.com/watch/123", ""])
+    assert.equal((await parse(bad)).ref, null, bad);
+
+  const state = async (who) => (await asUser(who, "select public.watch_state($1) as s", [id]))[0].s;
+  await asUser(a, "select public.watch_set_video($1,$2)", [id, "https://vimeo.com/76979871"]);
+  let s = await state(b);
+  assert.deepEqual([s.source, s.videoId, s.playing], ["vimeo", "76979871", false]);
+  await asUser(a, "select public.watch_set_video($1,$2)", [id, "https://example.com/video.webm"]);
+  s = await state(b);
+  assert.deepEqual([s.source, s.videoId], ["file", "https://example.com/video.webm"]);
+  await asUser(b, "select public.watch_set_video($1,$2)", [id, "https://youtu.be/dQw4w9WgXcQ"]);
+  s = await state(a);
+  assert.deepEqual([s.source, s.videoId], ["youtube", "dQw4w9WgXcQ"]);
+  await assert.rejects(asUser(a, "select public.watch_set_video($1,$2)", [id, "https://www.netflix.com/watch/123"]), /Invalid video link/);
+  // The table itself refuses a bad combination even from the server key.
+  await assert.rejects(admin.query("update public.watch_sessions set source='file', video_id='http://x.mp4' where room_id=$1", [id]), /watch_sessions_video_check/);
 });
