@@ -271,6 +271,25 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
     }), { timeout: 15_000 }).toBe(true);
   }
   console.log("call route:", await pageA.locator(".call-box [data-route]").getAttribute("data-route"));
+  // Both peers sit on one machine, so the call above connects directly either way. Check the relay on
+  // its own: ask for this call's servers, then gather candidates through TURN only. A relay candidate
+  // means Cloudflare accepted the credentials and its relay answered.
+  const relay = await pageA.evaluate(async () => {
+    const body = await fetch("/api/call/ice", { cache: "no-store" }).then((r) => r.json());
+    if (!body.relay) return { relay: false, candidate: false };
+    const pc = new RTCPeerConnection({ iceServers: body.iceServers, iceTransportPolicy: "relay" });
+    pc.createDataChannel("probe");
+    const found = new Promise<boolean>((done) => {
+      pc.onicecandidate = (e) => { if (e.candidate?.type === "relay") done(true); if (!e.candidate) done(false); };
+      setTimeout(() => done(false), 8000);
+    });
+    await pc.setLocalDescription(await pc.createOffer());
+    const candidate = await found;
+    pc.close();
+    return { relay: true, candidate };
+  });
+  console.log("relay servers:", relay.relay, "relay candidate:", relay.candidate);
+  if (relay.relay) expect(relay.candidate, "TURN credentials were issued but the relay did not answer").toBe(true);
   await pageA.getByRole("button", { name: "끊기" }).click();
   await expect(pageA.getByText("통화가 끝났어요.")).toBeVisible();
   await expect(pageB.getByText("통화가 끝났어요.")).toBeVisible({ timeout: 10_000 });
