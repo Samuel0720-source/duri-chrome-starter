@@ -44,7 +44,8 @@ export function CallControls({ session, view, ready }: { session: CallSession | 
   const localVideo = view.local?.getVideoTracks()[0];
   const status = view.phase === "idle" ? view.note : view.phase === "incoming" ? (audioOnly ? "incomingAudio" : "incomingVideo") : view.phase;
   return <section className="call-box" aria-label={t("call.title")}>
-    <div className="call-top"><div><h2>{t("call.title")}</h2><p role="status">{t(`call.${status}`)}</p></div>
+    <div className="call-top"><div><h2>{t("call.title")}</h2><p role="status">{t(`call.${status}`)}</p>
+      {view.phase === "connected" && view.route && <p className="hint" data-route={view.route}>{t(view.route === "relay" ? "call.route.relay" : "call.route.direct")}</p>}</div>
       <div className="call-actions">
         {view.phase === "idle" ? <>
           <button type="button" disabled={!ready} onClick={() => session?.start("audio")}>{t("call.audio")}</button>

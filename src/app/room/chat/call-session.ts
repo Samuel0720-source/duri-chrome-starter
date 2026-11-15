@@ -2,18 +2,25 @@ import { isSignal, type Kind, type Mode } from "../../../core/room-call";
 
 export type Phase = "idle" | "ringing" | "incoming" | "connecting" | "connected";
 export type CallNote = "hint" | "ended" | "device" | "network" | "busy" | "timeout" | "offline";
-type Session = { id: string; mode: Mode; caller: boolean; phase: Phase; pc?: RTCPeerConnection; stream?: MediaStream };
-export type View = { phase: Phase; mode: Mode; note: CallNote; local?: MediaStream; remote?: MediaStream };
+type Session = { id: string; mode: Mode; caller: boolean; phase: Phase; pc?: RTCPeerConnection; stream?: MediaStream; route?: Route };
+// "direct": the two browsers reached each other. "relay": the audio goes through the TURN relay server.
+export type Route = "direct" | "relay";
+export type View = { phase: Phase; mode: Mode; note: CallNote; local?: MediaStream; remote?: MediaStream; route?: Route };
+
+// Without a relay (TURN) server, two devices behind strict networks (mobile data, campus Wi-Fi) never connect.
+const STUN: RTCIceServer[] = [{ urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"] }];
 
 export class CallSession {
   private current?: Session;
   private timer?: ReturnType<typeof setTimeout>;
   private remote?: MediaStream;
   constructor(private me: string, private send: (id: string, kind: Kind, detail: string) => Promise<void>,
-    private render: (view: View) => void) {}
+    private render: (view: View) => void,
+    // Fresh STUN/TURN servers for each call (the app asks its own server; tests use STUN only).
+    private iceServers: () => Promise<RTCIceServer[]> = async () => STUN) {}
 
   private show(s: Session) {
-    this.render({ phase: s.phase, mode: s.mode, note: "hint", local: s.stream, remote: this.remote });
+    this.render({ phase: s.phase, mode: s.mode, note: "hint", local: s.stream, remote: this.remote, route: s.route });
   }
   private timeout(s: Session, ms: number) {
     clearTimeout(this.timer);
@@ -87,7 +94,10 @@ export class CallSession {
     } catch { if (s === this.current) this.end("network"); }
   }
   private async openPeer(s: Session) {
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    let servers = STUN;
+    try { servers = await this.iceServers(); } catch { /* STUN still works on friendly networks */ }
+    if (s !== this.current) return;
+    const pc = new RTCPeerConnection({ iceServers: servers });
     s.pc = pc;
     pc.ontrack = event => {
       if (s !== this.current) return;
@@ -103,6 +113,7 @@ export class CallSession {
         clearTimeout(this.timer);
         s.phase = "connected";
         this.show(s);
+        void this.findRoute(s, pc);
       } else if (pc.connectionState === "failed") this.end("network");
       else if (pc.connectionState === "disconnected") this.timeout(s, 12_000);
     };
@@ -114,6 +125,20 @@ export class CallSession {
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
     this.show(s);
     return pc;
+  }
+  // Which path the connected call uses (shown under the status, and useful when a call is silent).
+  private async findRoute(s: Session, pc: RTCPeerConnection) {
+    try {
+      const stats = await pc.getStats();
+      let pairId: string | undefined;
+      stats.forEach((r) => { if (r.type === "transport" && r.selectedCandidatePairId) pairId = r.selectedCandidatePairId; });
+      let pair: { localCandidateId?: string } | undefined;
+      stats.forEach((r) => { if (r.type === "candidate-pair" && (r.id === pairId || (!pairId && r.nominated && r.state === "succeeded"))) pair = r; });
+      const local = pair?.localCandidateId ? stats.get(pair.localCandidateId) : undefined;
+      if (s !== this.current) return;
+      s.route = local?.candidateType === "relay" ? "relay" : "direct";
+      this.show(s);
+    } catch { /* the route is only informative */ }
   }
   // Bundle ICE candidates into one SDP message to keep signaling traffic small.
   private async describe(s: Session, pc: RTCPeerConnection, desc: RTCSessionDescriptionInit) {

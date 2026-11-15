@@ -8,6 +8,7 @@ import { useT } from "../../../i18n/client";
 
 import { CallSession, type View } from "./call-session";
 import { CallControls } from "./call-controls";
+import { isIceList } from "../../../core/ice";
 
 export type Message = { id: number; sender: string | null; body: string; created_at: string };
 type Shown = Message & { state?: "sending" | "failed"; request?: string };
@@ -83,7 +84,13 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
     const session = new CallSession(me, async (id, kind, detail) => {
       const { error } = await supabase.rpc("signal_room_call", { target: roomId, session_id: id, kind, detail });
       if (error) throw new Error("Signaling unavailable");
-    }, setCallView);
+    }, setCallView, async () => {
+      // Our server hands out fresh relay (TURN) credentials to members of this room.
+      const res = await fetch("/api/call/ice", { cache: "no-store" });
+      const body = res.ok ? await res.json() : null;
+      if (!isIceList(body?.iceServers)) throw new Error("No call servers");
+      return body.iceServers as RTCIceServer[];
+    });
     call.current = session;
     const leave = () => session.end();
     window.addEventListener("pagehide", leave);

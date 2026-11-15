@@ -241,3 +241,11 @@
 - 채팅 중 상대의 수락 후 WebRTC로 음성 또는 영상을 보낸다. 전송용 DB 함수는 현재 멤버십을 확인하고 발신자를 인증 세션에서 정한다. 기기 간 직접 연결과 Google STUN만 사용한다. 통화 중 탭을 떠나면 종료된다.
 - 검증: 로컬 typecheck·프로덕션 빌드, 단위 57개·DB 21개, 확장 출시 ZIP 생성. 브라우저 테스트에는 합성 마이크·카메라를 사용하는 두 기기 시나리오가 들어 있다. 이 작업 환경에서 Chromium 시작이 차단되어 브라우저 결과는 PR의 GitHub Actions를 확인한다.
 - 다음 작업: 대상 Supabase에 `supabase/migrations/202611160001_call_signals.sql`을 적용하고, 두 기기로 서로 다른 네트워크에서 실제 통화와 권한 거부를 확인한다. Chrome Web Store 제출은 별도다.
+
+### 통화 소리 문제 · 2026-11-14
+
+- **증상(Sam):** 음성·영상 통화에서 목소리가 안 들림.
+- **원인:** STUN만 있고 중계(TURN) 서버가 없음 → 다른 네트워크 사이에서 연결 실패. 기존 테스트는 같은 기계 두 탭이라 항상 통과.
+- **변경:** `src/core/ice.ts`, `src/app/api/call/ice/route.ts`, `src/app/room/chat/{call-session.ts,chat.tsx,call-controls.tsx}`(통화마다 서버 목록 받기, 연결 경로 "직접/중계" 표시), `tests/unit/ice.test.mjs`, `tests/flow/two-users.spec.ts`(실제 사이트에서 음성 통화 → 양쪽 소리 재생 확인 → 끊기), `playwright.flow.config.ts`(가짜 마이크·카메라).
+- **검사:** 단위 59개, 기존 통화 브라우저 테스트 통과(로컬). 라이브 흐름은 CI 결과 참조.
+- 다음 행동 하나: Sam이 Cloudflare 계정에서 TURN 키를 만들고 Vercel에 두 환경 변수를 넣기 → 다른 네트워크(한 명은 모바일 데이터)에서 통화해 "중계 서버를 거쳐 연결됐어요"가 뜨는지 확인.

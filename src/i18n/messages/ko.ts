@@ -37,7 +37,7 @@ export const ko = {
   "call.ended": "통화가 끝났어요.",
   "call.device": "마이크 또는 카메라를 열 수 없어요. 브라우저 권한을 확인해 주세요.",
   "call.offline": "통화 연결을 사용할 수 없어요. 잠시 뒤 다시 시도해 주세요.",
-  "call.network": "직접 연결에 실패했어요. 다른 네트워크에서 다시 시도해 주세요.",
+  "call.network": "두 기기가 서로 연결되지 못했어요. 와이파이나 모바일 데이터를 바꿔 다시 시도해 주세요.",
   "call.busy": "상대가 다른 전화를 받고 있어요.",
   "call.timeout": "응답이나 연결이 지연됐어요. 두 사람 모두 대화창을 열고 다시 시도해 주세요.",
   "call.accept": "받기",
@@ -530,5 +530,7 @@ export const ko = {
   "watch.nf.wait": "확장이 준비됐어요. 아래 버튼으로 넷플릭스를 열고 로그인하면 자동으로 연결돼요.",
   "watch.nf.linked": "넷플릭스 탭과 연결됐어요.",
   "watch.err.netflixExt": "넷플릭스는 둘이 Chrome 확장이 있어야 같이 볼 수 있어요.",
+  "call.route.direct": "두 기기가 직접 연결됐어요.",
+  "call.route.relay": "중계 서버를 거쳐 연결됐어요.",
   // END
 } as const;

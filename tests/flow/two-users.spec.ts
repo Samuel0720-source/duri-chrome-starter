@@ -28,7 +28,7 @@ async function makeUser(label: string, password?: string) {
 async function signIn(browser: Browser, email: string, next: string): Promise<Page> {
   const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email });
   if (error) throw error;
-  const page = await (await browser.newContext()).newPage();
+  const page = await (await browser.newContext({ permissions: ["microphone", "camera"] })).newPage();
   const q = new URLSearchParams({ token_hash: data.properties.hashed_token, type: "magiclink", next });
   await page.goto("/auth/callback?" + q);
   return page;
@@ -254,6 +254,26 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   // A reload shows the same conversation from the server.
   await pageA.reload();
   await expect(pageA.locator(".chat-list .bubble")).toHaveCount(2);
+  // A real voice call on the deployed site: signals through Supabase, then each side must actually
+  // play the partner's voice (the <audio> element advances), and hanging up ends it on both screens.
+  await expect(pageA.locator("html[data-room-live=on]")).toHaveCount(1);
+  await expect(pageA.getByRole("button", { name: "음성 통화" })).toBeEnabled({ timeout: 10_000 });
+  await pageA.getByRole("button", { name: "음성 통화" }).click();
+  await expect(pageB.getByRole("button", { name: "받기" })).toBeVisible({ timeout: 10_000 });
+  await pageB.getByRole("button", { name: "받기" }).click();
+  for (const page of [pageA, pageB]) {
+    await expect(page.getByText("통화 중이에요.")).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator(".call-box [data-route]")).toBeVisible({ timeout: 10_000 });
+    await expect.poll(() => page.evaluate(() => {
+      const a = document.querySelector<HTMLAudioElement>(".call-box audio");
+      const track = (a?.srcObject as MediaStream | null)?.getAudioTracks()[0];
+      return Boolean(a && !a.paused && !a.muted && a.currentTime > 0.5 && track?.readyState === "live");
+    }), { timeout: 15_000 }).toBe(true);
+  }
+  console.log("call route:", await pageA.locator(".call-box [data-route]").getAttribute("data-route"));
+  await pageA.getByRole("button", { name: "끊기" }).click();
+  await expect(pageA.getByText("통화가 끝났어요.")).toBeVisible();
+  await expect(pageB.getByText("통화가 끝났어요.")).toBeVisible({ timeout: 10_000 });
   // Postcards share the first flip and rotate after the second, hit or miss.
   await Promise.all([pageA, pageB].map(page => page.goto("/room/game?g=post")));
   await expect(async () => {
