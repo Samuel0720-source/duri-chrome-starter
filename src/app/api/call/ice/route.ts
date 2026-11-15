@@ -19,7 +19,15 @@ export async function GET() {
   const headers = { "Cache-Control": "no-store" };
   const keyId = process.env.CLOUDFLARE_TURN_KEY_ID;
   const token = process.env.CLOUDFLARE_TURN_API_TOKEN;
-  if (!keyId || !token || !/^[A-Za-z0-9_-]{8,80}$/.test(keyId)) return Response.json({ iceServers: STUN_ONLY, relay: false }, { headers });
+  // Logs say why a call fell back to STUN (never the key or token themselves).
+  if (!keyId || !token) {
+    console.warn("[call/ice] TURN not configured:", !keyId ? "CLOUDFLARE_TURN_KEY_ID missing" : "CLOUDFLARE_TURN_API_TOKEN missing");
+    return Response.json({ iceServers: STUN_ONLY, relay: false }, { headers });
+  }
+  if (!/^[A-Za-z0-9_-]{8,80}$/.test(keyId)) {
+    console.warn("[call/ice] CLOUDFLARE_TURN_KEY_ID has an unexpected shape (length " + keyId.length + ")");
+    return Response.json({ iceServers: STUN_ONLY, relay: false }, { headers });
+  }
   try {
     const res = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${keyId}/credentials/generate`, {
       method: "POST",
@@ -28,10 +36,12 @@ export async function GET() {
       signal: AbortSignal.timeout(4000),
       cache: "no-store",
     });
+    if (!res.ok) console.warn("[call/ice] Cloudflare answered HTTP " + res.status);
     const servers = res.ok ? cloudflareIce(await res.json()) : null;
     if (servers) return Response.json({ iceServers: servers, relay: true }, { headers });
-  } catch {
-    // fall through to STUN
+    if (res.ok) console.warn("[call/ice] Cloudflare answer had no usable TURN entry");
+  } catch (e) {
+    console.warn("[call/ice] Cloudflare request failed:", e instanceof Error ? e.name : "error");
   }
   return Response.json({ iceServers: STUN_ONLY, relay: false }, { headers });
 }
