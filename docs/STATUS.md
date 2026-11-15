@@ -249,3 +249,9 @@
 - **변경:** `src/core/ice.ts`, `src/app/api/call/ice/route.ts`, `src/app/room/chat/{call-session.ts,chat.tsx,call-controls.tsx}`(통화마다 서버 목록 받기, 연결 경로 "직접/중계" 표시), `tests/unit/ice.test.mjs`, `tests/flow/two-users.spec.ts`(실제 사이트에서 음성 통화 → 양쪽 소리 재생 확인 → 끊기), `playwright.flow.config.ts`(가짜 마이크·카메라).
 - **검사:** 단위 59개, 기존 통화 브라우저 테스트 통과(로컬). 라이브 흐름은 CI 결과 참조.
 - 다음 행동 하나: Sam이 Cloudflare 계정에서 TURN 키를 만들고 Vercel에 두 환경 변수를 넣기 → 다른 네트워크(한 명은 모바일 데이터)에서 통화해 "중계 서버를 거쳐 연결됐어요"가 뜨는지 확인.
+
+### 통화 중계(TURN) 연결 확인 · 2026-11-15
+- 변경 경로: `src/app/api/call/ice/route.ts`(중계를 못 쓰는 이유를 Vercel 로그에 남김, 키·토큰은 기록하지 않음), `tests/flow/two-users.spec.ts`(배포마다 TURN만으로 후보를 모아 중계 서버 응답 확인).
+- 실제 검사: Vercel에 `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN`(Production, 비밀) 확인. 처음엔 계정 API 토큰(`cfut_`)을 넣어 Cloudflare가 HTTP 401 → TURN 키 자체의 API 토큰으로 교체 후 live flow `relay servers: true relay candidate: true`, 2 passed. Check starter 통과.
+- 미확인: 실제로 서로 다른 네트워크(한 명은 모바일 데이터)에서의 통화.
+- 다음 행동 하나: Sam이 모바일 데이터로 통화해서 "중계 서버를 거쳐 연결됐어요" 또는 "직접 연결됐어요"가 뜨고 소리가 들리는지 확인.
