@@ -7,5 +7,9 @@ export default defineConfig({
   workers: 1,
   timeout: 300_000,
   reporter: "list",
-  use: { actionTimeout: 20_000, navigationTimeout: 30_000, baseURL: process.env.FLOW_URL ?? "http://localhost:3000", headless: true, locale: "ko-KR" },
+  use: {
+    actionTimeout: 20_000, navigationTimeout: 30_000, baseURL: process.env.FLOW_URL ?? "http://localhost:3000", headless: true, locale: "ko-KR",
+    // Synthetic microphone and camera, so the flow can place a real call between the two people.
+    launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"] },
+  },
 });

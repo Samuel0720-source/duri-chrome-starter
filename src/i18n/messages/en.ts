@@ -38,7 +38,7 @@ export const en: Record<keyof typeof ko, string> = {
   "call.ended": "Call ended.",
   "call.device": "Couldn't open the microphone or camera. Check your browser permissions.",
   "call.offline": "Call signaling is unavailable. Please try again later.",
-  "call.network": "The direct connection failed. Try another network.",
+  "call.network": "The two devices couldn't reach each other. Try switching between Wi-Fi and mobile data, then call again.",
   "call.busy": "Your partner is on another call.",
   "call.timeout": "The call timed out. Open the chat on both devices and try again.",
   "call.accept": "Accept",
@@ -531,5 +531,7 @@ export const en: Record<keyof typeof ko, string> = {
   "watch.nf.wait": "Extension ready. Open Netflix with the button below and sign in; it connects by itself.",
   "watch.nf.linked": "Connected to your Netflix tab.",
   "watch.err.netflixExt": "Netflix together needs the Duri Chrome extension.",
+  "call.route.direct": "The two devices are connected directly.",
+  "call.route.relay": "Connected through the relay server.",
   // END
 };
