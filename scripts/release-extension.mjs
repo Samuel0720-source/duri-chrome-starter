@@ -55,7 +55,7 @@ export function zip(entries) {
 // What the store review cares about, checked before anything is packed.
 // The only pages the extension may run on: Netflix watch pages, and the 함께 보기 page of this web app.
 export function allowedScriptPages(origin) {
-  return new Set(["https://www.netflix.com/watch/*", origin + "/room/watch*"]);
+  return new Set(["https://www.netflix.com/watch/*", origin + "/room/watch*", origin + "/room/draw*"]);
 }
 
 export function checkManifest(manifest, files, origin = "https://duri.example") {

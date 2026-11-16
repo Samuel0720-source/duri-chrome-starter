@@ -3,6 +3,7 @@
 import { useRoomChannel } from "../use-room-channel";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorKey } from "../../../core/auth-paths";
 import { useT } from "../../../i18n/client";
@@ -11,6 +12,7 @@ import { cellLabel, GOMOKU_SIZE, scoreLine, stoneOf, type GomokuState } from "..
 // 오목. The database decides turns and the winner; this screen shows the board, previews a tap, and sends the stone.
 export function GomokuGame({ roomId, initial, partnerName }: { roomId: string; initial: GomokuState; partnerName: string }) {
   const { t } = useT();
+  const router = useRouter();
   const roomChannel = useRoomChannel(roomId);
   const [state, setState] = useState<GomokuState>(initial);
   const [pick, setPick] = useState<{ x: number; y: number } | null>(null);
@@ -42,7 +44,7 @@ export function GomokuGame({ roomId, initial, partnerName }: { roomId: string; i
       if (!active) return;
       channel = roomChannel(supabase)
         .on("broadcast", { event: "gomoku" }, reread)
-        .on("broadcast", { event: "members" }, () => window.location.reload())
+        .on("broadcast", { event: "members" }, () => router.refresh())
         .subscribe((status) => {
           document.documentElement.dataset.roomLive = status === "SUBSCRIBED" ? "on" : "off";
           if (status === "SUBSCRIBED") reread();
@@ -55,7 +57,7 @@ export function GomokuGame({ roomId, initial, partnerName }: { roomId: string; i
       clearInterval(beat);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomChannel, roomId, refresh]);
+  }, [roomChannel, roomId, refresh, router]);
 
   const stones = useMemo(() => {
     const map = new Map<string, { color: "black" | "white"; n: number }>();
@@ -142,7 +144,7 @@ export function GomokuGame({ roomId, initial, partnerName }: { roomId: string; i
                   data-preview={previewed ? state.me : undefined}
                   aria-label={label}
                   disabled={!myTurn || Boolean(stone) || busy}
-                  onClick={() => setPick({ x, y })}
+                  onClick={() => (previewed ? void place() : setPick({ x, y }))}
                 />
               );
             })}

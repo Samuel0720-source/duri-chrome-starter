@@ -209,3 +209,82 @@ test("Netflix together: the extension relays commands and playback between a Net
     await context.close();
   }
 });
+
+test("extension popup Draw tab renders strokes and duri-bridge pairs on /room/draw without touching /room/chat", async ({
+  playwright, baseURL,
+}, testInfo) => {
+  const unpacked = await buildExtension(baseURL, testInfo.outputPath("unpacked-draw"));
+  const context = await playwright.chromium.launchPersistentContext(testInfo.outputPath("profile-draw"), {
+    headless: true,
+    channel: "chromium",
+    locale: "ko-KR",
+    executablePath: process.env.CHROMIUM_PATH || undefined,
+    ignoreDefaultArgs: ["--disable-extensions"],
+    args: ["--enable-unsafe-extension-debugging"],
+  });
+  try {
+    const control = await context.browser()!.newBrowserCDPSession();
+    let id: string;
+    try {
+      ({ id } = await control.send("Extensions.loadUnpacked", { path: unpacked }));
+    } catch (error) {
+      const managed = String(error).includes("Loading of unpacked extensions is disabled by the administrator");
+      test.skip(managed && process.env.REQUIRE_NATIVE_EXTENSION !== "1", "Chromium administrator policy blocks unpacked extensions.");
+      throw error;
+    }
+
+    // 1. Draw tab inside extension popup draws local strokes onto the canvas and supports undo/clear.
+    const popup = await context.newPage();
+    await popup.goto("chrome-extension://" + id + "/popup.html");
+    await popup.getByRole("tab", { name: "함께 그리기" }).click();
+    const canvas = popup.getByTestId("ext-sketch-canvas");
+    await expect(canvas).toBeVisible();
+    const box = await canvas.boundingBox();
+    expect(box).not.toBeNull();
+    await popup.mouse.move(box!.x + box!.width * 0.25, box!.y + box!.height * 0.3);
+    await popup.mouse.down();
+    await popup.mouse.move(box!.x + box!.width * 0.7, box!.y + box!.height * 0.6, { steps: 6 });
+    await popup.mouse.up();
+    await expect.poll(async () => {
+      return popup.evaluate(() => {
+        const el = document.querySelector<HTMLCanvasElement>("[data-testid='ext-sketch-canvas']");
+        if (!el) return 0;
+        const data = el.getContext("2d")!.getImageData(0, 0, el.width, el.height).data;
+        let nonEmpty = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i] > 0) nonEmpty++;
+        return nonEmpty;
+      });
+    }).toBeGreaterThan(20);
+
+    // 2. duri-bridge pairs on /room/draw* and updates sketch-status, while /room/chat stays unbridged.
+    const drawStub = `<!doctype html><title>draw-stub</title><script>
+      window.__got = [];
+      addEventListener("message", (e) => { if (e.data && e.data.duri === "from-ext") window.__got.push(e.data); });
+      postMessage({ duri: "to-ext", type: "ping" }, location.origin);
+      postMessage({ duri: "to-ext", type: "sketch-status" }, location.origin);
+    </script>`;
+    await context.route(new URL("/room/draw?bridge=1", baseURL).href, (r) => r.fulfill({ contentType: "text/html", body: drawStub }));
+    await context.route(new URL("/room/chat?bridge=1", baseURL).href, (r) => r.fulfill({ contentType: "text/html", body: drawStub }));
+
+    const drawPage = await context.newPage();
+    await drawPage.goto(new URL("/room/draw?bridge=1", baseURL).href);
+    type Got = { type: string; paired?: boolean };
+    const gotDraw = () => drawPage.evaluate(() => (window as unknown as { __got: Got[] }).__got);
+    await expect.poll(async () => (await gotDraw()).some((m) => m.type === "hello")).toBe(true);
+    await expect.poll(async () => (await gotDraw()).some((m) => m.type === "sketch-status" && m.paired === false)).toBe(true);
+
+    const token = "a".repeat(64);
+    await drawPage.evaluate(([tok, origin]) => {
+      window.postMessage({ duri: "to-ext", type: "sketch-pair", token: tok, origin, partnerName: "민지" }, location.origin);
+      window.postMessage({ duri: "to-ext", type: "sketch-status" }, location.origin);
+    }, [token, new URL(baseURL!).origin]);
+    await expect.poll(async () => (await gotDraw()).some((m) => m.type === "sketch-status" && m.paired === true)).toBe(true);
+
+    const chatPage = await context.newPage();
+    await chatPage.goto(new URL("/room/chat?bridge=1", baseURL).href);
+    await chatPage.waitForTimeout(800);
+    expect(await chatPage.evaluate(() => (window as unknown as { __got: Got[] }).__got.length)).toBe(0);
+  } finally {
+    await context.close();
+  }
+});

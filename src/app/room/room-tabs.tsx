@@ -1,15 +1,25 @@
+import Link from "next/link";
 import { getT } from "../../i18n/server";
 
-export type RoomTab = "home" | "game" | "watch" | "album" | "chat" | "settings";
+export type RoomTab = "home" | "game" | "draw" | "watch" | "album" | "chat" | "settings";
 
-const icons: Record<RoomTab, string> = { home: "🏡", game: "🎮", watch: "🍿", album: "📸", chat: "💌", settings: "⚙️" };
+const icons: Record<RoomTab, string> = {
+  home: "🏡",
+  game: "🎮",
+  draw: "🎨",
+  watch: "🍿",
+  album: "📸",
+  chat: "💌",
+  settings: "⚙️",
+};
 
-// The room's main menu: 홈 / 게임 / 함께 보기 / 앨범 / 대화 / 설정.
+// The room's main menu: 홈 / 게임 / 그림 / 함께 보기 / 앨범 / 대화 / 설정.
 export async function RoomTabs({ active }: { active: RoomTab }) {
   const { t } = await getT();
   const tabs: [RoomTab, string, string][] = [
     ["home", "/room", t("tabs.home")],
     ["game", "/room/game", t("tabs.game")],
+    ["draw", "/room/draw", t("tabs.draw")],
     ["watch", "/room/watch", t("tabs.watch")],
     ["album", "/room/album", t("tabs.album")],
     ["chat", "/room/chat", t("tabs.chat")],
@@ -18,7 +28,10 @@ export async function RoomTabs({ active }: { active: RoomTab }) {
   return (
     <nav className="room-tabs" aria-label={t("tabs.label")}>
       {tabs.map(([key, href, label]) => (
-        <a key={key} href={href} aria-current={active === key ? "page" : undefined}><span className="tab-icon" aria-hidden="true">{icons[key]}</span><span>{label}</span></a>
+        <Link key={key} href={href} aria-current={active === key ? "page" : undefined}>
+          <span className="tab-icon" aria-hidden="true">{icons[key]}</span>
+          <span>{label}</span>
+        </Link>
       ))}
     </nav>
   );
