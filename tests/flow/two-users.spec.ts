@@ -144,6 +144,17 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   const applyTheme = pageB.getByRole("button", { name: "이 테마로 바꾸기" });
   // RoomLive sets this attribute from an effect, so it also tells us the page has hydrated.
   await expect(pageB.locator("html")).toHaveAttribute("data-room-live", "on", { timeout: 30_000 }).catch(() => console.log("settings: room-live never on"));
+  const headerBird = (page: Page) => page.locator(".brand .room-mascot");
+  const originalBird = /postbirds\.webp/;
+  await expect(headerBird(pageA)).toHaveCSS("background-image", originalBird);
+  for (const theme of ["forest", "cafe", "sunset", "night", "berry"]) {
+    const option = pageB.locator(`label.mood-option[data-mood="${theme}"]`);
+    const asset = theme === "berry" ? originalBird : new RegExp("/mascots/" + theme + "\\.webp");
+    await expect(option.locator(".mood-mascot")).toHaveCSS("background-image", asset);
+    await option.click();
+    await expect(headerBird(pageB)).toHaveCSS("background-image", asset);
+    await expect(headerBird(pageA)).toHaveCSS("background-image", originalBird);
+  }
   try {
     await expect(async () => {
       await pageB.locator('label.mood-option[data-mood="night"]').click();
@@ -161,6 +172,10 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await applyTheme.click();
   await expect(pageB.locator('.room[data-mood="night"]')).toHaveCount(1);
   await expect(pageA.locator('.room[data-mood="night"]')).toHaveCount(1, { timeout: 10_000 });
+  await expect(headerBird(pageA)).toHaveCSS("background-image", /night\.webp/);
+  await expect(pageA.locator(".daily-mascot")).toHaveCSS("background-image", /night\.webp/);
+  await pageB.reload();
+  await expect(headerBird(pageB)).toHaveCSS("background-image", /night\.webp/);
   // A gives B a nickname; B's settings show what A calls B.
   await pageA.getByRole("link", { name: "설정", exact: true }).click();
   await pageA.getByLabel("내가 상대를 부르는 애칭").fill("곰돌이");

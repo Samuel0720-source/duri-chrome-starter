@@ -1,5 +1,7 @@
 "use client";
 
+import { useRoomChannel } from "../use-room-channel";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorKey } from "../../../core/auth-paths";
@@ -11,6 +13,7 @@ import { guessQuestions, type GuessRound, type GuessState } from "../../../core/
 // a partner's answer for a round arrives after both have answered that round.
 export function GuessGame({ roomId, initial, partnerName }: { roomId: string; initial: GuessState; partnerName: string }) {
   const { t } = useT();
+  const roomChannel = useRoomChannel(roomId);
   const [state, setState] = useState<GuessState>(initial);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -32,8 +35,7 @@ export function GuessGame({ roomId, initial, partnerName }: { roomId: string; in
     (async () => {
       await supabase.realtime.setAuth();
       if (!active) return;
-      channel = supabase
-        .channel("room:" + roomId, { config: { private: true } })
+      channel = roomChannel(supabase)
         .on("broadcast", { event: "guess" }, () => refresh())
         .on("broadcast", { event: "members" }, () => window.location.reload())
         .subscribe((status) => {
@@ -45,7 +47,7 @@ export function GuessGame({ roomId, initial, partnerName }: { roomId: string; in
       active = false;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomId, refresh]);
+  }, [roomChannel, roomId, refresh]);
 
   async function call(fn: string, args: Record<string, unknown>) {
     const supabase = supabaseRef.current;

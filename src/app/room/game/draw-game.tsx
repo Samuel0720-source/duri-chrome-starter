@@ -1,5 +1,7 @@
 "use client";
 
+import { useRoomChannel } from "../use-room-channel";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorKey } from "../../../core/auth-paths";
@@ -16,6 +18,7 @@ type Pen = { id: string; color: string; width: number; points: Point[]; sent: nu
 // from draw_state() and the member-readable tables: the current word reaches the drawer only.
 export function DrawGame({ roomId, initial, partnerName }: { roomId: string; initial: DrawState; partnerName: string }) {
   const { t, locale } = useT();
+  const roomChannel = useRoomChannel(roomId);
   const [state, setState] = useState<DrawState>(initial);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [guesses, setGuesses] = useState<DrawGuess[]>([]);
@@ -91,8 +94,7 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
     (async () => {
       await supabase.realtime.setAuth();
       if (!active) return;
-      channel = supabase
-        .channel("room:" + roomId, { config: { private: true } })
+      channel = roomChannel(supabase)
         .on("broadcast", { event: "draw" }, reread)
         .on("broadcast", { event: "members" }, () => window.location.reload())
         .subscribe((status) => {
@@ -106,7 +108,7 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
       clearTimeout(timer);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomId, refresh, loadBoard]);
+  }, [roomChannel, roomId, refresh, loadBoard]);
 
   const wordNo = state.game ? state.wordNo : 0;
   useEffect(() => {
