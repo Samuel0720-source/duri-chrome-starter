@@ -3,6 +3,7 @@
 import { useRoomChannel } from "../use-room-channel";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorKey } from "../../../core/auth-paths";
 import { ago, lastMineId, seenStatus, startsGroup } from "../../../core/chat";
@@ -28,6 +29,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   prompt: string; roomId: string; me: string; zone: string; initial: Message[]; partnerName: string; initialPartnerRead: ReadMark; initialMyRead: number;
 }) {
   const { t, locale } = useT();
+  const router = useRouter();
   const roomChannel = useRoomChannel(roomId);
   const [messages, setMessages] = useState<Shown[]>(initial);
   const [partnerRead, setPartnerRead] = useState<ReadMark>(initialPartnerRead);
@@ -40,6 +42,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   const [callView, setCallView] = useState<View>({ phase: "idle", mode: "audio", note: "hint" });
   const [callReady, setCallReady] = useState(false);
   const listRef = useRef<HTMLOListElement>(null);
+  const mountedRef = useRef(false);
   const supabaseRef = useRef<ReturnType<typeof browserClient>>(null);
   const lastId = useRef(initial.at(-1)?.id ?? 0);
 
@@ -106,7 +109,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
         .on("broadcast", { event: "call" }, ({ payload }) => { void session.receive(payload); })
         .on("broadcast", { event: "messages" }, ({ payload }) => (payload?.change === "delete" ? reload() : pull()))
         .on("broadcast", { event: "prefs" }, () => loadPartnerRead())
-        .on("broadcast", { event: "members" }, () => window.location.reload())
+        .on("broadcast", { event: "members" }, () => router.refresh())
         .subscribe((status) => {
           if (!active) return;
           setCallReady(status === "SUBSCRIBED" && !!navigator.mediaDevices?.getUserMedia && typeof RTCPeerConnection !== "undefined");
@@ -123,7 +126,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
       call.current = null;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomChannel, roomId, me, pull, reload, loadPartnerRead]);
+  }, [roomChannel, roomId, me, pull, reload, loadPartnerRead, router]);
 
   // Tell the database how far I have read, but only while this screen is really in front of me.
   const markRead = useCallback(async () => {
@@ -152,7 +155,11 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   }, [markRead]);
 
   useEffect(() => {
-    listRef.current?.lastElementChild?.scrollIntoView({ block: "end" });
+    listRef.current?.lastElementChild?.scrollIntoView({
+      block: "end",
+      behavior: mountedRef.current ? "smooth" : "auto",
+    });
+    mountedRef.current = true;
   }, [messages.length]);
 
   async function deliver(request: string, body: string, tempId: number) {

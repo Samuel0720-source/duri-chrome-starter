@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { coupleCalendar, daysFrom, roomToday, upcomingMilestones } from "../../core/dates";
 import { MilestoneRail } from "../milestone-rail";
@@ -6,7 +7,7 @@ import { postcardQuestion } from "../../core/postcards";
 import { isMood } from "../../core/moods";
 import { defaultZone, zones } from "../../core/preview";
 import { getT } from "../../i18n/server";
-import { serverClient } from "../../lib/supabase/server";
+import { getRoomSession, getRoomSummary } from "../../lib/room-context";
 import { addPlan, createRoom, removePlan } from "./actions";
 import { DeleteAccount } from "./delete-account";
 import { RoomTabs } from "./room-tabs";
@@ -23,16 +24,12 @@ export default async function RoomPage({
 }) {
   const { t, locale } = await getT();
   const num = (n: number) => n.toLocaleString(locale === "ko" ? "ko-KR" : "en-CA");
-  const supabase = await serverClient();
+  const { supabase, user, roomId } = await getRoomSession();
   if (!supabase) return <main className="wrap auth"><p>{t("common.configMissing")}</p></main>;
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) redirect("/login?next=/room");
+  if (!user) redirect("/login?next=/room");
   const { error, left } = await searchParams;
 
-  // Row level security returns only the caller's own seat and room.
-  const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle();
-
-  if (!seat) {
+  if (!roomId) {
     // Show "partner left" only for a recent notice, so an old breakup is not shown forever.
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data: notice } = await supabase
@@ -60,16 +57,16 @@ export default async function RoomPage({
     );
   }
 
-  const [{ data: room }, { count }, { data: plans }, names] = await Promise.all([
-    supabase.from("couple_rooms").select("id, start_date, timezone, mood").eq("id", seat.room_id).maybeSingle(),
-    supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
-    supabase.from("room_plans").select("id, on_date, title").eq("room_id", seat.room_id).order("on_date").order("created_at").limit(200),
-    roomNames(supabase, seat.room_id, auth.user.id),
+  const [summary, { data: plans }, names] = await Promise.all([
+    getRoomSummary(roomId),
+    supabase.from("room_plans").select("id, on_date, title").eq("room_id", roomId).order("on_date").order("created_at").limit(200),
+    roomNames(supabase, roomId, user.id),
   ]);
+  const { room, count } = summary;
   if (!room) redirect("/room?error=closed");
   const today = roomToday(new Date(), room.timezone);
   const calendar = coupleCalendar(room.start_date, today);
-  const full = (count ?? 0) >= 2;
+  const full = count >= 2;
   const mood = isMood(room.mood) ? room.mood : "berry";
   const upcoming = (plans ?? []).filter((p) => p.on_date >= today);
   const past = (plans ?? []).filter((p) => p.on_date < today).reverse();
@@ -89,7 +86,7 @@ export default async function RoomPage({
           <img src={mood === "berry" ? "/art/post-garden.webp" : `/art/scenes/${mood}.webp`} alt="" fetchPriority="high" />
         </div>
         <div><h2 id="daily-heading">{t("post.daily")}</h2><p>{t(postcardQuestion(today))}</p>
-          <div className="post-links"><a href="/room/chat?prompt=today">{t("post.reply")}</a></div>
+          <div className="post-links"><Link href="/room/chat?prompt=today">{t("post.reply")}</Link></div>
         </div>
       </section>}
       <div className="room-grid">
@@ -181,7 +178,7 @@ export default async function RoomPage({
           <InviteBox roomId={room.id} />
         </section>
       )}
-      <p className="hint"><a href="/room/settings">{t("home.settingsLink")}</a></p>
+      <p className="hint"><Link href="/room/settings">{t("home.settingsLink")}</Link></p>
       </div>
     </RoomShell>
   );

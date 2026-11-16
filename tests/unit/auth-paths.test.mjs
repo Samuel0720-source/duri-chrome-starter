@@ -33,6 +33,7 @@ test("emails are checked loosely and database errors become a dictionary key, sh
   assert.match(roomErrorMessage("Invalid plan"), /1~60자/);
   assert.match(roomErrorMessage("Plan unavailable"), /약속/);
   assert.equal(roomErrorKey("Ball moving"), "err.ballMoving");
+  assert.equal(roomErrorKey("Bridge token unavailable"), "err.bridgeToken");
   assert.equal(roomErrorKey("internal: relation secret_table"), "err.unknown");
   assert.match(en(roomErrorKey("Room full")), /two people/);
   assert.match(en(roomErrorKey("Invalid nickname")), /1-20 characters/);

@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import { MAX_PHOTOS } from "../../../core/album";
 import { isMood } from "../../../core/moods";
 import { getT } from "../../../i18n/server";
+import { getRoomSession, getRoomSummary } from "../../../lib/room-context";
 import { roomNames } from "../../../lib/room-names";
-import { serverClient } from "../../../lib/supabase/server";
 import { RoomLive } from "../room-live";
 import { RoomShell } from "../room-shell";
 import { RoomTabs } from "../room-tabs";
@@ -17,18 +17,16 @@ const errors = { gone: "album.err.gone" } as const;
 // The couple's album. Photos are listed here; the bytes come from /api/photo/<id>.
 export default async function AlbumPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const { t, locale } = await getT();
-  const supabase = await serverClient();
+  const { supabase, user, roomId } = await getRoomSession();
   if (!supabase) redirect("/login?error=config");
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) redirect("/login?next=/room/album");
-  const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle();
-  if (!seat) redirect("/room");
-  const [{ data: room }, { count }, { data: rows }, names] = await Promise.all([
-    supabase.from("couple_rooms").select("id, timezone, mood, wallpaper").eq("id", seat.room_id).maybeSingle(),
-    supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
-    supabase.from("room_photos").select("id, added_by, width, height, created_at").eq("room_id", seat.room_id).order("created_at", { ascending: false }),
-    roomNames(supabase, seat.room_id, auth.user.id),
+  if (!user) redirect("/login?next=/room/album");
+  if (!roomId) redirect("/room");
+  const [summary, { data: rows }, names] = await Promise.all([
+    getRoomSummary(roomId),
+    supabase.from("room_photos").select("id, added_by, width, height, created_at").eq("room_id", roomId).order("created_at", { ascending: false }),
+    roomNames(supabase, roomId, user.id),
   ]);
+  const { room, count } = summary;
   if (!room) redirect("/room");
   const { saved, error } = await searchParams;
   const day = new Intl.DateTimeFormat(locale === "ko" ? "ko-KR" : "en-CA", { dateStyle: "medium", timeZone: room.timezone });
@@ -36,11 +34,11 @@ export default async function AlbumPage({ searchParams }: { searchParams: Promis
     id: r.id,
     width: r.width,
     height: r.height,
-    mine: r.added_by === auth.user.id,
+    mine: r.added_by === user.id,
     date: day.format(new Date(r.created_at)),
   }));
   const partner = names.partnerNick ?? t("common.partner");
-  const full = (count ?? 0) >= 2;
+  const full = count >= 2;
 
   return (
     <RoomShell>

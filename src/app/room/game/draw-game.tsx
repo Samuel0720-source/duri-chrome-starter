@@ -3,6 +3,7 @@
 import { useRoomChannel } from "../use-room-channel";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorKey } from "../../../core/auth-paths";
 import { Rich, useT } from "../../../i18n/client";
@@ -11,13 +12,59 @@ import {
   penColors, penWidths, recordText, secondsLeft, strokesToPaths, timeShare, wordIn,
   type DrawCategory, type DrawGuess, type DrawRecords, type DrawState, type Point, type Stroke,
 } from "../../../core/draw";
+import { drawSmoothPath } from "../../../core/sketch";
 
 type Pen = { id: string; color: string; width: number; points: Point[]; sent: number };
+
+function DrawCountdown({ deadlineMs, offsetMs, onExpire }: { deadlineMs: number; offsetMs: number; onExpire: () => void }) {
+  const { t } = useT();
+  const [, setTick] = useState(0);
+  const lastExpire = useRef(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick((n) => n + 1);
+      if (secondsLeft(deadlineMs, Date.now(), offsetMs) === 0 && Date.now() - lastExpire.current > 1200) {
+        lastExpire.current = Date.now();
+        onExpire();
+      }
+    }, 200);
+    return () => clearInterval(timer);
+  }, [deadlineMs, offsetMs, onExpire]);
+
+  const left = secondsLeft(deadlineMs, Date.now(), offsetMs);
+  return (
+    <p className="draw-timer" role="timer">
+      <Rich text={t("draw.left")} parts={{ n: <strong suppressHydrationWarning>{left}</strong> }} />
+    </p>
+  );
+}
+
+function DrawProgressBar({ deadlineMs, offsetMs }: { deadlineMs: number; offsetMs: number }) {
+  const barRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    let id = 0;
+    const step = () => {
+      if (barRef.current) {
+        barRef.current.style.transform = `scaleX(${deadlineMs ? timeShare(deadlineMs, Date.now(), offsetMs) : 0})`;
+      }
+      id = requestAnimationFrame(step);
+    };
+    id = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(id);
+  }, [deadlineMs, offsetMs]);
+  return (
+    <div className="draw-bar" aria-hidden="true">
+      <span ref={barRef} suppressHydrationWarning style={{ transform: `scaleX(${deadlineMs ? timeShare(deadlineMs, Date.now(), offsetMs) : 0})` }} />
+    </div>
+  );
+}
 
 // "100초 그림 퀴즈": in 100 seconds, solve as many words as you can. What this screen may know comes only
 // from draw_state() and the member-readable tables: the current word reaches the drawer only.
 export function DrawGame({ roomId, initial, partnerName }: { roomId: string; initial: DrawState; partnerName: string }) {
   const { t, locale } = useT();
+  const router = useRouter();
   const roomChannel = useRoomChannel(roomId);
   const [state, setState] = useState<DrawState>(initial);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
@@ -30,7 +77,6 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [, setTick] = useState(0);
 
   const supabaseRef = useRef<ReturnType<typeof browserClient>>(null);
   const offsetRef = useRef(clockOffset(initial.nowMs, Date.now()));
@@ -41,13 +87,12 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
   const pendingRef = useRef<Stroke[]>([]);
   const queueRef = useRef<Promise<void>>(Promise.resolve());
   const flushTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-  const lastExpireRefresh = useRef(0);
+  const rafRef = useRef(0);
   const strokesRef = useRef<Stroke[]>([]);
 
   const game = state.game ? state : null;
   const live = game?.phase === "live";
   const isDrawer = game?.role === "drawer";
-  const left = game && game.deadlineMs ? secondsLeft(game.deadlineMs, Date.now(), offsetRef.current) : 0;
 
   // ---------------------------------------------------------------- reading from the server
   const refresh = useCallback(async () => {
@@ -96,7 +141,7 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
       if (!active) return;
       channel = roomChannel(supabase)
         .on("broadcast", { event: "draw" }, reread)
-        .on("broadcast", { event: "members" }, () => window.location.reload())
+        .on("broadcast", { event: "members" }, () => router.refresh())
         .subscribe((status) => {
           document.documentElement.dataset.roomLive = status === "SUBSCRIBED" ? "on" : "off";
           if (status === "SUBSCRIBED") reread();
@@ -108,7 +153,7 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
       clearTimeout(timer);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomChannel, roomId, refresh, loadBoard]);
+  }, [roomChannel, roomId, refresh, loadBoard, router]);
 
   const wordNo = state.game ? state.wordNo : 0;
   useEffect(() => {
@@ -122,52 +167,27 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
     }
   }, [state.game, wordNo, loadBoard]);
 
-  // Countdown: redraw the clock a few times a second; when it reaches 0 ask the server to end the round.
-  useEffect(() => {
-    if (!live) return;
-    const timer = setInterval(() => {
-      setTick((n) => n + 1);
-      const g = state.game ? state : null;
-      if (g && g.deadlineMs && secondsLeft(g.deadlineMs, Date.now(), offsetRef.current) === 0 && Date.now() - lastExpireRefresh.current > 1200) {
-        lastExpireRefresh.current = Date.now();
-        refresh();
-      }
-    }, 200);
-    return () => clearInterval(timer);
-  }, [live, state, refresh]);
-
   // ---------------------------------------------------------------- the board
   strokesRef.current = strokes;
-  const redraw = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    ctx.clearRect(0, 0, BOARD_W, BOARD_H);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    const seen = new Set(strokesRef.current.map((r) => r.segment));
-    const rows = [...strokesRef.current, ...pendingRef.current.filter((r) => !seen.has(r.segment))];
-    const paths = strokesToPaths(rows);
-    const pen = penRef.current;
-    if (pen) paths.push({ color: pen.color, width: pen.width, points: pen.points });
-    for (const path of paths) {
-      ctx.strokeStyle = path.color;
-      ctx.fillStyle = path.color;
-      ctx.lineWidth = path.width;
-      const pts = path.points;
-      if (pts.length === 1) {
-        ctx.beginPath();
-        ctx.arc(pts[0][0], pts[0][1], path.width / 2, 0, Math.PI * 2);
-        ctx.fill();
-        continue;
+  const scheduleRedraw = useCallback(() => {
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (!canvas || !ctx) return;
+      ctx.clearRect(0, 0, BOARD_W, BOARD_H);
+      const seen = new Set(strokesRef.current.map((r) => r.segment));
+      const rows = [...strokesRef.current, ...pendingRef.current.filter((r) => !seen.has(r.segment))];
+      const paths = strokesToPaths(rows);
+      const pen = penRef.current;
+      if (pen) paths.push({ color: pen.color, width: pen.width, points: pen.points });
+      for (const path of paths) {
+        drawSmoothPath(ctx, path.points, path.color, path.width, false);
       }
-      ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-      ctx.stroke();
-    }
+    });
   }, []);
-  useEffect(() => { redraw(); }, [strokes, state.game, redraw]);
+  useEffect(() => { scheduleRedraw(); }, [strokes, state.game, scheduleRedraw]);
 
   function enqueue(job: () => Promise<void>) {
     queueRef.current = queueRef.current.then(job).catch(() => undefined);
@@ -205,30 +225,34 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
     return [Math.round(Math.min(BOARD_W, Math.max(0, x))), Math.round(Math.min(BOARD_H, Math.max(0, y)))];
   }
   function down(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (!isDrawer || !live || left === 0) return;
+    if (!isDrawer || !live) return;
+    if (game?.deadlineMs && secondsLeft(game.deadlineMs, Date.now(), offsetRef.current) === 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     penRef.current = { id: crypto.randomUUID(), color, width, points: [toBoard(e)], sent: 0 };
     clearInterval(flushTimer.current);
     flushTimer.current = setInterval(flush, 150);
-    redraw();
+    scheduleRedraw();
   }
   function move(e: React.PointerEvent<HTMLCanvasElement>) {
     const pen = penRef.current;
     if (!pen) return;
     const p = toBoard(e);
     const last = pen.points[pen.points.length - 1];
-    if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 3) return;
+    if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 2.5) return;
     pen.points.push(p);
-    redraw();
+    scheduleRedraw();
   }
   function up() {
     if (!penRef.current) return;
     clearInterval(flushTimer.current);
     flush();
     penRef.current = null;
-    redraw();
+    scheduleRedraw();
   }
-  useEffect(() => () => clearInterval(flushTimer.current), []);
+  useEffect(() => () => {
+    clearInterval(flushTimer.current);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+  }, []);
 
   // ---------------------------------------------------------------- commands
   async function call(fn: string, args: Record<string, unknown>) {
@@ -308,7 +332,11 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
         {game.phase === "live" && (
           <>
             <div className="draw-live-row">
-              <p className="draw-timer" role="timer"><Rich text={t("draw.left")} parts={{ n: <strong suppressHydrationWarning>{left}</strong> }} /></p>
+              {game.deadlineMs ? (
+                <DrawCountdown deadlineMs={game.deadlineMs} offsetMs={offsetRef.current} onExpire={refresh} />
+              ) : (
+                <p className="draw-timer" role="timer"><Rich text={t("draw.left")} parts={{ n: <strong>0</strong> }} /></p>
+              )}
               <p className="draw-score" aria-live="polite"><span>{t("draw.score")}</span> <strong data-testid="draw-score">{game.score}</strong></p>
             </div>
             {isDrawer && game.word && (
@@ -318,9 +346,7 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
               </div>
             )}
             {!isDrawer && <p className="lead">{t("draw.guessPrompt", { n: game.wordNo, name: partnerName })}</p>}
-            <div className="draw-bar" aria-hidden="true">
-              <span suppressHydrationWarning style={{ transform: `scaleX(${game.deadlineMs ? timeShare(game.deadlineMs, Date.now(), offsetRef.current) : 0})` }} />
-            </div>
+            <DrawProgressBar deadlineMs={game.deadlineMs ?? 0} offsetMs={offsetRef.current} />
           </>
         )}
         {game.phase === "done" && (

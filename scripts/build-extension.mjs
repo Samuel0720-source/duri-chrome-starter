@@ -21,7 +21,7 @@ export async function buildExtension(input = localOrigin, directory = defaultDir
   const origin = validateOrigin(input);
   await mkdir(join(directory, "core"), { recursive: true });
   await cp(join(root, "extension"), directory, { recursive: true });
-  for (const name of ["dates", "preview"]) {
+  for (const name of ["dates", "preview", "sketch"]) {
     const file = await readFile(join(root, "src", "core", name + ".ts"), "utf8");
     const { outputText } = ts.transpileModule(file, {
       compilerOptions: {

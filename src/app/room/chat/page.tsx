@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { roomToday } from "../../../core/dates";
 import { postcardQuestion } from "../../../core/postcards";
 import { isMood } from "../../../core/moods";
 import { getT } from "../../../i18n/server";
-import { serverClient } from "../../../lib/supabase/server";
+import { getRoomSession, getRoomSummary } from "../../../lib/room-context";
 import { RoomTabs } from "../room-tabs";
 import { RoomShell } from "../room-shell";
 import { Chat, type Message } from "./chat";
@@ -12,24 +13,22 @@ export const dynamic = "force-dynamic";
 
 export default async function ChatPage({ searchParams }: { searchParams: Promise<{ prompt?: string }> }) {
   const { t } = await getT();
-  const supabase = await serverClient();
+  const { supabase, user, roomId } = await getRoomSession();
   if (!supabase) redirect("/login?error=config");
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) redirect("/login?next=/room/chat");
-  const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle();
-  if (!seat) redirect("/room");
-  const [{ data: room }, { count }, { data: recent }, { data: prefs }] = await Promise.all([
-    supabase.from("couple_rooms").select("id, timezone, mood").eq("id", seat.room_id).maybeSingle(),
-    supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
-    supabase.from("room_messages").select("id, sender, body, created_at").eq("room_id", seat.room_id).order("id", { ascending: false }).limit(50),
-    supabase.from("member_prefs").select("user_id, partner_nickname, read_upto, read_at").eq("room_id", seat.room_id),
+  if (!user) redirect("/login?next=/room/chat");
+  if (!roomId) redirect("/room");
+  const [summary, { data: recent }, { data: prefs }] = await Promise.all([
+    getRoomSummary(roomId),
+    supabase.from("room_messages").select("id, sender, body, created_at").eq("room_id", roomId).order("id", { ascending: false }).limit(50),
+    supabase.from("member_prefs").select("user_id, partner_nickname, read_upto, read_at").eq("room_id", roomId),
   ]);
+  const { room, count } = summary;
   if (!room) redirect("/room");
-  const full = (count ?? 0) >= 2;
+  const full = count >= 2;
   const prompt = (await searchParams).prompt === "today" ? t(postcardQuestion(roomToday(new Date(), room.timezone))) : "";
   const initial: Message[] = (recent ?? []).reverse();
-  const mine = (prefs ?? []).find((p) => p.user_id === auth.user.id);
-  const theirs = (prefs ?? []).find((p) => p.user_id !== auth.user.id);
+  const mine = (prefs ?? []).find((p) => p.user_id === user.id);
+  const theirs = (prefs ?? []).find((p) => p.user_id !== user.id);
 
   return (
     <RoomShell>
@@ -40,7 +39,7 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
           {full ? (
             <Chat
               roomId={room.id}
-              me={auth.user.id}
+              me={user.id}
               prompt={prompt}
               zone={room.timezone}
               initial={initial}
@@ -49,7 +48,7 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
               initialMyRead={Number(mine?.read_upto ?? 0)}
             />
           ) : (
-            <p className="notice">{t("chat.needPartner")} <a href="/room">{t("chat.inviteLink")}</a></p>
+            <p className="notice">{t("chat.needPartner")} <Link href="/room">{t("chat.inviteLink")}</Link></p>
           )}
         </section>
       </div>

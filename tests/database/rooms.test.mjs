@@ -245,6 +245,8 @@ before(async () => {
   await admin.query(await readFile(new URL("../../supabase/migrations/202611160001_call_signals.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611170001_postcard_duel.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611180001_birthday.sql", import.meta.url), "utf8"));
+  await admin.query(await readFile(new URL("../../supabase/migrations/202611190001_chess.sql", import.meta.url), "utf8"));
+  await admin.query(await readFile(new URL("../../supabase/migrations/202611190002_shared_draw.sql", import.meta.url), "utf8"));
 });
 after(async () => {
   admin?.release();
@@ -1573,4 +1575,126 @@ test("postcard duel shares a hidden 7-pair board, alternates each turn, handles 
   await asUser(a, "select public.leave_couple_room($1)", [id]);
   await assert.rejects(read(b), /Room unavailable/);
   await assert.rejects(flip(a,next.revision,first), /Room unavailable/);
+});
+
+test("chess: server rules enforce turns, detect Fool's mate, keep scores, swap colours on rematch, and broadcast", async () => {
+  const { id, token, a } = await fixture();
+  const b = await user(), outsider = await user();
+  const read = async (who) => (await asUser(who, "select public.chess_state($1) as state", [id]))[0].state;
+  const start = async (who) => (await asUser(who, "select public.start_chess($1) as id", [id]))[0].id;
+  const play = async (who, game, fromSq, toSq, promo = null, req = randomUUID()) =>
+    (await asUser(who, "select public.play_chess($1,$2,$3,$4,$5) as res", [game, fromSq, toSq, promo, req]))[0].res;
+
+  assert.equal((await read(a)).game, null);
+  await assert.rejects(start(a), /Partner needed/);
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+
+  const game1 = await start(a);
+  const sA1 = await read(a);
+  const sB1 = await read(b);
+  assert.equal(sA1.me, "white");
+  assert.equal(sB1.me, "black");
+  assert.equal(sA1.turn, "me");
+  await assert.rejects(read(outsider), /Room unavailable/);
+  await assert.rejects(play(b, game1, 12, 28), /Not your turn/);
+  await assert.rejects(play(a, game1, 53, 20), /Invalid move/);
+
+  const req1 = randomUUID();
+  assert.equal(await play(a, game1, 53, 45, null, req1), "ok"); // f2-f3
+  assert.equal(await play(a, game1, 53, 45, null, req1), "duplicate");
+  assert.equal(await play(b, game1, 12, 28), "ok"); // e7-e5
+  assert.equal(await play(a, game1, 54, 38), "ok"); // g2-g4
+  assert.equal(await play(b, game1, 3, 39), "won"); // Qd8-h4#
+
+  const done = await read(a);
+  assert.equal(done.status, "won");
+  assert.equal(done.winner, "partner");
+  assert.equal(done.partnerWins, 1);
+  assert.equal(done.moves.at(-1).notation, "Qd8h4#");
+
+  // Rematch swaps white/black and resign works cleanly.
+  const game2 = await start(a);
+  const sA2 = await read(a);
+  assert.equal(sA2.me, "black");
+  assert.equal(sA2.turn, "partner");
+  await asUser(a, "select public.resign_chess($1)", [game2]);
+  const sA3 = await read(a);
+  assert.equal(sA3.status, "won");
+  assert.equal(sA3.partnerWins, 2);
+
+  const broadcasts = (await admin.query("select count(*)::int as n from realtime.sent where topic=$1 and event='chess'", ["room:" + id])).rows[0].n;
+  assert.ok(broadcasts > 0);
+});
+
+test("shared sketch board and scoped Chrome extension bridge tokens work securely", async () => {
+  const { id, token, a } = await fixture();
+  const b = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+
+  async function asAnon(sql, args = []) {
+    const c = await pool.connect();
+    try {
+      await c.query("begin");
+      await c.query("set local role anon");
+      const res = await c.query(sql, args);
+      await c.query("commit");
+      return res.rows;
+    } catch (error) {
+      await c.query("rollback");
+      throw error;
+    } finally {
+      c.release();
+    }
+  }
+
+  // Raw tables and private functions stay off-limits.
+  await assert.rejects(asUser(a, "select * from duri_private.sketch_bridge_tokens"), /permission denied/);
+  await assert.rejects(asAnon("select public.sketch_state($1)", [id]), /permission denied/);
+
+  // User A draws a stroke and stamps on the board, then issues an extension token.
+  const strokeId = randomUUID();
+  const segId = randomUUID();
+  await asUser(a, "select public.add_sketch_stroke($1,$2,$3,'pen','#6e304b',9::smallint,$4::jsonb,null)", [
+    id, strokeId, segId, JSON.stringify([[10, 20], [50, 80]]),
+  ]);
+  await asUser(a, "select public.add_sketch_stroke($1,$2,$3,'stamp','#2a1f26',44::smallint,$4::jsonb,'❤️')", [
+    id, randomUUID(), randomUUID(), JSON.stringify([[200, 150]]),
+  ]);
+
+  const [{ raw: extToken }] = await asUser(b, "select public.issue_sketch_token($1) as raw", [id]);
+  assert.match(extToken, /^[0-9a-f]{64}$/);
+
+  // Extension (role anon with valid token) reads both items incrementally and adds a stroke as user B.
+  const [{ s: extInitial }] = await asAnon("select public.sketch_bridge_state($1, 0, null) as s", [extToken]);
+  assert.equal(extInitial.strokes.length, 2);
+  assert.equal(extInitial.strokes[0].by, "partner");
+
+  const bStroke = randomUUID();
+  await asAnon("select public.sketch_bridge_stroke($1,$2,$3,'pen','#1c7ed6',16::smallint,$4::jsonb,null)", [
+    extToken, bStroke, randomUUID(), JSON.stringify([[300, 300], [400, 350]]),
+  ]);
+  await asAnon("select public.sketch_bridge_bg($1,'mint')", [extToken]);
+
+  const [{ s: delta }] = await asAnon("select public.sketch_bridge_state($1,$2,$3) as s", [
+    extToken, extInitial.latestSeq, extInitial.revision,
+  ]);
+  assert.equal(delta.incremental, true);
+  assert.equal(delta.bg, "mint");
+  assert.equal(delta.strokes.length, 1);
+  assert.equal(delta.strokes[0].by, "me");
+
+  // Undo via bridge removes only B's last stroke; A's stroke and stamp remain.
+  const [{ s: afterUndo }] = await asAnon("select public.sketch_bridge_undo($1) as s", [extToken]);
+  assert.equal(afterUndo.strokes.length, 2);
+  assert.equal(afterUndo.incremental, false);
+
+  // Revoking the token immediately blocks the extension bridge.
+  await asUser(b, "select public.revoke_sketch_token($1)", [id]);
+  await assert.rejects(asAnon("select public.sketch_bridge_state($1, 0, null)", [extToken]), /Bridge token unavailable/);
+
+  // Clearing and realtime broadcast.
+  const [{ s: cleared }] = await asUser(a, "select public.clear_sketch_board($1) as s", [id]);
+  assert.equal(cleared.strokes.length, 0);
+  const broadcasts = (await admin.query("select count(*)::int as n from realtime.sent where topic=$1 and event='sketch'", ["room:" + id])).rows[0].n;
+  assert.ok(broadcasts > 0);
 });

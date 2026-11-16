@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { isMood } from "../../../core/moods";
 import { getT } from "../../../i18n/server";
-import { serverClient } from "../../../lib/supabase/server";
+import { getRoomSession, getRoomSummary } from "../../../lib/room-context";
 import { roomNames } from "../../../lib/room-names";
 import { RoomTabs } from "../room-tabs";
 import { RoomShell } from "../room-shell";
@@ -11,17 +11,15 @@ export const dynamic = "force-dynamic";
 
 export default async function WatchPage() {
   const { t } = await getT();
-  const supabase = await serverClient();
+  const { supabase, user, roomId } = await getRoomSession();
   if (!supabase) redirect("/login?error=config");
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) redirect("/login?next=/room/watch");
-  const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle();
-  if (!seat) redirect("/room");
-  const [{ data: room }, { count }, names] = await Promise.all([
-    supabase.from("couple_rooms").select("id, mood").eq("id", seat.room_id).maybeSingle(),
-    supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
-    roomNames(supabase, seat.room_id, auth.user.id),
+  if (!user) redirect("/login?next=/room/watch");
+  if (!roomId) redirect("/room");
+  const [summary, names] = await Promise.all([
+    getRoomSummary(roomId),
+    roomNames(supabase, roomId, user.id),
   ]);
+  const { room, count } = summary;
   if (!room) redirect("/room");
 
   return (
@@ -29,7 +27,7 @@ export default async function WatchPage() {
       <div className="room" data-mood={isMood(room.mood) ? room.mood : "berry"}>
         <RoomTabs active="watch" />
         <h1 className="visually-hidden">{t("watch.title")}</h1>
-        <WatchTogether roomId={room.id} hasPartner={(count ?? 0) >= 2} partnerName={names.partnerNick ?? t("common.partner")} />
+        <WatchTogether roomId={room.id} hasPartner={count >= 2} partnerName={names.partnerNick ?? t("common.partner")} />
       </div>
     </RoomShell>
   );

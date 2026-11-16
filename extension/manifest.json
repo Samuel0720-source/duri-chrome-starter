@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_name__",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "__MSG_description__",
   "permissions": [
     "storage"
@@ -46,7 +46,8 @@
     },
     {
       "matches": [
-        "__DURI_ORIGIN__/room/watch*"
+        "__DURI_ORIGIN__/room/watch*",
+        "__DURI_ORIGIN__/room/draw*"
       ],
       "js": [
         "duri-bridge.js"

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { isMood } from "../../../core/moods";
 import { zones } from "../../../core/preview";
 import { getT } from "../../../i18n/server";
-import { serverClient } from "../../../lib/supabase/server";
+import { getRoomSession, getRoomSummary } from "../../../lib/room-context";
 import { roomNames } from "../../../lib/room-names";
 import { LanguageForm } from "../../language-form";
 import { leaveRoom, setBirthday, setNickname, setStart, signOut } from "../actions";
@@ -14,26 +14,24 @@ import { RoomShell } from "../room-shell";
 
 export const dynamic = "force-dynamic";
 
-const guide = ["start", "home", "games", "golf", "watch", "album", "chat", "settings", "install"] as const;
+const guide = ["start", "home", "games", "draw", "golf", "watch", "album", "chat", "settings", "install"] as const;
 
 // Settings: language, nicknames, birthdays, room theme and first day, a short guide, and the account.
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const { t, locale } = await getT();
-  const supabase = await serverClient();
+  const { supabase, user, roomId } = await getRoomSession();
   if (!supabase) return <main className="wrap auth"><p>{t("common.configMissing")}</p></main>;
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) redirect("/login?next=/room/settings");
+  if (!user) redirect("/login?next=/room/settings");
   const { error, saved } = await searchParams;
-  const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle();
-  if (!seat) redirect("/room");
-  const [{ data: room }, { count }, names] = await Promise.all([
-    supabase.from("couple_rooms").select("id, start_date, timezone, mood").eq("id", seat.room_id).maybeSingle(),
-    supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
-    roomNames(supabase, seat.room_id, auth.user.id),
+  if (!roomId) redirect("/room");
+  const [summary, names] = await Promise.all([
+    getRoomSummary(roomId),
+    roomNames(supabase, roomId, user.id),
   ]);
+  const { room, count } = summary;
   if (!room) redirect("/room");
   const mood = isMood(room.mood) ? room.mood : "berry";
-  const full = (count ?? 0) >= 2;
+  const full = count >= 2;
   const myMonth = names.myBirthday ? String(Number(names.myBirthday.slice(0, 2))) : "";
   const myDay = names.myBirthday ? String(Number(names.myBirthday.slice(3))) : "";
 

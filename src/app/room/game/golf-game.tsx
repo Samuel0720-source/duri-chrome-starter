@@ -3,6 +3,7 @@
 import { useRoomChannel } from "../use-room-channel";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorKey } from "../../../core/auth-paths";
 import { simulateShot } from "../../../core/golf-physics";
@@ -53,6 +54,7 @@ type Phase = { meMoving: boolean; partnerMoving: boolean };
 // database clock and turns a drag (anywhere on the course) into an angle and a power.
 export function GolfGame({ roomId, initial, partnerName }: { roomId: string; initial: GolfState; partnerName: string }) {
   const { t } = useT();
+  const router = useRouter();
   const roomChannel = useRoomChannel(roomId);
   const [state, setState] = useState<GolfState>(initial);
   const [error, setError] = useState("");
@@ -61,6 +63,7 @@ export function GolfGame({ roomId, initial, partnerName }: { roomId: string; ini
   const [phase, setPhase] = useState<Phase>({ meMoving: false, partnerMoving: false });
   const supabaseRef = useRef<ReturnType<typeof browserClient>>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cssWidthRef = useRef(0);
   const stateRef = useRef<GolfState>(initial);
   const clockRef = useRef<Clock>({ offset: initial.nowMs - Date.now(), rtt: 10_000, at: Date.now() });
   const delayRef = useRef<Map<string, number>>(new Map()); // "me:3" -> ms the replay was shifted
@@ -70,8 +73,6 @@ export function GolfGame({ roomId, initial, partnerName }: { roomId: string; ini
   const labelsRef = useRef({ me: "", partner: "" });
   const dragRef = useRef<{ from: { x: number; y: number }; to: { x: number; y: number } } | null>(null);
   const phaseRef = useRef<Phase>({ meMoving: false, partnerMoving: false });
-
-  const dbNow = () => Date.now() + clockRef.current.offset;
 
   // Remember, for each new shot, how late we first saw it: that delay is replayed instead of skipped.
   const noteShots = useCallback((st: GolfState) => {
@@ -112,7 +113,7 @@ export function GolfGame({ roomId, initial, partnerName }: { roomId: string; ini
       if (!active) return;
       channel = roomChannel(supabase)
         .on("broadcast", { event: "golf" }, () => void refresh())
-        .on("broadcast", { event: "members" }, () => window.location.reload())
+        .on("broadcast", { event: "members" }, () => router.refresh())
         .subscribe((status) => {
           document.documentElement.dataset.roomLive = status === "SUBSCRIBED" ? "on" : "off";
           if (status === "SUBSCRIBED") void refresh();
@@ -127,7 +128,7 @@ export function GolfGame({ roomId, initial, partnerName }: { roomId: string; ini
       clearInterval(beat);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomChannel, roomId, refresh]);
+  }, [roomChannel, roomId, refresh, router]);
 
   const s = state.game ? state : null;
   const delayOf = (who: "me" | "pa", b: GolfBall) =>
@@ -149,6 +150,14 @@ export function GolfGame({ roomId, initial, partnerName }: { roomId: string; ini
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    cssWidthRef.current = canvas.clientWidth;
+    const ro = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver((entries) => {
+          const w = entries[0]?.contentRect.width;
+          if (w) cssWidthRef.current = w;
+        })
+      : null;
+    ro?.observe(canvas);
     let frame = 0;
     let layer: HTMLCanvasElement | null = null;
     let layerKey = "";
@@ -158,8 +167,9 @@ export function GolfGame({ roomId, initial, partnerName }: { roomId: string; ini
       if (!st.game) return;
       const c = st.course;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const cssW = canvas.clientWidth;
+      const cssW = cssWidthRef.current || canvas.clientWidth;
       if (!cssW) return;
+      cssWidthRef.current = cssW;
       const w = Math.round(cssW * dpr);
       const h = Math.round(((cssW * c.h) / c.w) * dpr);
       if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
@@ -201,7 +211,10 @@ export function GolfGame({ roomId, initial, partnerName }: { roomId: string; ini
       }
     };
     frame = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      ro?.disconnect();
+    };
   }, [state.game]);
 
   const open = Boolean(s && s.status === "open");

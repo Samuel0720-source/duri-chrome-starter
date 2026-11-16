@@ -3,6 +3,7 @@
 import { useRoomChannel } from "../use-room-channel";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorKey } from "../../../core/auth-paths";
 import { clockOffset } from "../../../core/draw";
@@ -20,6 +21,7 @@ const GUARD_MS = 1200; // after we move the player ourselves, its own events are
 // This screen follows it, and sends a command only when a person on THIS device pressed something.
 export function WatchTogether({ roomId, hasPartner, partnerName }: { roomId: string; hasPartner: boolean; partnerName: string }) {
   const { t } = useT();
+  const router = useRouter();
   const roomChannel = useRoomChannel(roomId);
   const [ws, setWs] = useState<WatchState | null>(null);
   const [link, setLink] = useState("");
@@ -193,7 +195,7 @@ export function WatchTogether({ roomId, hasPartner, partnerName }: { roomId: str
       if (!active) return;
       channel = roomChannel(supabase)
         .on("broadcast", { event: "watch" }, reread)
-        .on("broadcast", { event: "members" }, () => window.location.reload())
+        .on("broadcast", { event: "members" }, () => router.refresh())
         .subscribe((status) => {
           document.documentElement.dataset.roomLive = status === "SUBSCRIBED" ? "on" : "off";
           if (status === "SUBSCRIBED") reread();
@@ -222,7 +224,7 @@ export function WatchTogether({ roomId, hasPartner, partnerName }: { roomId: str
       if (channel) supabase.removeChannel(channel);
       leave();
     };
-  }, [roomChannel, roomId, refresh]);
+  }, [roomChannel, roomId, refresh, router]);
 
   // ---------------------------------------------------------------- the player
   useEffect(() => {

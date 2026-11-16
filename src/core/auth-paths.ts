@@ -77,5 +77,6 @@ export function roomErrorKey(message: string | undefined) {
   if (text.includes("Invalid course")) return "err.course";
   if (text.includes("Invalid move")) return "err.move";
   if (text.includes("Invalid nickname")) return "err.nickname";
+  if (text.includes("Bridge token unavailable")) return "err.bridgeToken";
   return "err.unknown";
 }
