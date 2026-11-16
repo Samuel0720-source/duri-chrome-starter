@@ -1,5 +1,7 @@
 "use client";
 
+import { useRoomChannel } from "../use-room-channel";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorKey } from "../../../core/auth-paths";
@@ -9,6 +11,7 @@ import { cellLabel, GOMOKU_SIZE, scoreLine, stoneOf, type GomokuState } from "..
 // 오목. The database decides turns and the winner; this screen shows the board, previews a tap, and sends the stone.
 export function GomokuGame({ roomId, initial, partnerName }: { roomId: string; initial: GomokuState; partnerName: string }) {
   const { t } = useT();
+  const roomChannel = useRoomChannel(roomId);
   const [state, setState] = useState<GomokuState>(initial);
   const [pick, setPick] = useState<{ x: number; y: number } | null>(null);
   const [error, setError] = useState("");
@@ -37,8 +40,7 @@ export function GomokuGame({ roomId, initial, partnerName }: { roomId: string; i
     (async () => {
       await supabase.realtime.setAuth();
       if (!active) return;
-      channel = supabase
-        .channel("room:" + roomId, { config: { private: true } })
+      channel = roomChannel(supabase)
         .on("broadcast", { event: "gomoku" }, reread)
         .on("broadcast", { event: "members" }, () => window.location.reload())
         .subscribe((status) => {
@@ -53,7 +55,7 @@ export function GomokuGame({ roomId, initial, partnerName }: { roomId: string; i
       clearInterval(beat);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomId, refresh]);
+  }, [roomChannel, roomId, refresh]);
 
   const stones = useMemo(() => {
     const map = new Map<string, { color: "black" | "white"; n: number }>();

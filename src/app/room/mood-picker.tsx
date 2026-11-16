@@ -23,7 +23,7 @@ export function MoodPicker({ roomId, current }: { roomId: string; current: Mood 
           {moods.map((m) => (
             <label key={m.value} className="mood-option" data-mood={m.value}>
               <input type="radio" name="mood" value={m.value} checked={picked === m.value} onChange={() => preview(m.value)} />
-              <span className="mood-swatch" aria-hidden="true" />
+              <span className="room-mascot mood-mascot" aria-hidden="true" />
               <span>{t(`mood.${m.value}`)}</span>
             </label>
           ))}
