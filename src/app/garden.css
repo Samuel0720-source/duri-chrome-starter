@@ -54,11 +54,6 @@ body:not(:has(.wallpaper)) {
 .post-links { margin-top: 14px; }
 .post-links a { color: var(--color-accent); }
 .post-links a:first-child { border-radius: 999px; padding-inline: 18px; text-decoration: none; background: var(--color-accent); color: var(--color-accent-ink); }
-.daily-art:has(.daily-mascot) {
-  display: grid; place-items: center;
-  background: radial-gradient(ellipse at center, var(--color-paper-3) 15%, transparent 67%), var(--color-paper-2);
-}
-.daily-mascot { position: absolute; inset: 8%; aspect-ratio: auto; }
 .room-grid { gap: 20px; }
 .room-grid > .plans, .sheet, .auth-card { padding: clamp(20px,3vw,34px); background-color: var(--color-paper-3);
   border: 1px solid var(--color-rule); border-radius: var(--radius-card); box-shadow: var(--shadow-card); }

@@ -86,8 +86,7 @@ export default async function RoomPage({
       <RoomTabs active="home" />
       {full && <section className="daily-post" aria-labelledby="daily-heading">
         <div className="daily-art" aria-hidden="true">
-          {mood === "berry" ? <img src="/art/post-garden.webp" width="1080" height="720" alt="" />
-            : <span className="room-mascot daily-mascot" />}
+          <img src={mood === "berry" ? "/art/post-garden.webp" : `/art/scenes/${mood}.webp`} alt="" fetchPriority="high" />
         </div>
         <div><h2 id="daily-heading">{t("post.daily")}</h2><p>{t(postcardQuestion(today))}</p>
           <div className="post-links"><a href="/room/chat?prompt=today">{t("post.reply")}</a></div>
