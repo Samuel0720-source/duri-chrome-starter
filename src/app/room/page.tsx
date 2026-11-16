@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { coupleCalendar, daysFrom, roomToday, upcomingMilestones } from "../../core/dates";
 import { MilestoneRail } from "../milestone-rail";
+import { birthdaysOf, roomNames } from "../../lib/room-names";
 import { postcardQuestion } from "../../core/postcards";
 import { isMood } from "../../core/moods";
 import { defaultZone, zones } from "../../core/preview";
@@ -59,10 +60,11 @@ export default async function RoomPage({
     );
   }
 
-  const [{ data: room }, { count }, { data: plans }] = await Promise.all([
+  const [{ data: room }, { count }, { data: plans }, names] = await Promise.all([
     supabase.from("couple_rooms").select("id, start_date, timezone, mood").eq("id", seat.room_id).maybeSingle(),
     supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
     supabase.from("room_plans").select("id, on_date, title").eq("room_id", seat.room_id).order("on_date").order("created_at").limit(200),
+    roomNames(supabase, seat.room_id, auth.user.id),
   ]);
   if (!room) redirect("/room?error=closed");
   const today = roomToday(new Date(), room.timezone);
@@ -170,7 +172,7 @@ export default async function RoomPage({
       </div>
       <section className="room-milestones" aria-labelledby="room-milestones-head">
         <h2 id="room-milestones-head">{t("home.upcoming")}</h2>
-        <MilestoneRail milestones={upcomingMilestones(room.start_date, today)} />
+        <MilestoneRail milestones={upcomingMilestones(room.start_date, today, birthdaysOf(names))} />
       </section>
       {!full && (
         <section className="settings">

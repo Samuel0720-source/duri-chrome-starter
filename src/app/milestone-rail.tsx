@@ -3,7 +3,7 @@
 import type { Milestone } from "../core/dates";
 import { useT } from "../i18n/client";
 
-// The next hundred-day mark, the next anniversary and couple days within 100 days.
+// The next hundred-day mark, the next anniversary, couple days and birthdays within 100 days.
 // Shared by the public home (live preview) and the couple's room (saved first day).
 export function MilestoneRail({ milestones }: { milestones: Milestone[] }) {
   const { t, locale } = useT();
@@ -13,7 +13,7 @@ export function MilestoneRail({ milestones }: { milestones: Milestone[] }) {
     <ol className="rail" tabIndex={0} aria-label={t("ms.list")}>
       {milestones.map((m) => (
         <li key={m.kind + m.date} className={m.daysLeft === 0 ? "is-today" : undefined}>
-          <span className="rail-name">{t(`ms.${m.kind}`, { n: num(m.n ?? 0) })}</span>
+          <span className="rail-name">{m.kind === "partnerBirthday" && !m.name ? t("ms.partnerBirthdayPlain") : t(`ms.${m.kind}`, { n: num(m.n ?? 0), name: m.name ?? "" })}</span>
           <strong className="rail-d">{m.daysLeft === 0 ? t("common.today") : t("common.dMinus", { n: num(m.daysLeft) })}</strong>
           <time dateTime={m.date}>{m.date.replaceAll("-", ". ")}</time>
         </li>

@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function PrivacyPage() {
   const { t, locale } = await getT();
   return (
-    <LegalPage title={t("legal.privacy")} updated={locale === "ko" ? "2026년 11월 14일" : "November 14, 2026"}>
+    <LegalPage title={t("legal.privacy")} updated={locale === "ko" ? "2026년 11월 15일" : "November 15, 2026"}>
       {locale === "ko" ? <Ko /> : <En />}
     </LegalPage>
   );
@@ -24,7 +24,7 @@ function Ko() {
       <ul>
         <li><strong>로그인 정보:</strong> Google로 로그인하면 Google 계정의 이메일 주소, 이름, 프로필 사진 주소를 받아요. 이메일과 비밀번호로 가입하면 이메일 주소를 받고, 비밀번호는 원래 글자로 되돌릴 수 없는 형태(해시)로만 Supabase에 저장돼요.</li>
         <li><strong>커플방 정보:</strong> 함께한 첫날, 기준 시간대, 방 테마와 방 배경으로 고른 사진, 방에 누가 들어와 있는지, 초대 링크의 만료 시각과 사용 여부. 초대 링크 자체는 저장하지 않고 되돌릴 수 없게 바꾼 값만 저장해요.</li>
-        <li><strong>두 사람이 만든 것:</strong> 약속, 대화 메시지, 서로 정한 애칭, 대화를 어디까지 읽었는지와 그 시각, 게임 답과 기록, 함께 보기에 넣은 영상 링크와 재생 위치, 앨범에 올린 사진(누가 언제 올렸는지 포함).</li>
+        <li><strong>두 사람이 만든 것:</strong> 약속, 대화 메시지, 서로 정한 애칭, 각자 적은 생일(월과 일만, 태어난 해는 저장하지 않음), 대화를 어디까지 읽었는지와 그 시각, 게임 답과 기록, 함께 보기에 넣은 영상 링크와 재생 위치, 앨범에 올린 사진(누가 언제 올렸는지 포함).</li>
         <li><strong>앨범 사진:</strong> 올리기 전에 브라우저가 사진을 다시 그려서 크기를 줄여요. 이때 위치(GPS)·기기 같은 카메라 정보는 지워져요. 사진은 공개 주소가 없는 저장소에 있고, 방의 두 사람만 열 수 있어요.</li>
         <li><strong>알림:</strong> 상대가 방을 나갔을 때 보여 줄 안내 한 줄.</li>
         <li><strong>쿠키:</strong> 로그인 상태를 기억하는 쿠키와, 고른 언어를 기억하는 쿠키만 써요. 광고나 방문 분석용 쿠키는 쓰지 않아요.</li>
@@ -50,7 +50,7 @@ function Ko() {
       <p>방의 모든 내용은 그 방의 두 사람만 볼 수 있어요. 데이터베이스 규칙이 다른 사람의 접근을 막아요.</p>
 
       <h2>지우기</h2>
-      <p>로그인한 뒤 <strong>설정 → 계정 → 계정 삭제</strong>를 누르면 계정, 로그인 정보, 방, 초대, 알림, 애칭과 읽음 정보, 앨범 사진이 바로 지워져요. 방에 상대가 있었다면 상대에게는 ‘상대가 방을 나갔어요’만 보여요. ‘방 나가기’만 하면 앨범 사진을 지운 뒤 두 사람 모두 방에서 빠지고 방은 닫혀요. 앨범에서 내가 올린 사진은 언제든 하나씩 지울 수 있어요.</p>
+      <p>로그인한 뒤 <strong>설정 → 계정 → 계정 삭제</strong>를 누르면 계정, 로그인 정보, 방, 초대, 알림, 애칭과 생일, 읽음 정보, 앨범 사진이 바로 지워져요. 방에 상대가 있었다면 상대에게는 ‘상대가 방을 나갔어요’만 보여요. ‘방 나가기’만 하면 앨범 사진을 지운 뒤 두 사람 모두 방에서 빠지고 방은 닫혀요. 앨범에서 내가 올린 사진은 언제든 하나씩 지울 수 있어요.</p>
 
       <h2>문의</h2>
       <p>samuelkoo0720@gmail.com</p>
@@ -65,7 +65,7 @@ function En() {
       <ul>
         <li><strong>Sign-in:</strong> with Google, the email address, name and profile picture address of your Google account. With an email and password, the email address; Supabase stores the password only as a hash that cannot be turned back into it.</li>
         <li><strong>Your room:</strong> your first day, time zone, room theme and the photo chosen as the room background, who is in the room, and when an invite link expires and whether it was used. The invite link itself is not stored, only a value that cannot be turned back into it.</li>
-        <li><strong>What the two of you make:</strong> plans, chat messages, the nicknames you set for each other, how far each of you has read the chat and when, game answers and records, the video links and playback position used in Watch together, and album photos (with who added them and when).</li>
+        <li><strong>What the two of you make:</strong> plans, chat messages, the nicknames you set for each other, the birthday each of you adds (month and day only; no birth year is stored), how far each of you has read the chat and when, game answers and records, the video links and playback position used in Watch together, and album photos (with who added them and when).</li>
         <li><strong>Album photos:</strong> before upload, your browser redraws each photo at a smaller size, which removes camera data such as GPS location and device. Photos are kept in storage with no public address; only the two people in the room can open them.</li>
         <li><strong>Notices:</strong> one line telling you when your partner left the room.</li>
         <li><strong>Cookies:</strong> only one that keeps you signed in and one that remembers your language. No advertising or analytics cookies.</li>
@@ -91,7 +91,7 @@ function En() {
       <p>Everything in a room is visible only to the two people in it. Database rules block everyone else.</p>
 
       <h2>Deleting</h2>
-      <p>After signing in, <strong>Settings → Account → Delete account</strong> deletes your account, sign-in, room, invites, notices, nicknames, read positions and album photos at once. If your partner was in the room, they only see "Your partner left". Leaving the room deletes the album photos, removes both of you and closes it. You can delete photos you added from the album at any time.</p>
+      <p>After signing in, <strong>Settings → Account → Delete account</strong> deletes your account, sign-in, room, invites, notices, nicknames, birthdays, read positions and album photos at once. If your partner was in the room, they only see "Your partner left". Leaving the room deletes the album photos, removes both of you and closes it. You can delete photos you added from the album at any time.</p>
 
       <h2>Contact</h2>
       <p>samuelkoo0720@gmail.com</p>

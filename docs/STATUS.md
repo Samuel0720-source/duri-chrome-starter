@@ -255,3 +255,10 @@
 - 실제 검사: Vercel에 `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN`(Production, 비밀) 확인. 처음엔 계정 API 토큰(`cfut_`)을 넣어 Cloudflare가 HTTP 401 → TURN 키 자체의 API 토큰으로 교체 후 live flow `relay servers: true relay candidate: true`, 2 passed. Check starter 통과.
 - 미확인: 실제로 서로 다른 네트워크(한 명은 모바일 데이터)에서의 통화.
 - 다음 행동 하나: Sam이 모바일 데이터로 통화해서 "중계 서버를 거쳐 연결됐어요" 또는 "직접 연결됐어요"가 뜨고 소리가 들리는지 확인.
+
+### 생일 · 2026-11-15
+- 변경 경로: `supabase/migrations/202611180001_birthday.sql`(member_prefs.birthday 'MM-DD', set_my_birthday, 알림 트리거), `src/core/dates.ts`(Birthday, isMonthDay, upcomingMilestones 3번째 인자), `src/lib/room-names.ts`(roomNames에 생일, birthdaysOf), `src/app/room/actions.ts`(setBirthday), `src/app/room/settings/page.tsx`(#bday 칸), `src/app/room/page.tsx`, `src/app/milestone-rail.tsx`, i18n 14개, `src/app/privacy/page.tsx`, `src/app/globals.css`.
+- 규칙: 다른 기념일과 같이 100일 안(오늘 포함, 정확히 100일까지)일 때만 홈 "다가오는 기념일"에 보임. 상대 생일은 내가 정한 애칭으로("곰돌이 생일"), 없으면 "상대 생일". 2월 29일은 평년에 2월 28일. 태어난 해는 받지도 저장하지도 않음.
+- 실제 검사: 단위 61 통과(생일 2개 추가), DB 23 통과(생일 권한·검증·알림), 타입 검사 통과. Supabase에 마이그레이션 적용 후 칸·함수·권한(anon 불가)·트리거·검사 규칙 확인. 로컬 빌드는 이 환경에서 Google 글꼴을 못 받아 CI 빌드로 확인.
+- 미확인: 상대가 생일을 저장했을 때 내 홈이 바로 바뀌지는 않음(새로 열면 보임).
+- 다음 행동 하나: Sam이 설정 → 생일에 날짜를 넣고 홈 목록에 뜨는지 확인.
