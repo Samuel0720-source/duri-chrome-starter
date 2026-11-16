@@ -147,6 +147,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   const headerBird = (page: Page) => page.locator(".brand .room-mascot");
   const originalBird = /postbirds\.webp/;
   await expect(headerBird(pageA)).toHaveCSS("background-image", originalBird);
+  const dailyScene = pageA.locator(".daily-art img");
+  await expect(dailyScene).toHaveAttribute("src", "/art/post-garden.webp");
   for (const theme of ["forest", "cafe", "sunset", "night", "berry"]) {
     const option = pageB.locator(`label.mood-option[data-mood="${theme}"]`);
     const asset = theme === "berry" ? originalBird : new RegExp("/mascots/" + theme + "\\.webp");
@@ -173,7 +175,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(pageB.locator('.room[data-mood="night"]')).toHaveCount(1);
   await expect(pageA.locator('.room[data-mood="night"]')).toHaveCount(1, { timeout: 10_000 });
   await expect(headerBird(pageA)).toHaveCSS("background-image", /night\.webp/);
-  await expect(pageA.locator(".daily-mascot")).toHaveCSS("background-image", /night\.webp/);
+  await expect(dailyScene).toHaveAttribute("src", "/art/scenes/night.webp");
+  await expect.poll(() => dailyScene.evaluate(img => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await pageB.reload();
   await expect(headerBird(pageB)).toHaveCSS("background-image", /night\.webp/);
   // A gives B a nickname; B's settings show what A calls B.
