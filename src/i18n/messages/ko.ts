@@ -97,7 +97,7 @@ export const ko = {
   "settings.room.theme": "방 테마",
   "settings.room.themeCurrent": "지금 테마예요",
   "settings.room.themeApply": "이 테마로 바꾸기",
-  "settings.room.themeHint": "고르면 바로 미리 보이고, 바꾸면 두 사람 모두에게 적용돼요.",
+  "settings.room.themeHint": "캐릭터를 고르면 위의 둘이 로고에서 미리 볼 수 있어요. 저장하면 두 사람의 방에 적용돼요.",
   "settings.room.start": "함께한 첫날",
   "settings.room.zone": "기준 시간대",
   "settings.room.saveDate": "날짜 저장",

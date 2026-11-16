@@ -14,7 +14,8 @@ body:not(:has(.wallpaper)) {
 :root { --container: 1260px; --radius-card: 28px; --shadow-card: 0 12px 35px -20px var(--color-shadow); }
 .nav { background: color-mix(in srgb,var(--color-paper-3) 76%,transparent); }
 .brand { gap: 6px; font-size: 1.9rem; letter-spacing: -.04em; }
-.brand img { width: 61px; height: 41px; object-fit: contain; }
+.room-mascot { display: block; aspect-ratio: 1.45; background: var(--room-mascot) center / contain no-repeat; }
+.brand img, .brand .room-mascot { width: 61px; height: 41px; object-fit: contain; }
 .top { margin-bottom: 20px; }
 .hero { display: block; min-height: auto; padding-block: clamp(24px,5vw,66px) 0; }
 .hero-grid { grid-template-columns: minmax(0,.78fr) minmax(0,1.22fr); gap: clamp(25px,5vw,78px); }
@@ -53,6 +54,11 @@ body:not(:has(.wallpaper)) {
 .post-links { margin-top: 14px; }
 .post-links a { color: var(--color-accent); }
 .post-links a:first-child { border-radius: 999px; padding-inline: 18px; text-decoration: none; background: var(--color-accent); color: var(--color-accent-ink); }
+.daily-art:has(.daily-mascot) {
+  display: grid; place-items: center;
+  background: radial-gradient(ellipse at center, var(--color-paper-3) 15%, transparent 67%), var(--color-paper-2);
+}
+.daily-mascot { position: absolute; inset: 8%; aspect-ratio: auto; }
 .room-grid { gap: 20px; }
 .room-grid > .plans, .sheet, .auth-card { padding: clamp(20px,3vw,34px); background-color: var(--color-paper-3);
   border: 1px solid var(--color-rule); border-radius: var(--radius-card); box-shadow: var(--shadow-card); }
@@ -66,11 +72,11 @@ body:not(:has(.wallpaper)) {
   padding-inline: 12px; background: var(--color-paper); }
 .auth-primary { border-radius: 999px; }
 .chat-wrap { margin-inline: auto; }
-.chat-empty::before { content: ""; display: block; width: 104px; height: 74px; margin: 0 auto 12px; background: url('/icons/postbirds.webp') center / contain no-repeat; }
+.chat-empty::before { content: ""; display: block; width: 104px; height: 74px; margin: 0 auto 12px; background: var(--room-mascot) center / contain no-repeat; }
 .game-switch a { background: var(--color-paper-3); }
 .post-game { margin-inline: auto; max-width: 760px; border-radius: 28px; gap: 18px; box-shadow: var(--shadow-card); }
 .post-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.post-heading img { width: clamp(65px,12vw,115px); flex: none; }
+.post-heading .room-mascot { width: clamp(65px,12vw,115px); flex: none; }
 .post-game .post-heading h2 { margin-bottom: 5px; }
 .post-heading p { color: var(--color-ink-2); font-size: var(--text-sm); }
 .post-scores { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
@@ -81,7 +87,7 @@ body:not(:has(.wallpaper)) {
 .post-turn { text-align:center; font-weight:700; color:var(--color-accent); }
 .post-board { grid-template-columns: repeat(7,minmax(0,1fr)); }
 .post-board button { aspect-ratio: .86; min-height: 46px; position:relative; }
-.post-board button:not([data-open=true]) { background: var(--color-accent-wash) url('/icons/postbirds.webp') center/80% auto no-repeat; border:1px solid var(--color-muted); }
+.post-board button:not([data-open=true]) { background: var(--color-accent-wash) var(--room-mascot) center/80% auto no-repeat; border:1px solid var(--color-muted); }
 .post-board button:not([data-open=true]) span { visibility:hidden; }
 .post-board button[data-open=true] { background: var(--color-paper); }
 .post-board button[data-found=true] { background: var(--color-accent-wash); border:2px solid var(--color-accent); }
@@ -104,5 +110,5 @@ body:not(:has(.wallpaper)) {
   .post-board { grid-template-columns: repeat(4,minmax(0,1fr)); }
   .room-tabs a { font-size:.88rem; padding-inline:3px; gap:4px; }
   .brand { font-size:1.5rem; }
-  .brand img { width:42px; height:32px; }
+  .brand img, .brand .room-mascot { width:42px; height:32px; }
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useRoomChannel } from "../use-room-channel";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { postcardFaces, type PostcardState } from "../../../core/postcards";
 import { useT } from "../../../i18n/client";
@@ -9,6 +11,7 @@ export function PostcardGame({ roomId, initial, partnerName }: {
   roomId: string; initial: PostcardState | null; partnerName: string;
 }) {
   const { t } = useT();
+  const roomChannel = useRoomChannel(roomId);
   const [state, setState] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(!initial);
@@ -30,7 +33,7 @@ export function PostcardGame({ roomId, initial, partnerName }: {
     let channel: ReturnType<typeof client.channel> | undefined;
     void client.realtime.setAuth().then(() => {
       if (!present) return;
-      channel = client.channel("room:" + roomId, { config: { private: true } })
+      channel = roomChannel(client)
         .on("broadcast", { event: "postcards" }, refresh)
         .on("broadcast", { event: "members" }, () => window.location.reload())
         .subscribe(status => { if (status === "SUBSCRIBED") void refresh(); });
@@ -43,7 +46,7 @@ export function PostcardGame({ roomId, initial, partnerName }: {
       window.removeEventListener("focus", refresh);
       if (channel) void client.removeChannel(channel);
     };
-  }, [roomId, refresh]);
+  }, [roomChannel, roomId, refresh]);
   useEffect(() => {
     if (!state?.revealMs) return;
     const timer = window.setTimeout(refresh, state.revealMs + 60);
@@ -81,7 +84,7 @@ export function PostcardGame({ roomId, initial, partnerName }: {
   const canFlip = state?.phase === "playing" && myTurn && state.revealMs === 0 && !busy;
   return <section className="post-game" data-phase={state?.phase}>
     <header className="post-heading"><div><h2>{t("game.post")}</h2><p>{t("post.rules")}</p></div>
-      <img src="/icons/postbirds.webp" alt="" width="126" height="84" /></header>
+      <span className="room-mascot" aria-hidden="true" /></header>
     {failed && <p className="error" role="alert">{t("common.saveFailed")} <button onClick={refresh}>{t("post.retry")}</button></p>}
     {state?.phase === "idle" && <button className="button" disabled={busy} onClick={() => move()}>{t("post.start")}</button>}
     {state && state.phase !== "idle" && <>

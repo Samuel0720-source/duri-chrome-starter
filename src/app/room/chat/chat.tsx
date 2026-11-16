@@ -1,5 +1,7 @@
 "use client";
 
+import { useRoomChannel } from "../use-room-channel";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorKey } from "../../../core/auth-paths";
@@ -26,6 +28,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   prompt: string; roomId: string; me: string; zone: string; initial: Message[]; partnerName: string; initialPartnerRead: ReadMark; initialMyRead: number;
 }) {
   const { t, locale } = useT();
+  const roomChannel = useRoomChannel(roomId);
   const [messages, setMessages] = useState<Shown[]>(initial);
   const [partnerRead, setPartnerRead] = useState<ReadMark>(initialPartnerRead);
   const [now, setNow] = useState(() => Date.now());
@@ -99,8 +102,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
     (async () => {
       await supabase.realtime.setAuth();
       if (!active) return;
-      channel = supabase
-        .channel("room:" + roomId, { config: { private: true } })
+      channel = roomChannel(supabase)
         .on("broadcast", { event: "call" }, ({ payload }) => { void session.receive(payload); })
         .on("broadcast", { event: "messages" }, ({ payload }) => (payload?.change === "delete" ? reload() : pull()))
         .on("broadcast", { event: "prefs" }, () => loadPartnerRead())
@@ -121,7 +123,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
       call.current = null;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomId, me, pull, reload, loadPartnerRead]);
+  }, [roomChannel, roomId, me, pull, reload, loadPartnerRead]);
 
   // Tell the database how far I have read, but only while this screen is really in front of me.
   const markRead = useCallback(async () => {

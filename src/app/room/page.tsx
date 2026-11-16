@@ -85,7 +85,10 @@ export default async function RoomPage({
       <RoomLive roomId={room.id} />
       <RoomTabs active="home" />
       {full && <section className="daily-post" aria-labelledby="daily-heading">
-        <div className="daily-art"><img src="/art/post-garden.webp" width="1080" height="720" alt="" /></div>
+        <div className="daily-art" aria-hidden="true">
+          {mood === "berry" ? <img src="/art/post-garden.webp" width="1080" height="720" alt="" />
+            : <span className="room-mascot daily-mascot" />}
+        </div>
         <div><h2 id="daily-heading">{t("post.daily")}</h2><p>{t(postcardQuestion(today))}</p>
           <div className="post-links"><a href="/room/chat?prompt=today">{t("post.reply")}</a>
             <a href="/room/game?g=post">{t("game.post")}</a></div>
@@ -98,7 +101,7 @@ export default async function RoomPage({
             <time dateTime={today}>{today.replaceAll("-", ". ")}</time>
           </div>
           <p className="caption">{calendar.status === "active" ? (calendar.milestoneToday ? t("home.milestoneToday") : t("home.together")) : t("home.untilStart")}</p>
-          <div className="big"><img className="counter-birds" src="/icons/postbirds.webp" width="104" height="70" alt="" />
+          <div className="big"><span className="room-mascot counter-birds" aria-hidden="true" />
             <strong>{calendar.status === "active" ? num(calendar.day) : t("common.dMinus", { n: calendar.daysToStart })}</strong>
             {calendar.status === "active" && <span>{t("home.dayUnit")}</span>}
           </div>

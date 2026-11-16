@@ -1,4 +1,5 @@
 :root {
+  --room-mascot: url("/icons/postbirds.webp");
   --color-win: #f4c542; --color-win-wash: rgba(244, 197, 66, 0.38);
   /* Google's sign-in button blue (brand guideline colour, not a theme colour). */
   --color-google: #4285f4; --color-google-hover: #3b78e7; --color-google-ink: #ffffff; --color-google-tile: #ffffff;
@@ -31,30 +32,35 @@
 
 /* Room moods. Each block re-points the colour tokens; html:has() carries the room's mood to the page background. */
 [data-mood="berry"], html:has(.room[data-mood="berry"]) {
+  --room-mascot: url("/icons/postbirds.webp");
   --color-paper: #fbf7ef; --color-paper-2: #f5e4e2; --color-paper-3: #fffdf8;
   --color-ink: #302627; --color-ink-2: #5f504e; --color-muted: #8c7a76; --color-rule: #e4d7cd;
   --color-accent: #6e304b; --color-accent-2: #5a2640; --color-accent-ink: #fff8f5; --color-focus: #6e304b;
   --color-accent-wash: #f0dde0; --color-shadow: #6e304b24;
 }
 [data-mood="forest"], html:has(.room[data-mood="forest"]) {
+  --room-mascot: url("/art/mascots/forest.webp");
   --color-paper: #f1f4ec; --color-paper-2: #e1e9d9; --color-paper-3: #fbfcf8;
   --color-ink: #1f2b22; --color-ink-2: #48574b; --color-muted: #77887a; --color-rule: #d3ddcc;
   --color-accent: #2f5e45; --color-accent-2: #224a35; --color-accent-ink: #f5fbf3; --color-focus: #2f5e45;
   --color-accent-wash: #dbe8dd; --color-shadow: #2f5e4524;
 }
 [data-mood="cafe"], html:has(.room[data-mood="cafe"]) {
+  --room-mascot: url("/art/mascots/cafe.webp");
   --color-paper: #f1eee9; --color-paper-2: #e2dbd2; --color-paper-3: #fbf9f6;
   --color-ink: #2b2420; --color-ink-2: #594e46; --color-muted: #877a70; --color-rule: #dbd2c8;
   --color-accent: #6b4a36; --color-accent-2: #533828; --color-accent-ink: #fbf6f1; --color-focus: #6b4a36;
   --color-accent-wash: #eadfd5; --color-shadow: #3d4a5a2b;
 }
 [data-mood="sunset"], html:has(.room[data-mood="sunset"]) {
+  --room-mascot: url("/art/mascots/sunset.webp");
   --color-paper: #fdf3ea; --color-paper-2: #fae0cd; --color-paper-3: #fffaf5;
   --color-ink: #3a2219; --color-ink-2: #6a473a; --color-muted: #997a6b; --color-rule: #efd9c8;
   --color-accent: #a3431d; --color-accent-2: #853514; --color-accent-ink: #fff7f1; --color-focus: #a3431d;
   --color-accent-wash: #f8dccb; --color-shadow: #a3431d24;
 }
 [data-mood="night"], html:has(.room[data-mood="night"]) {
+  --room-mascot: url("/art/mascots/night.webp");
   color-scheme: dark;
   --color-paper: #17141d; --color-paper-2: #221d2b; --color-paper-3: #262030;
   --color-ink: #f3eef6; --color-ink-2: #c7bed1; --color-muted: #8f859b; --color-rule: #3b3447;
