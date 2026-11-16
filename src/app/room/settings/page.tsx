@@ -5,7 +5,7 @@ import { getT } from "../../../i18n/server";
 import { serverClient } from "../../../lib/supabase/server";
 import { roomNames } from "../../../lib/room-names";
 import { LanguageForm } from "../../language-form";
-import { leaveRoom, setNickname, setStart, signOut } from "../actions";
+import { leaveRoom, setBirthday, setNickname, setStart, signOut } from "../actions";
 import { DeleteAccount } from "../delete-account";
 import { MoodPicker } from "../mood-picker";
 import { RoomLive } from "../room-live";
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 const guide = ["start", "home", "games", "golf", "watch", "album", "chat", "settings", "install"] as const;
 
-// Settings: language, nicknames, room theme and first day, a short guide, and the account.
+// Settings: language, nicknames, birthdays, room theme and first day, a short guide, and the account.
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const { t, locale } = await getT();
   const supabase = await serverClient();
@@ -34,6 +34,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   if (!room) redirect("/room");
   const mood = isMood(room.mood) ? room.mood : "berry";
   const full = (count ?? 0) >= 2;
+  const myMonth = names.myBirthday ? String(Number(names.myBirthday.slice(0, 2))) : "";
+  const myDay = names.myBirthday ? String(Number(names.myBirthday.slice(3))) : "";
 
   return (
     <RoomShell>
@@ -68,6 +70,40 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             )}
             {saved === "nick" && <p role="status" className="hit">{t("common.saved")}</p>}
             {error === "nick" && <p role="alert" className="error">{t("settings.nick.invalid")}</p>}
+          </section>
+
+          <section className="sheet" id="bday" aria-labelledby="bday-head">
+            <h2 id="bday-head">{t("settings.bday.title")}</h2>
+            {full ? (
+              <>
+                <form action={setBirthday} className="stack">
+                  <input type="hidden" name="room" value={room.id} />
+                  <p className="field-label" id="bday-label">{t("settings.bday.label")}</p>
+                  <div className="inline-field" role="group" aria-labelledby="bday-label">
+                    <select name="month" aria-label={t("settings.bday.month")} defaultValue={myMonth}>
+                      <option value="">{t("settings.bday.month")}</option>
+                      {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <select name="day" aria-label={t("settings.bday.day")} defaultValue={myDay}>
+                      <option value="">{t("settings.bday.day")}</option>
+                      {Array.from({ length: 31 }, (_, i) => String(i + 1)).map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <button type="submit">{t("common.save")}</button>
+                    {names.myBirthday && <button type="submit" name="clear" value="1" className="secondary">{t("settings.bday.clear")}</button>}
+                  </div>
+                </form>
+                <p className="hint">{t("settings.bday.hint")}</p>
+                <p className="nick-theirs" data-testid="bday-theirs">
+                  {names.partnerBirthday
+                    ? t("settings.bday.theirs", { month: String(Number(names.partnerBirthday.slice(0, 2))), day: String(Number(names.partnerBirthday.slice(3))) })
+                    : t("settings.bday.theirsNone")}
+                </p>
+              </>
+            ) : (
+              <p className="hint">{t("settings.bday.needPartner")}</p>
+            )}
+            {saved === "bday" && <p role="status" className="hit">{t("common.saved")}</p>}
+            {error === "bday" && <p role="alert" className="error">{t("settings.bday.invalid")}</p>}
           </section>
 
           <section className="sheet room-settings" id="room" aria-labelledby="room-head">

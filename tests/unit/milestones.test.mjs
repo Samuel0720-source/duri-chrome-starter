@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { upcomingMilestones } from "../../src/core/dates.ts";
+import { isMonthDay, upcomingMilestones } from "../../src/core/dates.ts";
 
 const labels = (list) => list.map((m) => m.label);
 
@@ -43,4 +43,26 @@ test("each milestone carries a kind (and a number) so any language can name it",
   const en = makeT("en");
   const list = upcomingMilestones("2026-08-13", "2026-11-09");
   assert.deepEqual(list.map((m) => en(`ms.${m.kind}`, { n: m.n ?? 0 })), ["Day 100", "Christmas", "Valentine's Day", "1-year anniversary"]);
+});
+
+test("birthdays show only within the next 100 days, with the partner's nickname", () => {
+  const bdays = [{ who: "me", monthDay: "12-25" }, { who: "partner", monthDay: "01-10", name: "곰돌이" }, { who: "partner", monthDay: "06-01" }];
+  const list = upcomingMilestones("2026-08-13", "2026-11-15", bdays).filter((m) => m.kind.endsWith("Birthday"));
+  assert.deepEqual(list, [
+    { label: "내 생일", kind: "myBirthday", date: "2026-12-25", daysLeft: 40 },
+    { label: "곰돌이 생일", kind: "partnerBirthday", name: "곰돌이", date: "2027-01-10", daysLeft: 56 },
+  ]);
+  // Exactly 100 days away counts, 101 does not; today counts as D-day.
+  assert.equal(upcomingMilestones("2026-08-13", "2026-11-15", [{ who: "me", monthDay: "02-23" }]).find((m) => m.kind === "myBirthday")?.daysLeft, 100);
+  assert.equal(upcomingMilestones("2026-08-13", "2026-11-15", [{ who: "me", monthDay: "02-24" }]).some((m) => m.kind === "myBirthday"), false);
+  assert.equal(upcomingMilestones("2026-08-13", "2026-11-15", [{ who: "me", monthDay: "11-15" }]).find((m) => m.kind === "myBirthday")?.daysLeft, 0);
+});
+
+test("a 29 February birthday falls on the 28th in other years; bad month-days are skipped", () => {
+  assert.equal(upcomingMilestones("2026-08-13", "2026-12-01", [{ who: "me", monthDay: "02-29" }]).find((m) => m.kind === "myBirthday")?.date, "2027-02-28");
+  assert.equal(upcomingMilestones("2026-08-13", "2027-12-01", [{ who: "me", monthDay: "02-29" }]).find((m) => m.kind === "myBirthday")?.date, "2028-02-29");
+  const bad = upcomingMilestones("2026-08-13", "2026-11-15", [{ who: "me", monthDay: "02-30" }, { who: "me", monthDay: "13-01" }]);
+  assert.equal(bad.some((m) => m.kind === "myBirthday"), false);
+  assert.equal(isMonthDay("02-29"), true);
+  assert.equal(isMonthDay("04-31"), false);
 });

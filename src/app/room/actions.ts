@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { invitePath, isInviteToken, roomErrorKey } from "../../core/auth-paths";
 import { isPreviewStart, zones } from "../../core/preview";
+import { isMonthDay } from "../../core/dates";
 import { isMood } from "../../core/moods";
 import { isUuid } from "../../core/album";
 import { appOrigin, serverClient } from "../../lib/supabase/server";
@@ -126,6 +127,20 @@ export async function setNickname(formData: FormData) {
   if (!user) redirect("/login?next=/room/settings");
   const { error } = await supabase.rpc("set_partner_nickname", { target: room, nick });
   redirect(error ? "/room/settings?error=nick#nick" : "/room/settings?saved=nick#nick");
+}
+
+// My birthday as month and day ('MM-DD'). "clear" or an empty month removes it.
+export async function setBirthday(formData: FormData) {
+  const room = String(formData.get("room") ?? "");
+  const month = String(formData.get("month") ?? "");
+  const day = String(formData.get("day") ?? "");
+  const clear = formData.get("clear") === "1" || month === "" || day === "";
+  const md = clear ? "" : month.padStart(2, "0") + "-" + day.padStart(2, "0");
+  if (!clear && !isMonthDay(md)) redirect("/room/settings?error=bday#bday");
+  const { supabase, user } = await signedIn();
+  if (!user) redirect("/login?next=/room/settings");
+  const { error } = await supabase.rpc("set_my_birthday", { target: room, md });
+  redirect(error ? "/room/settings?error=bday#bday" : "/room/settings?saved=bday#bday");
 }
 
 export async function addPlan(formData: FormData) {

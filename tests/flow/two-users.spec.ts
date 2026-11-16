@@ -164,8 +164,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   // A gives B a nickname; B's settings show what A calls B.
   await pageA.getByRole("link", { name: "설정", exact: true }).click();
   await pageA.getByLabel("내가 상대를 부르는 애칭").fill("곰돌이");
-  await pageA.getByRole("button", { name: "저장", exact: true }).click();
-  await expect(pageA.getByText("저장했어요.")).toBeVisible();
+  await pageA.locator("#nick").getByRole("button", { name: "저장", exact: true }).click();
+  await expect(pageA.locator("#nick").getByText("저장했어요.")).toBeVisible();
   await expect(pageA.getByLabel("내가 상대를 부르는 애칭")).toHaveValue("곰돌이");
   await pageB.reload();
   await expect(pageB.getByTestId("nick-theirs")).toHaveText("상대가 나를 부르는 애칭: 곰돌이");
@@ -184,6 +184,20 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await pageB.locator("#lang").selectOption("ko");
   await pageB.getByRole("button", { name: "Change language" }).click();
   await expect(pageB.getByRole("heading", { name: "설정", exact: true })).toBeVisible({ timeout: 10_000 });
+  // B saves a birthday ten days from now (month and day only). A's settings show it, and both homes list it
+  // with the upcoming days: "내 생일" for B, and for A the nickname A chose ("곰돌이 생일").
+  const soon = new Date(Date.now() + 10 * 86_400_000);
+  const [bm, bd] = [soon.getUTCMonth() + 1, soon.getUTCDate()];
+  await pageB.getByLabel("월", { exact: true }).selectOption(String(bm));
+  await pageB.getByLabel("일", { exact: true }).selectOption(String(bd));
+  await pageB.locator("#bday").getByRole("button", { name: "저장", exact: true }).click();
+  await expect(pageB.locator("#bday").getByText("저장했어요.")).toBeVisible();
+  await pageA.reload();
+  await expect(pageA.getByTestId("bday-theirs")).toHaveText(`상대 생일: ${bm}월 ${bd}일`);
+  await Promise.all([pageA, pageB].map((page) => page.goto("/room")));
+  await expect(pageA.locator(".rail .rail-name", { hasText: "곰돌이 생일" })).toBeVisible();
+  await expect(pageB.locator(".rail .rail-name", { hasText: "내 생일" })).toBeVisible();
+  await Promise.all([pageA, pageB].map((page) => page.goto("/room/settings")));
 
   // 3b2. Album. A uploads a picture; both see it; B makes it the room background, which A's screen takes live;
   // a third person gets nothing; only A can delete it, and deleting it clears the background.

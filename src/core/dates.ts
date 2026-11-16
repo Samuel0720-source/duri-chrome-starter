@@ -67,8 +67,16 @@ export function coupleCalendar(start: string, today: string) {
 }
 
 // kind + n let each screen name the day in its own language (label stays Korean for the extension popup).
-export type MilestoneKind = "days" | "years" | "valentine" | "white" | "girlfriend" | "boyfriend" | "christmas";
-export type Milestone = { label: string; kind: MilestoneKind; n?: number; date: string; daysLeft: number };
+export type MilestoneKind = "days" | "years" | "valentine" | "white" | "girlfriend" | "boyfriend" | "christmas" | "myBirthday" | "partnerBirthday";
+export type Milestone = { label: string; kind: MilestoneKind; n?: number; name?: string; date: string; daysLeft: number };
+
+// A birthday saved as 'MM-DD' (no year). The partner's carries the name to show ("곰돌이 생일").
+export type Birthday = { who: "me" | "partner"; monthDay: string; name?: string };
+
+// True for a real month-day ('02-29' included): every one exists in the leap year 2000.
+export function isMonthDay(value: string): boolean {
+  return /^\d{2}-\d{2}$/.test(value) && isCalendarDate("2000-" + value);
+}
 
 // Couple days that fall on the same date every year.
 export const specialDays = [
@@ -81,7 +89,7 @@ export const specialDays = [
 
 // The next hundred-day mark and the next anniversary, plus any special day
 // within the next 100 days, soonest first.
-export function upcomingMilestones(start: string, today: string): Milestone[] {
+export function upcomingMilestones(start: string, today: string, birthdays: Birthday[] = []): Milestone[] {
   const s = dayNumber(start);
   const t = dayNumber(today);
   const items: Milestone[] = [];
@@ -101,6 +109,19 @@ export function upcomingMilestones(start: string, today: string): Milestone[] {
       const date = y + "-" + day.monthDay;
       const left = dayNumber(date) - t;
       if (left >= 0 && left <= 100) items.push({ label: day.label, kind: day.kind, date, daysLeft: left });
+    }
+  }
+  // Birthdays follow the same rule: only within the next 100 days. 29 February falls on the 28th otherwise.
+  for (const b of birthdays) {
+    if (!isMonthDay(b.monthDay)) continue;
+    for (const y of [year, year + 1]) {
+      const date = annualOccurrence("2000-" + b.monthDay, y);
+      const left = dayNumber(date) - t;
+      if (left < 0 || left > 100) continue;
+      const kind = b.who === "me" ? "myBirthday" : "partnerBirthday";
+      const label = b.who === "me" ? "내 생일" : (b.name ? b.name + " 생일" : "상대 생일");
+      items.push(b.name && b.who === "partner" ? { label, kind, name: b.name, date, daysLeft: left } : { label, kind, date, daysLeft: left });
+      break;
     }
   }
   return items.sort((a, b) => a.daysLeft - b.daysLeft);

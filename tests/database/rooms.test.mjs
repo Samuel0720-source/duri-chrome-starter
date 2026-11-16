@@ -244,6 +244,7 @@ before(async () => {
   await admin.query(await readFile(new URL("../../supabase/migrations/202611150002_watch_netflix.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611160001_call_signals.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611170001_postcard_duel.sql", import.meta.url), "utf8"));
+  await admin.query(await readFile(new URL("../../supabase/migrations/202611180001_birthday.sql", import.meta.url), "utf8"));
 });
 after(async () => {
   admin?.release();
@@ -1306,6 +1307,37 @@ test("member prefs: nicknames for each other, chat read position moves forward o
   await asUser(a, "select public.leave_couple_room($1)", [id]);
   assert.equal((await admin.query("select count(*)::int n from public.member_prefs where room_id=$1", [id])).rows[0].n, 2, "kept with the closed room until it is deleted");
   await assert.rejects(nick(b, "x"), /Room unavailable/);
+});
+
+test("birthdays: each partner sets only their own month-day, both can read them, strangers refused", async () => {
+  const { a, id, token } = await fixture(),
+    b = await user(),
+    c = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const bday = async (who, md) => (await asUser(who, "select public.set_my_birthday($1,$2) as d", [id, md]))[0].d;
+  const rows = async (who) => asUser(who, "select user_id, birthday from public.member_prefs where room_id=$1", [id]);
+  const before = (await admin.query("select count(*)::int n from realtime.sent where topic=$1 and event='prefs'", ["room:" + id])).rows[0].n;
+
+  assert.equal(await bday(a, "03-14"), "03-14");
+  assert.equal(await bday(b, " 02-29 "), "02-29", "29 February is a real birthday; spaces trimmed");
+  for (const bad of ["02-30", "04-31", "13-01", "00-10", "3-14", "2000-03-14", "03-14x"]) {
+    await assert.rejects(bday(a, bad), /Invalid birthday/, bad);
+  }
+  const seen = await rows(b);
+  assert.equal(seen.find((r) => r.user_id === a).birthday, "03-14", "B sees A's birthday");
+  assert.equal(seen.find((r) => r.user_id === b).birthday, "02-29");
+  assert.equal(await bday(a, ""), null, "empty clears");
+  assert.equal((await rows(b)).find((r) => r.user_id === a).birthday, null);
+  await assert.rejects(asUser(a, "update public.member_prefs set birthday='01-01'"), /permission denied/);
+  await assert.rejects(admin.query("update public.member_prefs set birthday='1-1' where room_id=$1", [id]), /check/, "the column itself refuses other shapes");
+
+  assert.deepEqual(await asUser(c, "select * from public.member_prefs"), []);
+  await assert.rejects(bday(c, "05-05"), /Room unavailable/);
+  const after = (await admin.query("select payload from realtime.sent where topic=$1 and event='prefs'", ["room:" + id])).rows;
+  assert.ok(after.length >= before + 3, "a birthday change rings the room");
+  assert.ok(!JSON.stringify(after).includes("03-14"), "the signal carries no birthday");
+  await asUser(a, "select public.leave_couple_room($1)", [id]);
+  await assert.rejects(bday(b, "06-06"), /Room unavailable/);
 });
 
 test("draw quiz in English: every word has an English name, the guesser may answer in either language, and still never sees it", async () => {
