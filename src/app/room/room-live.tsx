@@ -1,5 +1,7 @@
 "use client";
 
+import { useRoomChannel } from "./use-room-channel";
+
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { browserClient } from "../../lib/supabase/browser";
@@ -8,6 +10,7 @@ import { browserClient } from "../../lib/supabase/browser";
 // or the theme, background, plans or album change.
 export function RoomLive({ roomId }: { roomId: string }) {
   const router = useRouter();
+  const roomChannel = useRoomChannel(roomId);
   useEffect(() => {
     const supabase = browserClient();
     if (!supabase) return;
@@ -17,10 +20,8 @@ export function RoomLive({ roomId }: { roomId: string }) {
       // Private channels authorize with the signed-in user's token.
       await supabase.realtime.setAuth();
       if (!active) return;
-      channel = supabase
-        .channel("room:" + roomId, { config: { private: true } })
+      channel = roomChannel(supabase)
         .on("broadcast", { event: "members" }, () => router.refresh())
-        .on("broadcast", { event: "room" }, () => router.refresh())
         .on("broadcast", { event: "plans" }, () => router.refresh())
         .on("broadcast", { event: "photos" }, () => router.refresh())
         // The data attribute lets tests (and debugging) see the channel is live.
@@ -32,6 +33,6 @@ export function RoomLive({ roomId }: { roomId: string }) {
       active = false;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomId, router]);
+  }, [roomChannel, router]);
   return null;
 }

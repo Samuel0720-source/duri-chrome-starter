@@ -98,7 +98,7 @@ export const en: Record<keyof typeof ko, string> = {
   "settings.room.theme": "Room theme",
   "settings.room.themeCurrent": "Current theme",
   "settings.room.themeApply": "Use this theme",
-  "settings.room.themeHint": "Picking previews it here; saving applies it for both of you.",
+  "settings.room.themeHint": "Pick a character to preview it in the Duri logo above. Save to use it in your shared room.",
   "settings.room.start": "Our first day",
   "settings.room.zone": "Time zone",
   "settings.room.saveDate": "Save date",

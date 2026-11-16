@@ -1,5 +1,7 @@
 "use client";
 
+import { useRoomChannel } from "../use-room-channel";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorKey } from "../../../core/auth-paths";
@@ -51,6 +53,7 @@ type Phase = { meMoving: boolean; partnerMoving: boolean };
 // database clock and turns a drag (anywhere on the course) into an angle and a power.
 export function GolfGame({ roomId, initial, partnerName }: { roomId: string; initial: GolfState; partnerName: string }) {
   const { t } = useT();
+  const roomChannel = useRoomChannel(roomId);
   const [state, setState] = useState<GolfState>(initial);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -107,8 +110,7 @@ export function GolfGame({ roomId, initial, partnerName }: { roomId: string; ini
     (async () => {
       await supabase.realtime.setAuth();
       if (!active) return;
-      channel = supabase
-        .channel("room:" + roomId, { config: { private: true } })
+      channel = roomChannel(supabase)
         .on("broadcast", { event: "golf" }, () => void refresh())
         .on("broadcast", { event: "members" }, () => window.location.reload())
         .subscribe((status) => {
@@ -125,7 +127,7 @@ export function GolfGame({ roomId, initial, partnerName }: { roomId: string; ini
       clearInterval(beat);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomId, refresh]);
+  }, [roomChannel, roomId, refresh]);
 
   const s = state.game ? state : null;
   const delayOf = (who: "me" | "pa", b: GolfBall) =>
