@@ -87,8 +87,7 @@ export default async function RoomPage({
       {full && <section className="daily-post" aria-labelledby="daily-heading">
         <div className="daily-art"><img src="/art/post-garden.webp" width="1080" height="720" alt="" /></div>
         <div><h2 id="daily-heading">{t("post.daily")}</h2><p>{t(postcardQuestion(today))}</p>
-          <div className="post-links"><a href="/room/chat?prompt=today">{t("post.reply")}</a>
-            <a href="/room/game?g=post">{t("game.post")}</a></div>
+          <div className="post-links"><a href="/room/chat?prompt=today">{t("post.reply")}</a></div>
         </div>
       </section>}
       <div className="room-grid">
