@@ -28,10 +28,7 @@ export async function RoomTabs({ active }: { active: RoomTab }) {
   return (
     <nav className="room-tabs" aria-label={t("tabs.label")}>
       {tabs.map(([key, href, label]) => (
-        <Link key={key} href={href} aria-current={active === key ? "page" : undefined}>
-          <span className="tab-icon" aria-hidden="true">{icons[key]}</span>
-          <span>{label}</span>
-        </Link>
+        <Link key={key} href={href} aria-current={active === key ? "page" : undefined}><span className="tab-icon" aria-hidden="true">{icons[key]}</span><span>{label}</span></Link>
       ))}
     </nav>
   );

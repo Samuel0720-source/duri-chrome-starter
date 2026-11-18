@@ -1,4 +1,6 @@
 "use client";
+import { GameResult } from "./game-result";
+import { useNewGameRefresh } from "./new-game";
 
 import { useRoomChannel } from "../use-room-channel";
 
@@ -27,6 +29,8 @@ export function GomokuGame({ roomId, initial, partnerName }: { roomId: string; i
     const { data } = await supabase.rpc("gomoku_state", { target: roomId });
     if (data) setState(data as GomokuState);
   }, [roomId]);
+
+  useNewGameRefresh(refresh);
 
   useEffect(() => {
     const supabase = browserClient();
@@ -116,6 +120,7 @@ export function GomokuGame({ roomId, initial, partnerName }: { roomId: string; i
     <div className="gomoku" data-status={state.game ? state.status : "none"} data-turn={state.game ? (state.turn ?? "") : ""}>
       <section className="sheet">
         <h2>{t("gomoku.title")}</h2>
+        {state.game && (state.status === "won" || state.status === "draw") && <GameResult result={state.status === "draw" ? "tie" : state.winner === "me" ? "win" : "loss"} partnerName={partnerName} />}
         <p className="waiting" role="status" aria-live="polite">{headline}</p>
         <p className="hint">{scoreLine(state, t, partnerName)}</p>
         {state.game && state.status === "open" && <p className="hint">{t("gomoku.rules")}</p>}

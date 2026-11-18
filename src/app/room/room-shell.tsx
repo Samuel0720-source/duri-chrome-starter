@@ -2,7 +2,7 @@ import Link from "next/link";
 import { photoUrl } from "../../core/album";
 import { getT } from "../../i18n/server";
 import { getRoomSession, getRoomSummary } from "../../lib/room-context";
-import { signOut } from "./actions";
+import { SignOutForm } from "./sign-out-form";
 
 // The room's shared background photo, if one is set (row level security returns only my room).
 async function wallpaperOf(): Promise<string | null> {
@@ -23,9 +23,7 @@ export async function RoomShell({ children, wide = true }: { children: React.Rea
           <span className="room-mascot" aria-hidden="true" />
           {t("app.name")}
         </Link>
-        <form action={signOut}>
-          <button type="submit" className="link">{t("common.signOut")}</button>
-        </form>
+        <SignOutForm label={t("common.signOut")} />
       </header>
       {children}
     </main>

@@ -22,7 +22,8 @@
     }
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -46,14 +47,30 @@
     },
     {
       "matches": [
-        "__DURI_ORIGIN__/room/watch*",
-        "__DURI_ORIGIN__/room/draw*"
+        "__DURI_ORIGIN__/room/watch*"
       ],
       "js": [
         "duri-bridge.js"
       ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "__DURI_ORIGIN__/*"
+      ],
+      "js": [
+        "app-bridge.js"
+      ],
+      "all_frames": true,
       "run_at": "document_start"
     }
   ],
-  "default_locale": "en"
+  "default_locale": "en",
+  "host_permissions": [
+    "__DURI_ORIGIN__/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; frame-src __DURI_ORIGIN__;"
+  }
 }

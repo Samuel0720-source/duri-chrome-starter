@@ -1,3 +1,6 @@
+import { PokerGame } from "./poker-game";
+import { NewGame } from "./new-game";
+import type { PokerState } from "../../../core/poker";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PostcardGame } from "./postcard-game";
@@ -24,12 +27,12 @@ export const dynamic = "force-dynamic";
 export default async function GamePage({ searchParams }: { searchParams: Promise<{ g?: string }> }) {
   const { t } = await getT();
   const g = (await searchParams).g;
-  const which = g === "draw" || g === "gomoku" || g === "chess" || g === "golf" || g === "post" ? g : "guess";
+  const which = g === "draw" || g === "gomoku" || g === "chess" || g === "golf" || g === "post" || g === "poker" ? g : "guess";
   const { supabase, user, roomId } = await getRoomSession();
   if (!supabase) redirect("/login?error=config");
   if (!user) redirect("/login?next=/room/game");
   if (!roomId) redirect("/room");
-  const [summary, { data: state }, { data: drawState }, { data: gomokuState }, { data: chessState }, { data: golfState }, { data: postState }, names] = await Promise.all([
+  const [summary, { data: state }, { data: drawState }, { data: gomokuState }, { data: chessState }, { data: golfState }, { data: postState }, { data: pokerState }, names] = await Promise.all([
     getRoomSummary(roomId),
     which === "guess" ? supabase.rpc("guess_state", { target: roomId }) : Promise.resolve({ data: null }),
     which === "draw" ? supabase.rpc("draw_state", { target: roomId }) : Promise.resolve({ data: null }),
@@ -37,6 +40,7 @@ export default async function GamePage({ searchParams }: { searchParams: Promise
     which === "chess" ? supabase.rpc("chess_state", { target: roomId }) : Promise.resolve({ data: null }),
     which === "golf" ? supabase.rpc("golf_state", { target: roomId }) : Promise.resolve({ data: null }),
     which === "post" ? supabase.rpc("postcard_state", { target: roomId }) : Promise.resolve({ data: null }),
+    which === "poker" ? supabase.rpc("poker_state", { target: roomId }) : Promise.resolve({ data: null }),
     roomNames(supabase, roomId, user.id),
   ]);
   const { room, count } = summary;
@@ -50,6 +54,7 @@ export default async function GamePage({ searchParams }: { searchParams: Promise
     ["chess", "/room/game?g=chess"],
     ["golf", "/room/game?g=golf"],
     ["post", "/room/game?g=post"],
+    ["poker", "/room/game?g=poker"],
   ] as const;
 
   return (
@@ -64,7 +69,10 @@ export default async function GamePage({ searchParams }: { searchParams: Promise
                 <Link key={key} href={href} aria-current={which === key ? "page" : undefined}>{t(`game.${key}`)}</Link>
               ))}
             </nav>
-            {which === "post" ? (
+            <NewGame key={which} roomId={room.id} kind={which} partnerName={partnerName} />
+            {which === "poker" ? (
+              <PokerGame roomId={room.id} initial={pokerState as PokerState | null} partnerName={partnerName} myName={names.myNick ?? t("common.me")} />
+            ) : which === "post" ? (
               <PostcardGame key={room.id} roomId={room.id} partnerName={partnerName} initial={postState as PostcardState | null} />
             ) : which === "golf" ? (
               <GolfGame roomId={room.id} partnerName={partnerName} initial={(golfState as GolfState | null) ?? { game: null, best: {}, nowMs: Date.now() }} />

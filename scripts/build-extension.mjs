@@ -21,7 +21,7 @@ export async function buildExtension(input = localOrigin, directory = defaultDir
   const origin = validateOrigin(input);
   await mkdir(join(directory, "core"), { recursive: true });
   await cp(join(root, "extension"), directory, { recursive: true });
-  for (const name of ["dates", "preview", "sketch"]) {
+  for (const name of ["dates", "preview"]) {
     const file = await readFile(join(root, "src", "core", name + ".ts"), "utf8");
     const { outputText } = ts.transpileModule(file, {
       compilerOptions: {
@@ -34,6 +34,14 @@ export async function buildExtension(input = localOrigin, directory = defaultDir
     await writeFile(join(directory, "core", name + ".js"), outputText);
   }
   await writeFile(join(directory, "origin.js"), "export const webOrigin = " + JSON.stringify(origin) + ";\n");
+  await cp(join(root, "public", "icons", "postbirds.webp"), join(directory, "icons", "postbirds.webp"));
+  await mkdir(join(directory, "art"), { recursive: true });
+  await cp(join(root, "public", "art", "mascots"), join(directory, "art", "mascots"), { recursive: true });
+  // Copy the live berry overrides too, so the toolbar and room share the same palette.
+  const tokens = await readFile(join(root, "src", "app", "tokens.css"), "utf8");
+  const garden = await readFile(join(root, "src", "app", "garden.css"), "utf8");
+  const berry = garden.slice(garden.indexOf(":root,"), garden.indexOf("body {"));
+  await writeFile(join(directory, "tokens.css"), tokens + "\n" + berry);
   // The 함께 보기 bridge may run only on this web app's own address.
   const manifestPath = join(directory, "manifest.json");
   const manifest = (await readFile(manifestPath, "utf8")).replaceAll("__DURI_ORIGIN__", origin);

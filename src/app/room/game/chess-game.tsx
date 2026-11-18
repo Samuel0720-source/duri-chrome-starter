@@ -10,6 +10,8 @@ import {
   type ChessColor, type ChessPosition, type ChessState, type PromoPiece,
 } from "../../../core/chess";
 import { useRoomChannel } from "../use-room-channel";
+import { GameResult } from "./game-result";
+import { useNewGameRefresh } from "./new-game";
 
 function playTone(kind: "move" | "capture" | "check" | "end") {
   try {
@@ -168,6 +170,8 @@ export function ChessGame({ roomId, initial, partnerName }: { roomId: string; in
     }
     setState(next);
   }, [roomId]);
+
+  useNewGameRefresh(refresh);
 
   useEffect(() => {
     const supabase = browserClient();
@@ -428,6 +432,9 @@ export function ChessGame({ roomId, initial, partnerName }: { roomId: string; in
             {soundOn ? t("chess.soundOn") : t("chess.soundOff")}
           </button>
         </div>
+        {s && (s.status === "won" || s.status === "draw") && (
+          <GameResult result={s.status === "draw" ? "tie" : s.winner === "me" ? "win" : "loss"} partnerName={partnerName} />
+        )}
         <p className="waiting" role="status" aria-live="polite">{headline}</p>
         <p className="hint">{chessScoreLine(state, t, partnerName)}</p>
         {s && open && <p className="hint">{t("chess.rules")}</p>}

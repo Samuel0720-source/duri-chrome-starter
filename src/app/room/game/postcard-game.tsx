@@ -1,8 +1,10 @@
 "use client";
+import { GameResult } from "./game-result";
+import { useNewGameRefresh } from "./new-game";
+import Link from "next/link";
 
 import { useRoomChannel } from "../use-room-channel";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { postcardFaces, type PostcardState } from "../../../core/postcards";
@@ -29,6 +31,8 @@ export function PostcardGame({ roomId, initial, partnerName }: {
     if (result?.data) { accept(result.data); setFailed(false); }
     else setFailed(true);
   }, [roomId, accept]);
+  useNewGameRefresh(refresh);
+
   useEffect(() => {
     const client = browserClient();
     if (!client) return;
@@ -104,6 +108,7 @@ export function PostcardGame({ roomId, initial, partnerName }: {
         <button key={i} type="button" disabled={!canFlip || face !== null} data-found={state.owners[i] !== null}
           data-open={face !== null} aria-label={t(face === null ? "post.back" : "post.face", { n: i + 1, face: face === null ? "" : postcardFaces[face] })}
           onClick={() => move(i)}>{face === null ? <span aria-hidden="true">💌</span> : postcardFaces[face]}</button>)}</div>
+      {finished && <GameResult result={mine > theirs ? "win" : "loss"} partnerName={partnerName} />}
       {finished && <div className="actions">
         <button className="button" disabled={busy} onClick={() => move()}>{t("post.rematch")}</button>
         <button className="button ghost" disabled={busy || shared === state.revision} onClick={shareScore}>{t(shared === state.revision ? "post.sent" : "post.share")}</button>

@@ -48,14 +48,15 @@ export async function AuthShell({ back, title, lead, children }: { back: string;
 
 // Google's sign-in button: the brand's blue with the multicolour "G" on a white tile, as Google's guidelines ask.
 export async function GoogleButton({ next }: { next: string }) {
-  const { t } = await getT();
+  const { t, locale } = await getT();
   return (
-    <form action={continueWithGoogle}>
+    <form action={continueWithGoogle} data-mini-handoff>
       <input type="hidden" name="next" value={next} />
       <button type="submit" className="provider provider-google">
         <span className="provider-mark" aria-hidden="true"><FcGoogle /></span>
         <span>{t("login.google")}</span>
       </button>
+      <p className="mini-google-hint">{locale === "ko" ? "Google 로그인은 작은 창에서 계속해요." : "Google sign-in continues in a small window."}</p>
     </form>
   );
 }

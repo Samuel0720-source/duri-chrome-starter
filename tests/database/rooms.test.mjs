@@ -245,6 +245,7 @@ before(async () => {
   await admin.query(await readFile(new URL("../../supabase/migrations/202611160001_call_signals.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611170001_postcard_duel.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611180001_birthday.sql", import.meta.url), "utf8"));
+  await admin.query(await readFile(new URL("../../supabase/migrations/20261118145301_poker_and_rematches.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611190001_chess.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611190002_shared_draw.sql", import.meta.url), "utf8"));
 });
@@ -1697,4 +1698,93 @@ test("shared sketch board and scoped Chrome extension bridge tokens work securel
   assert.equal(cleared.strokes.length, 0);
   const broadcasts = (await admin.query("select count(*)::int as n from realtime.sent where topic=$1 and event='sketch'", ["room:" + id])).rows[0].n;
   assert.ok(broadcasts > 0);
+});
+
+async function pokerFixture(bb=50) {
+  const {id,token,a}=await fixture(),b=await user();
+  await asUser(b,"select public.accept_couple_invite($1)",[token]);
+  const rpc=async(who,fn,args=[])=>(await asUser(who,`select public.${fn} as s`,args))[0].s;
+  const read=who=>rpc(who,'poker_state($1)',[id]);
+  const move=async(who,action,amount=null,revision=null)=>rpc(who,'poker_action($1,$2,$3,$4)',[id,revision??(await read(who)).revision,action,amount]);
+  const request=await rpc(a,'request_new_game($1,$2,$3)',[id,'poker',bb]);
+  await rpc(b,'respond_new_game($1,$2,$3,$4)',[id,'poker',request.id,true]);
+  return {id,a,b,rpc,read,move};
+}
+test('poker rank: every category, wheel, kickers and best five of seven',async()=>{
+ const rank=async cards=>(await admin.query('select duri_private.poker_rank($1::integer[]) r',[cards])).rows[0].r;
+ const hands=[
+  [12,24,7,18,3], [12,25,9,18,3], [12,25,9,22,3], [12,25,38,9,3],
+  [12,13,27,41,3], [12,10,7,5,2], [12,25,38,9,22], [12,25,38,51,9], [8,9,10,11,12],
+ ];
+ for(let i=0;i<hands.length;i++)assert.equal((await rank(hands[i]))[0],i,`category ${i}`);
+ assert.deepEqual(await rank(hands[4]),[4,5]);
+ assert.deepEqual(await rank([12,25,38,9,22,35,3]),[6,14,11], 'two triplets choose higher full house');
+ assert.deepEqual(await rank([8,9,10,11,12,25,38]),[8,14]);
+ assert.ok((await rank([12,25,11,7,3]))[2]>(await rank([12,25,10,7,3]))[2], 'pair kicker decides');
+});
+test('poker: agreed equal stacks, HU action order, legal raises, hidden cards and duplicate requests',async()=>{
+ const {id,a,b,rpc,read,move}=await pokerFixture(75);const outsider=await user();
+ let s=await read(a);assert.equal(s.stackBB,75);assert.deepEqual(s.stacks,[149,148]);assert.equal(s.turnSeat,1);assert.equal(s.pot,3);assert.equal(s.opponentCards,null);assert.equal(s.board.length,0);assert.ok(!('deck' in s));
+ await assert.rejects(read(outsider),/Room unavailable/);
+ await assert.rejects(asUser(a,'select * from duri_private.poker_games'),/permission denied/);
+ const acl=(await admin.query("select has_function_privilege('anon','public.poker_action(uuid,integer,text,integer)','EXECUTE') a,has_function_privilege('authenticated','duri_private.poker_rank(integer[])','EXECUTE') b")).rows[0];assert.deepEqual(acl,{a:false,b:false});
+ await assert.rejects(move(b,'check'),/Not your turn/);await assert.rejects(move(a,'check'),/Must call/);await assert.rejects(move(a,'raise',3),/Minimum raise/);
+ const revision=s.revision;await move(a,'call');s=await move(a,'call',null,revision);assert.equal(s.turnSeat,2);assert.equal(s.pot,4);assert.equal(s.street,0,'BB keeps option after SB limp');
+ await move(b,'check');s=await read(a);assert.equal(s.street,1);assert.equal(s.turnSeat,2);assert.equal(s.board.length,3);
+ await move(b,'raise',2);await move(a,'raise',6);await assert.rejects(move(b,'raise',8),/Minimum raise/);await move(b,'call');s=await read(a);assert.equal(s.street,2);assert.equal(s.turnSeat,2);
+ await move(b,'check');await move(a,'check');await move(b,'check');await move(a,'check');s=await read(a);assert.equal(s.phase,'showdown');assert.equal(s.board.length,5);assert.equal(s.opponentCards.length,2);assert.equal(s.stacks[0]+s.stacks[1],300);
+ await move(a,'next');assert.equal((await read(a)).phase,'showdown');await move(b,'next');s=await read(a);assert.equal(s.dealer,2);assert.equal(s.turnSeat,2);assert.equal(s.hand,2);assert.equal(s.opponentCards,null);
+ await move(b,'fold');s=await read(a);assert.equal(s.winner,1);assert.equal(s.opponentCards,null,'fold does not reveal opponent cards');
+ const req=await rpc(a,'request_new_game($1,$2,$3)',[id,'poker',100]);await assert.rejects(rpc(a,'respond_new_game($1,$2,$3,$4)',[id,'poker',req.id,true]),/Partner must accept/);
+ await Promise.all([rpc(b,'respond_new_game($1,$2,$3,$4)',[id,'poker',req.id,true]),rpc(b,'respond_new_game($1,$2,$3,$4)',[id,'poker',req.id,true])]);s=await read(a);assert.equal(s.stackBB,100);assert.equal(s.hand,1);assert.equal(s.stacks[0]+s.stacks[1]+s.pot,400);
+});
+test('poker: unequal all-in refund, short raises, tied board and session winner',async()=>{
+ const {id,a,b,read,move}=await pokerFixture();
+ // Legal mid-hand fixture: total bankroll 200, player B has 4 chips left.
+ await admin.query("update duri_private.poker_games set stacks='{193,4}',bets='{1,2}',committed='{1,2}' where room_id=$1",[id]);
+ await move(a,'raise',4);await move(b,'raise',6);let s=await read(a);assert.equal(s.canRaise,false,'short all-in cannot reopen betting');await assert.rejects(move(a,'raise',8),/Invalid raise/);
+ // Fixed shared royal flush: both play the board; unmatched excess must return.
+ await admin.query("update duri_private.poker_games set deck=array[13,14,15,16,17,8,9,10,18,11,19,12]||array(select generate_series(20,51)),hole1='{13,15}',hole2='{14,16}' where room_id=$1",[id]);
+ await move(a,'call');s=await read(a);assert.equal(s.winner,0);assert.deepEqual(s.stacks,[194,6]);assert.equal(s.lastPot,12);
+ await move(a,'next');await move(b,'next');
+ s=await read(a);const first=s.turnSeat===1?a:b,second=s.turnSeat===1?b:a;
+ // All-in larger stack, smaller opponent calls: no side pot in heads-up.
+ await move(first,'raise',(await read(first)).maxRaiseTo);await move(second,'call');s=await read(a);assert.equal(s.stacks[0]+s.stacks[1],200);assert.ok(['showdown','finished'].includes(s.phase));assert.equal(s.pot,0);
+ // Force a real river winner with equal all-in stacks to test match termination.
+ await admin.query("update duri_private.poker_games set phase='playing',street=3,turn_seat=1,stacks='{100,100}',bets='{0,0}',committed='{0,0}',acted='{false,false}',min_raise=2,hole1='{12,25}',hole2='{11,24}',deck=array[12,11,25,24,50,0,16,32,51,46,49,9],board='{0,16,32,46,9}' where room_id=$1",[id]);
+ await move(a,'raise',100);await move(b,'call');s=await read(a);assert.equal(s.phase,'finished');assert.equal(s.winner,1);assert.deepEqual(s.stacks,[200,0]);
+});
+test('new-game consent: outsider, cancellation, stale poker action, expired request and invalid options',async()=>{
+ const {id,a,b,rpc,read,move}=await pokerFixture();const c=await user();
+ await assert.rejects(rpc(c,'request_new_game($1,$2,$3)',[id,'poker',50]),/Room unavailable/);
+ await assert.rejects(rpc(a,'request_new_game($1,$2,$3)',[id,'poker',51]),/Invalid stack/);
+ await assert.rejects(rpc(a,'request_new_game($1,$2,$3)',[id,'bogus',50]),/Invalid game/);
+ let r=await rpc(a,'request_new_game($1,$2,$3)',[id,'poker',50]);const revision=(await read(a)).revision;
+ await move(a,'call');await assert.rejects(rpc(b,'respond_new_game($1,$2,$3,$4)',[id,'poker',r.id,true]),/Game changed/);assert.equal((await read(a)).revision,revision+1);
+ r=await rpc(a,'request_new_game($1,$2,$3)',[id,'poker',50]);await rpc(b,'respond_new_game($1,$2,$3,$4)',[id,'poker',r.id,false]);assert.equal((await read(a)).revision,revision+1);
+ r=await rpc(a,'request_new_game($1,$2,$3)',[id,'poker',50]);await admin.query("update duri_private.game_requests set expires_at=clock_timestamp()-interval '1 minute' where room_id=$1",[id]);await assert.rejects(rpc(b,'respond_new_game($1,$2,$3,$4)',[id,'poker',r.id,true]),/Game changed/);
+});
+test('every existing game supports agreed restart without awarding a false result or erasing history',async()=>{
+ const {id,a,b,rpc}=await pokerFixture();
+ for(const kind of ['guess','draw','gomoku','chess','golf','post']) {
+  const start=async()=>{const r=await rpc(a,'request_new_game($1,$2,$3)',[id,kind,50]);return rpc(b,'respond_new_game($1,$2,$3,$4)',[id,kind,r.id,true]);};
+  await start();const fn=kind==='post'?'postcard':kind;const before=await rpc(a,`${fn}_state($1)`,[id]);await start();const after=await rpc(a,`${fn}_state($1)`,[id]);
+  if(kind==='post'){assert.equal(after.revision,before.revision+1);assert.deepEqual(after.scores,[0,0]);}
+  else{assert.notEqual(after.game,before.game);const rows=(await admin.query(`select count(*)::integer n from public.${kind==='draw'?'draw':kind}_games where room_id=$1`,[id])).rows;assert.equal(rows[0].n,2);}
+  if(kind==='gomoku'||kind==='chess'){assert.equal(after.draws,0);assert.equal(after.myWins+after.partnerWins,0);}
+ }
+});
+test('rematch preserves earned draw and golf records even before a final state read',async()=>{
+ const {id,a,b,rpc}=await pokerFixture();
+ const restart=async kind=>{const r=await rpc(a,'request_new_game($1,$2,$3)',[id,kind,50]);await rpc(b,'respond_new_game($1,$2,$3,$4)',[id,kind,r.id,true]);};
+ const draw=await rpc(a,'start_draw_game($1,$2,$3)',[id,'food',true]);
+ await admin.query("update public.draw_games set score=3,started_at=clock_timestamp()-interval '101 seconds',deadline_at=clock_timestamp()-interval '1 second' where id=$1",[draw]);
+ await restart('draw');
+ assert.equal((await admin.query('select best_score from public.draw_records where room_id=$1',[id])).rows[0].best_score,3);
+ const golf=await rpc(a,'start_golf($1,$2)',[id,3]);
+ await admin.query('update public.golf_games set hole=3 where id=$1',[golf]);
+ await admin.query("update public.golf_balls set total=2,strokes=1,holed=true,moving_until=clock_timestamp()-interval '1 second' where game_id=$1",[golf]);
+ await restart('golf');
+ assert.equal((await admin.query('select best from public.golf_records where room_id=$1',[id])).rows[0].best,6);
+ assert.equal((await admin.query('select status from public.golf_games where id=$1',[golf])).rows[0].status,'done');
 });
