@@ -46,16 +46,17 @@ export class CallSession {
     this.timeout(s, 45_000);
     void this.signal(s, "accept");
   }
-  end(note: CallNote = "ended", notify = true) {
+  end(note: CallNote = "ended", notify = true): Promise<void> {
     const s = this.current;
-    if (!s) return;
+    if (!s) return Promise.resolve();
     this.current = undefined;
     clearTimeout(this.timer);
-    if (notify) void this.send(s.id, "bye", "").catch(() => {});
+    const sent = notify ? this.send(s.id, "bye", "").catch(() => {}) : Promise.resolve();
     s.pc?.close();
     s.stream?.getTracks().forEach(track => track.stop());
     this.remote = undefined;
     this.render({ phase: "idle", mode: s.mode, note });
+    return sent;
   }
   async receive(value: unknown) {
     if (!isSignal(value) || value.sender === this.me) return;
