@@ -8,7 +8,7 @@ export type GomokuState =
   | { game: null; myWins: number; partnerWins: number; draws: number }
   | {
       game: string;
-      status: "open" | "won" | "draw";
+      status: "open" | "won" | "draw" | "cancelled";
       me: "black" | "white";
       turn: "me" | "partner" | null;
       winner: "me" | "partner" | null;

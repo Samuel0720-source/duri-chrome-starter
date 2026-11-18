@@ -1,4 +1,6 @@
 "use client";
+import { GameResult } from "./game-result";
+import { useNewGameRefresh } from "./new-game";
 
 import { useRoomChannel } from "../use-room-channel";
 
@@ -100,6 +102,8 @@ export function GolfGame({ roomId, initial, partnerName }: { roomId: string; ini
     clockRef.current = updateClock(clockRef.current, next.nowMs, t0, t1);
     apply(next);
   }, [roomId, apply]);
+
+  useNewGameRefresh(refresh);
 
   useEffect(() => {
     const supabase = browserClient();
@@ -310,6 +314,7 @@ export function GolfGame({ roomId, initial, partnerName }: { roomId: string; ini
 
   return (
     <div className="golf" data-status={s ? s.status : "none"} data-hole={s ? s.hole : ""}>
+      {s?.status === "done" && <GameResult result={s.me.total === s.partner.total ? "tie" : s.me.total < s.partner.total ? "win" : "loss"} partnerName={partnerName} />}
       <section className="golf-head">
         <div>
           <h2>{t("golf.title")}</h2>

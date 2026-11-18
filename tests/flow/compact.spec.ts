@@ -115,8 +115,8 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(app.locator(".album-tile")).toHaveCount(0);
 
     await app.getByRole("link", { name: "게임", exact: true }).click();
-    await expect(app.locator(".game-switch a")).toHaveCount(5);
-    for (let i = 0; i < 5; i++) {
+    await expect(app.locator(".game-switch a")).toHaveCount(6);
+    for (let i = 0; i < 6; i++) {
       await app.locator(".game-switch a").nth(i).click();
       await expect(app.locator(".game-switch a").nth(i)).toHaveAttribute("aria-current", "page");
       expect(await app.locator("html").evaluate(root => root.scrollWidth <= window.innerWidth)).toBe(true);
@@ -187,6 +187,33 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await playable.first().click();
     await expect(small.locator('.post-board button[data-open="true"]')).toHaveCount(1);
     expect((await media(small)).id).toBe(original.id);
+    // Poker shares the persistent call, and both people agree to identical stacks.
+    await small.locator('.game-switch a[href="/room/game?g=poker"]').click();
+    await b.locator('.room-tabs a[href="/room/game"]').click();
+    await b.locator('.game-switch a[href="/room/game?g=poker"]').click();
+    await small.locator('.new-game select').selectOption('75');
+    await small.getByRole('button', { name: '♠ Invite with this stack', exact: true }).click();
+    await b.getByRole('button', { name: '수락하고 시작', exact: true }).click();
+    await expect(small.locator('.poker-game')).toHaveAttribute('data-phase','playing');
+    await expect(b.locator('.poker-game')).toHaveAttribute('data-phase','playing');
+    await expect(small.locator('.poker-meta')).toContainText('75 BB');
+    await expect(b.locator('.poker-meta')).toContainText('75 BB');
+    await expect(small.locator('.poker-seat').first().locator('[data-hidden="true"]')).toHaveCount(2);
+    await small.getByRole('button', { name: 'Call 1', exact: true }).click();
+    await b.getByRole('button', { name: '체크', exact: true }).click();
+    await expect(small.locator('.poker-community [data-hidden="false"]')).toHaveCount(3);
+    await b.getByRole('button', { name: '체크', exact: true }).click();
+    await small.getByRole('button', { name: 'Fold', exact: true }).click();
+    await expect(small.locator('.game-result')).toHaveAttribute('data-result','loss');
+    await expect(b.locator('.game-result')).toHaveAttribute('data-result','win');
+    expect((await media(small)).id).toBe(original.id);
+    expect((await media(small)).live).toBe('live');
+    expect(await small.locator('html').evaluate(root=>root.scrollWidth<=innerWidth)).toBe(true);
+    await small.locator('.new-game select').selectOption('100');
+    await small.getByRole('button', { name: '♠ Invite with this stack', exact: true }).click();
+    await b.getByRole('button', { name: '수락하고 시작', exact: true }).click();
+    await expect(small.locator('.poker-meta')).toContainText('100 BB');
+    await expect(b.locator('.poker-meta')).toContainText('100 BB');
     // Remote hang-up also works away from Chat.
     await small.getByRole("button", { name: "End call", exact: true }).click();
     await expect(b.locator(".call-box video")).toHaveCount(0);
