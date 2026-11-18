@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { roomToday } from "../../../core/dates";
 import { postcardQuestion } from "../../../core/postcards";
@@ -49,7 +50,7 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
               initialMyRead={Number(mine?.read_upto ?? 0)}
             />
           ) : (
-            <p className="notice">{t("chat.needPartner")} <a href="/room">{t("chat.inviteLink")}</a></p>
+            <p className="notice">{t("chat.needPartner")} <Link href="/room">{t("chat.inviteLink")}</Link></p>
           )}
         </section>
       </div>

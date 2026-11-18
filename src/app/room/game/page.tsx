@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PostcardGame } from "./postcard-game";
 import type { PostcardState } from "../../../core/postcards";
@@ -52,7 +53,7 @@ export default async function GamePage({ searchParams }: { searchParams: Promise
           <>
             <nav className="game-switch" aria-label={t("game.pick")}>
               {games.map(([key, href]) => (
-                <a key={key} href={href} aria-current={which === key ? "page" : undefined}>{t(`game.${key}`)}</a>
+                <Link key={key} href={href} aria-current={which === key ? "page" : undefined}>{t(`game.${key}`)}</Link>
               ))}
             </nav>
             {which === "post" ? (
@@ -68,7 +69,7 @@ export default async function GamePage({ searchParams }: { searchParams: Promise
             )}
           </>
         ) : (
-          <p className="notice">{t("game.needPartner")} <a href="/room">{t("chat.inviteLink")}</a></p>
+          <p className="notice">{t("game.needPartner")} <Link href="/room">{t("chat.inviteLink")}</Link></p>
         )}
       </div>
     </RoomShell>

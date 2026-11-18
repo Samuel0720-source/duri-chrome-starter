@@ -53,3 +53,11 @@ html[data-compact="popup"] .room-wrap > .top button { font: inherit; font-size: 
 }
 .mini-google-hint { display: none; }
 html[data-compact="popup"] .mini-google-hint { display: block; margin-top: 6px; color: var(--color-ink-2); font-size: .8rem; }
+
+/* Reserve exactly the dock's height so game controls never sit behind it. */
+body { padding-bottom: var(--call-dock-height, 0px); }
+.call-dock { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: min(680px, calc(100% - 16px)); z-index: 40; max-height: 48dvh; overflow-y: auto; border-radius: 18px 18px 0 0; box-shadow: 0 -4px 24px #0002; background: var(--color-paper); }
+.call-dock[hidden], .call-streams[hidden] { display: none; }
+.call-dock .call-box { margin: 0; padding: 12px; }
+.call-dock .call-streams video { max-height: 120px; }
+.call-video-toggle { margin-block: 6px; font: inherit; color: var(--color-accent); }

@@ -33,10 +33,11 @@ function VideoPreview({ track, label }: { track: MediaStreamTrack; label: string
   return <div><video ref={video} muted autoPlay playsInline aria-label={label} /></div>;
 }
 
-export function CallControls({ session, view, ready }: { session: CallSession | null; view: View; ready: boolean }) {
+export function CallControls({ session, view, ready, compact = false }: { compact?: boolean; session: CallSession | null; view: View; ready: boolean }) {
   const { t, locale } = useT();
   const [popup, setPopup] = useState(false);
   useEffect(() => { setPopup(document.documentElement.dataset.compact === "popup"); }, []);
+  const [expanded, setExpanded] = useState(false);
   const [muted, setMuted] = useState(false);
   const [hidden, setHidden] = useState(false);
   useEffect(() => { setMuted(false); setHidden(false); }, [view.local]);
@@ -63,7 +64,8 @@ export function CallControls({ session, view, ready }: { session: CallSession | 
       </div>
     </div>
     {remoteAudio && <PartnerAudio track={remoteAudio} />}
-    {!audioOnly && (remoteVideo || localVideo) && <div className="call-streams">
+    {compact && !audioOnly && (remoteVideo || localVideo) && <button type="button" className="call-video-toggle" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{locale === "ko" ? (expanded ? "영상 접기" : "영상 보기") : (expanded ? "Hide video" : "Show video")}</button>}
+    {!audioOnly && (remoteVideo || localVideo) && <div className="call-streams" hidden={compact && !expanded}>
       {remoteVideo && <VideoPreview track={remoteVideo} label={t("call.partner")} />}
       {localVideo && <VideoPreview track={localVideo} label={t("call.self")} />}
     </div>}

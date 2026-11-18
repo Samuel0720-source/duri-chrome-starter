@@ -155,8 +155,51 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
       }), { timeout: 15000 }).toBe(true);
       expect(await screen.locator("html").evaluate(root => root.scrollWidth <= innerWidth)).toBe(true);
     }
+    // Preserve the very same media stream while both people leave Chat.
+    const media = (page: Page) => page.locator(".call-box audio").evaluate((audio: HTMLAudioElement) => ({
+      id: (audio.srcObject as MediaStream).id, time: audio.currentTime,
+      live: (audio.srcObject as MediaStream).getAudioTracks()[0].readyState,
+    }));
+    const original = await media(small);
+    await b.getByRole("link", { name: "앨범", exact: true }).click();
+    await expect(b).toHaveURL(/\/room\/album$/);
+    for (const path of ["game", "album", "settings", "watch"]) {
+      await small.locator(`.room-tabs a[href="/room/${path}"]`).click();
+      await expect(small).toHaveURL(new RegExp("/room/" + path + "$"));
+      await expect(small.getByRole("button", { name: "End call", exact: true })).toBeVisible();
+      expect((await media(small)).id).toBe(original.id);
+      expect((await media(small)).live).toBe("live");
+      expect(await small.locator("html").evaluate(root => root.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await expect.poll(async () => (await media(small)).time).toBeGreaterThan(original.time);
+    await small.getByRole("button", { name: "Mute microphone", exact: true }).click();
+    await expect(small.getByRole("button", { name: "Unmute microphone", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await small.locator('.room-tabs a[href="/room/game"]').click();
+    await small.locator('.game-switch a[href="/room/game?g=post"]').click();
+    await expect(small).toHaveURL(/g=post/);
+    await expect(small.getByRole("button", { name: "Unmute microphone", exact: true })).toBeVisible();
+    await small.getByRole("button", { name: "Unmute microphone", exact: true }).click();
+    expect((await media(small)).id).toBe(original.id);
+    await small.getByRole("button", { name: "Start match", exact: true }).click();
+    await expect(small.locator(".post-board button")).toHaveCount(14);
+    const playable = small.locator('.post-board button:not([disabled])');
+    // The first player starts this newly created match.
+    await playable.first().click();
+    await expect(small.locator('.post-board button[data-open="true"]')).toHaveCount(1);
+    expect((await media(small)).id).toBe(original.id);
+    // Remote hang-up also works away from Chat.
     await small.getByRole("button", { name: "End call", exact: true }).click();
     await expect(b.locator(".call-box video")).toHaveCount(0);
+    await expect(b.locator(".call-dock")).toBeHidden();
+    await small.locator('.room-tabs a[href="/room/chat"]').click();
+    await small.getByRole("button", { name: "Voice call", exact: true }).click();
+    await expect(b.getByRole("button", { name: "받기", exact: true })).toBeVisible();
+    await b.getByRole("button", { name: "받기", exact: true }).click();
+    await expect.poll(async () => (await media(small)).live).toBe("live");
+    await small.getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(small).toHaveURL(/\/login/);
+    await expect(small.locator(".call-box")).toHaveCount(0);
+    await expect(b.locator(".call-box audio")).toHaveCount(0);
 
   } finally {
     // Own temporary uploads and Auth users are cleaned even after an assertion failure.
