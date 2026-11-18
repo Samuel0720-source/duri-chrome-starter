@@ -50,7 +50,7 @@ export async function AuthShell({ back, title, lead, children }: { back: string;
 export async function GoogleButton({ next }: { next: string }) {
   const { t } = await getT();
   return (
-    <form action={continueWithGoogle}>
+    <form action={continueWithGoogle} data-mini-handoff>
       <input type="hidden" name="next" value={next} />
       <button type="submit" className="provider provider-google">
         <span className="provider-mark" aria-hidden="true"><FcGoogle /></span>

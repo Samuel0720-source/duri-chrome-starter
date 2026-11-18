@@ -5,6 +5,8 @@ import { I18nProvider } from "../i18n/client";
 import { getT } from "../i18n/server";
 import "./globals.css";
 import "./garden.css";
+import "./compact.css";
+import { SmallSurface } from "./small-surface";
 
 // Rounded Korean display face for headings and the big day count.
 const jua = Jua({ weight: "400", subsets: ["latin"], preload: false, display: "swap", variable: "--font-jua" });
@@ -23,7 +25,7 @@ export default async function Layout({ children }: { children: ReactNode }) {
   return (
     <html lang={locale} className={jua.variable}>
       <body>
-        <I18nProvider locale={locale}>{children}</I18nProvider>
+        <I18nProvider locale={locale}><SmallSurface />{children}</I18nProvider>
       </body>
     </html>
   );
