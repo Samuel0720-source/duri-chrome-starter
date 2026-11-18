@@ -17,7 +17,7 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     baseURL: origin, headless: true, channel: "chromium", locale: "ko-KR",
     viewport: { width: 440, height: 600 },
     executablePath: process.env.CHROMIUM_PATH || undefined,
-    ignoreDefaultArgs: ["--disable-extensions"], args: ["--enable-unsafe-extension-debugging"],
+    ignoreDefaultArgs: ["--disable-extensions"], args: ["--enable-unsafe-extension-debugging", "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"],
   });
   let partner: BrowserContext | undefined;
   let roomId: string | null = null;
@@ -97,6 +97,13 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
 
     await app.getByRole("link", { name: "게임", exact: true }).click();
     await expect(app.locator(".game-switch a")).toHaveCount(5);
+    for (let i = 0; i < 5; i++) {
+      await app.locator(".game-switch a").nth(i).click();
+      await expect(app.locator(".game-switch a").nth(i)).toHaveAttribute("aria-current", "page");
+      expect(await app.locator("html").evaluate(root => root.scrollWidth <= window.innerWidth)).toBe(true);
+    }
+    await app.getByRole("link", { name: "함께 보기", exact: true }).click();
+    await expect(app.locator(".watch")).toBeVisible();
     expect(await app.locator("html").evaluate(root => root.scrollWidth <= window.innerWidth)).toBe(true);
     await app.getByRole("link", { name: "설정", exact: true }).click();
     await app.locator("#lang").selectOption("en");
@@ -109,6 +116,26 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(small.getByText("Your partner can reply here", { exact: true })).toBeVisible();
     await expect(small.locator("html")).toHaveAttribute("lang", "en");
     await expect(small.locator('.room[data-mood="night"]')).toHaveCount(1);
+    // A persistent small window keeps a real two-way video/audio session alive after the toolbar closes.
+    await popup.close();
+    await context.grantPermissions(["microphone", "camera"], { origin });
+    await partner.grantPermissions(["microphone", "camera"], { origin });
+    await b.goto("/room/chat");
+    await expect(small.getByRole("button", { name: "Video call", exact: true })).toBeEnabled({ timeout: 10000 });
+    await small.getByRole("button", { name: "Video call", exact: true }).click();
+    await expect(b.getByRole("button", { name: "받기", exact: true })).toBeVisible({ timeout: 15000 });
+    await b.getByRole("button", { name: "받기", exact: true }).click();
+    for (const screen of [small, b]) {
+      await expect(screen.locator(".call-box video")).toHaveCount(2, { timeout: 30000 });
+      await expect.poll(() => screen.evaluate(() => {
+        const audio = document.querySelector<HTMLAudioElement>(".call-box audio");
+        return Boolean(audio && !audio.paused && !audio.muted && audio.currentTime > 0.5);
+      }), { timeout: 15000 }).toBe(true);
+      expect(await screen.locator("html").evaluate(root => root.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await small.getByRole("button", { name: "End call", exact: true }).click();
+    await expect(b.locator(".call-box video")).toHaveCount(0);
+
   } finally {
     // Own temporary uploads and Auth users are cleaned even after an assertion failure.
     if (roomId) {
