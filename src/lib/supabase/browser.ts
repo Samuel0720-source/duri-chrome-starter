@@ -1,11 +1,39 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-// Reads the same sign-in cookies the server set. Uses the public key only.
-export function browserClient() {
+let framedClient: SupabaseClient | undefined;
+// Always consult the current HTTP cookies. A token cache could briefly reuse the
+// previous person's session after signing out and signing in as someone else.
+async function frameToken(): Promise<string | null> {
+  const response = await fetch("/api/session/token", {
+    credentials: "same-origin", cache: "no-store",
+    headers: { "X-Duri-Surface": "popup" },
+  });
+  if (!response.ok) return null;
+  const body = await response.json();
+  return typeof body.accessToken === "string" ? body.accessToken : null;
+}
+
+// Normal tabs read the site's cookies. Chrome extension frames use authenticated
+// same-origin HTTP instead: Chrome hides SameSite cookies from document.cookie.
+export function browserClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return null;
+  const extensionFrame = typeof window !== "undefined" && window.parent !== window &&
+    Array.from(window.location.ancestorOrigins ?? []).some(origin => origin.startsWith("chrome-extension://"));
+  if (extensionFrame) {
+    framedClient ??= createClient(url, key, { accessToken: frameToken });
+    return framedClient;
+  }
   return createBrowserClient(url, key);
+}
+
+// Independent socket, with the same current website authentication and room RLS.
+export function callClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  return url && key ? createClient(url, key, { accessToken: frameToken }) : null;
 }

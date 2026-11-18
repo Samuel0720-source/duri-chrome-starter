@@ -28,7 +28,7 @@ async function makeUser(label: string, password?: string) {
 async function signIn(browser: Browser, email: string, next: string): Promise<Page> {
   const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email });
   if (error) throw error;
-  const page = await (await browser.newContext({ permissions: ["microphone", "camera"] })).newPage();
+  const page = await (await browser.newContext({ permissions: ["microphone", "camera"], viewport: { width: 440, height: 600 } })).newPage();
   const q = new URLSearchParams({ token_hash: data.properties.hashed_token, type: "magiclink", next });
   await page.goto("/auth/callback?" + q);
   return page;
@@ -462,6 +462,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   for (const page of [pageA, pageB]) {
     await page.route("https://www.youtube.com/**", (route) => route.abort());
     await page.addInitScript(fakeYouTube);
+    // Next links keep the current document alive; install the mock there too.
+    await page.evaluate(fakeYouTube);
   }
   await pageA.getByRole("link", { name: "함께 보기", exact: true }).click();
   await pageB.getByRole("link", { name: "함께 보기", exact: true }).click();

@@ -55,7 +55,7 @@ export function zip(entries) {
 // What the store review cares about, checked before anything is packed.
 // The only pages the extension may run on: Netflix watch pages, and the 함께 보기 page of this web app.
 export function allowedScriptPages(origin) {
-  return new Set(["https://www.netflix.com/watch/*", origin + "/room/watch*", origin + "/room/draw*"]);
+  return new Set(["https://www.netflix.com/watch/*", origin + "/room/watch*", origin + "/*"]);
 }
 
 export function checkManifest(manifest, files, origin = "https://duri.example") {
@@ -64,13 +64,13 @@ export function checkManifest(manifest, files, origin = "https://duri.example") 
   if (!/^\d+(\.\d+){0,3}$/.test(manifest.version ?? "")) problems.push("version must be 1-4 numbers");
   const allowed = new Set(["storage"]);
   for (const p of manifest.permissions ?? []) if (!allowed.has(p)) problems.push("unexpected permission: " + p);
-  if (manifest.host_permissions?.length) problems.push("host_permissions are not needed");
+  if (JSON.stringify(manifest.host_permissions) !== JSON.stringify([origin + "/*"])) problems.push("host_permissions must be only the Duri origin");
   const pages = allowedScriptPages(origin);
   for (const script of manifest.content_scripts ?? []) {
     for (const match of script.matches ?? []) if (!pages.has(match)) problems.push("content script on an unexpected page: " + match);
-    if (script.all_frames) problems.push("content scripts stay in the top frame");
+    if (script.all_frames && script.matches?.some(m => !m.startsWith(origin + "/"))) problems.push("only Duri scripts may run in child frames");
   }
-  if (manifest.background && Object.keys(manifest.background).join() !== "service_worker") problems.push("background must be one service worker");
+  if (manifest.background && (manifest.background.type !== "module" || Object.keys(manifest.background).some(k => !["service_worker", "type"].includes(k)))) problems.push("background must be one service worker");
   if (!manifest.default_locale) problems.push("default_locale is missing");
   for (const lang of ["en", "ko"]) if (!files.includes(`_locales/${lang}/messages.json`)) problems.push(`_locales/${lang}/messages.json is missing`);
   for (const size of ["16", "32", "48", "128"]) if (!manifest.icons?.[size]) problems.push("icon " + size + " is missing");

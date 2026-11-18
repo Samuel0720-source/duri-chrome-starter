@@ -33,8 +33,11 @@ function VideoPreview({ track, label }: { track: MediaStreamTrack; label: string
   return <div><video ref={video} muted autoPlay playsInline aria-label={label} /></div>;
 }
 
-export function CallControls({ session, view, ready }: { session: CallSession | null; view: View; ready: boolean }) {
-  const { t } = useT();
+export function CallControls({ session, view, ready, compact = false }: { compact?: boolean; session: CallSession | null; view: View; ready: boolean }) {
+  const { t, locale } = useT();
+  const [popup, setPopup] = useState(false);
+  useEffect(() => { setPopup(document.documentElement.dataset.compact === "popup"); }, []);
+  const [expanded, setExpanded] = useState(false);
   const [muted, setMuted] = useState(false);
   const [hidden, setHidden] = useState(false);
   useEffect(() => { setMuted(false); setHidden(false); }, [view.local]);
@@ -44,6 +47,10 @@ export function CallControls({ session, view, ready }: { session: CallSession | 
   const localVideo = view.local?.getVideoTracks()[0];
   const status = view.phase === "idle" ? view.note : view.phase === "incoming" ? (audioOnly ? "incomingAudio" : "incomingVideo") : view.phase;
   return <section className="call-box" aria-label={t("call.title")}>
+    {popup && <div className="mini-call-note">
+      <p>{locale === "ko" ? "팝업 바깥을 누르면 통화도 종료돼요. 통화 전에 작은 창을 열어 주세요." : "Clicking outside this popup ends a call. Open the small window before calling."}</p>
+      {view.phase === "idle" && <button type="button" className="button" onClick={() => window.postMessage({ duri: "open-small" }, location.origin)}>{locale === "ko" ? "작은 창에서 통화하기" : "Call in a small window"}</button>}
+    </div>}
     <div className="call-top"><div><h2>{t("call.title")}</h2><p role="status">{t(`call.${status}`)}</p>
       {view.phase === "connected" && view.route && <p className="hint" data-route={view.route}>{t(view.route === "relay" ? "call.route.relay" : "call.route.direct")}</p>}</div>
       <div className="call-actions">
@@ -57,7 +64,8 @@ export function CallControls({ session, view, ready }: { session: CallSession | 
       </div>
     </div>
     {remoteAudio && <PartnerAudio track={remoteAudio} />}
-    {!audioOnly && (remoteVideo || localVideo) && <div className="call-streams">
+    {compact && !audioOnly && (remoteVideo || localVideo) && <button type="button" className="call-video-toggle" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{locale === "ko" ? (expanded ? "영상 접기" : "영상 보기") : (expanded ? "Hide video" : "Show video")}</button>}
+    {!audioOnly && (remoteVideo || localVideo) && <div className="call-streams" hidden={compact && !expanded}>
       {remoteVideo && <VideoPreview track={remoteVideo} label={t("call.partner")} />}
       {localVideo && <VideoPreview track={localVideo} label={t("call.self")} />}
     </div>}
