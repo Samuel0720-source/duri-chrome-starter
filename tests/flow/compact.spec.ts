@@ -130,6 +130,8 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(app.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
     await expect(popup.locator("html")).toHaveAttribute("lang", "en");
     await app.getByRole("link", { name: "Chat", exact: true }).click();
+    await expect(app.getByText("Your partner can reply here", { exact: true })).toBeVisible();
+    await expect(app.getByRole("button", { name: "Video call", exact: true })).toBeEnabled();
     const [small] = await Promise.all([context.waitForEvent("page"), popup.locator("#detach").click()]);
     await expect(small).toHaveURL(url => url.pathname === "/room/chat" && url.searchParams.get("mini") === "1");
     await expect(small.getByText("Your partner can reply here", { exact: true })).toBeVisible();
@@ -140,6 +142,7 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await context.grantPermissions(["microphone", "camera"], { origin });
     await partner.grantPermissions(["microphone", "camera"], { origin });
     await b.goto("/room/chat");
+    await expect(b.locator(".call-actions button").first()).toBeEnabled({ timeout: 10000 });
     await expect(small.getByRole("button", { name: "Video call", exact: true })).toBeEnabled({ timeout: 10000 });
     await small.getByRole("button", { name: "Video call", exact: true }).click();
     await expect(b.getByRole("button", { name: "받기", exact: true })).toBeVisible({ timeout: 15000 });
