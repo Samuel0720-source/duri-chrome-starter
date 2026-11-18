@@ -47,3 +47,9 @@ html[data-compact="popup"] .room-wrap > .top .brand { display: none; }
 html[data-compact="popup"] .room-wrap > .top button { font: inherit; font-size: .75rem; border: 0; background: transparent; color: var(--color-ink-2); cursor: pointer; min-height: 30px; }
 .mini-call-note { font-size: .85rem; color: var(--color-ink-2); margin-bottom: 10px; }
 .mini-call-note button { margin-top: 8px; }
+.lang-form button, .settings-stack > .sheet > form > button.link, .post-game .error button {
+  min-height: 40px; padding: 8px 14px; border: 1px solid var(--color-rule); border-radius: 12px;
+  background: var(--color-paper-3); color: var(--color-accent); font: inherit; font-weight: 650; cursor: pointer;
+}
+.mini-google-hint { display: none; }
+html[data-compact="popup"] .mini-google-hint { display: block; margin-top: 6px; color: var(--color-ink-2); font-size: .8rem; }
