@@ -32,14 +32,15 @@ test("old compact calendar links keep their date when opened in the full website
 test("packaged popup hosts the actual room and opens that screen outside the popup", async ({ context, page, baseURL }, testInfo) => {
   const unpacked = await buildExtension(baseURL, testInfo.outputPath("ui-build"));
   const mime: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".webp": "image/webp" };
-  await context.route("http://popup.test/**", async route => {
-    const path = new URL(route.request().url()).pathname.slice(1);
+  const adapter = new URL("/__extension_test__/", baseURL).href;
+  await context.route(adapter + "**", async route => {
+    const path = new URL(route.request().url()).pathname.replace("/__extension_test__/", "");
     if (!/^[a-zA-Z0-9_./-]+$/.test(path) || path.includes("..") || !mime[extname(path)]) return route.fulfill({ status: 404 });
     try { return route.fulfill({ body: await readFile(join(unpacked, path)), contentType: mime[extname(path)] }); }
     catch { return route.fulfill({ status: 404 }); }
   });
   await context.addInitScript(({ origin }) => {
-    if (location.hostname !== "popup.test") return;
+    if (!location.pathname.startsWith("/__extension_test__/")) return;
     const openSmall = (path: string) => window.open(origin + path + (path.includes("?") ? "&" : "?") + "mini=1", "duri-small", "popup,width=460,height=680");
     const apis = {
       i18n: { getUILanguage: () => "ko" },
@@ -56,7 +57,7 @@ test("packaged popup hosts the actual room and opens that screen outside the pop
     surface.chrome ??= {};
     Object.assign(surface.chrome, apis);
   }, { origin: new URL(baseURL!).origin });
-  await page.goto("http://popup.test/popup.html");
+  await page.goto(adapter + "popup.html");
   const frame = page.frameLocator("#app");
   await expect(page.locator("#app")).toHaveAttribute("src", new RegExp(new URL(baseURL!).origin.replaceAll(".", "\\.") + "/room"));
   await expect(frame.locator("main")).toBeVisible();
