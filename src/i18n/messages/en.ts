@@ -137,7 +137,7 @@ export const en: Record<keyof typeof ko, string> = {
   "guide.settings.title": "Settings",
   "guide.settings.body": "Change the language, your partner's nickname, the room theme and your first day. Leaving the room and deleting your account are here too.",
   "guide.install.title": "Use it like an app",
-  "guide.install.body": "Install it on your phone's home screen or computer to open it directly. You stay signed in on the same device until you sign out. With the Chrome extension you can see the next anniversary from the toolbar.",
+  "guide.install.body": "Install it on your phone's home screen or computer to open it directly. You stay signed in on the same device until you sign out. The Chrome popup includes your games, album, chat and settings. Open its small persistent window for ongoing calls and watching together.",
   "err.full": "This room already has two people.",
   "err.inviteGone": "This invite has expired or was already used. Ask for a new link.",
   "err.room": "This room is closed or not available.",
