@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { photoUrl } from "../../core/album";
 import { getT } from "../../i18n/server";
 import { serverClient } from "../../lib/supabase/server";
@@ -22,10 +23,10 @@ export async function RoomShell({ children, wide = true }: { children: React.Rea
     <main className={wide ? "wrap room-wrap" : "wrap auth"} data-wallpaper={wallpaper ?? undefined}>
       {wallpaper && <div className="wallpaper" aria-hidden="true" style={{ backgroundImage: `url(${photoUrl(wallpaper)})` }} />}
       <header className="top">
-        <a className="brand" href="/room">
+        <Link className="brand" href="/room">
           <span className="room-mascot" aria-hidden="true" />
           {t("app.name")}
-        </a>
+        </Link>
         <form action={signOut}>
           <button type="submit" className="link">{t("common.signOut")}</button>
         </form>

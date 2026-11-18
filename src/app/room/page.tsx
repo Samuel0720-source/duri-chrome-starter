@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { coupleCalendar, daysFrom, roomToday, upcomingMilestones } from "../../core/dates";
 import { MilestoneRail } from "../milestone-rail";
@@ -89,7 +90,7 @@ export default async function RoomPage({
           <img src={mood === "berry" ? "/art/post-garden.webp" : `/art/scenes/${mood}.webp`} alt="" fetchPriority="high" />
         </div>
         <div><h2 id="daily-heading">{t("post.daily")}</h2><p>{t(postcardQuestion(today))}</p>
-          <div className="post-links"><a href="/room/chat?prompt=today">{t("post.reply")}</a></div>
+          <div className="post-links"><Link href="/room/chat?prompt=today">{t("post.reply")}</Link></div>
         </div>
       </section>}
       <div className="room-grid">
@@ -181,7 +182,7 @@ export default async function RoomPage({
           <InviteBox roomId={room.id} />
         </section>
       )}
-      <p className="hint"><a href="/room/settings">{t("home.settingsLink")}</a></p>
+      <p className="hint"><Link href="/room/settings">{t("home.settingsLink")}</Link></p>
       </div>
     </RoomShell>
   );

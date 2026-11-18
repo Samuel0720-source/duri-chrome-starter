@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 import { useRoomChannel } from "../use-room-channel";
 
@@ -101,7 +102,7 @@ export function PostcardGame({ roomId, initial, partnerName }: {
       {finished && <div className="actions">
         <button className="button" disabled={busy} onClick={() => move()}>{t("post.rematch")}</button>
         <button className="button ghost" disabled={busy || shared === state.revision} onClick={shareScore}>{t(shared === state.revision ? "post.sent" : "post.share")}</button>
-        <a className="nav-link" href="/room/chat">{t("tabs.chat")}</a>
+        <Link className="nav-link" href="/room/chat">{t("tabs.chat")}</Link>
       </div>}
     </>}
   </section>;

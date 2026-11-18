@@ -30,3 +30,10 @@ export function browserClient(): SupabaseClient | null {
   }
   return createBrowserClient(url, key);
 }
+
+// Independent socket, with the same current website authentication and room RLS.
+export function callClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  return url && key ? createClient(url, key, { accessToken: frameToken }) : null;
+}
