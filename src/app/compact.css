@@ -1,0 +1,55 @@
+/* One app, smaller surfaces. Preserve all controls and normal readable text. */
+@media (max-width: 560px) {
+  :root { --gutter: 14px; --text-section: 1.8rem; --radius-card: 20px; }
+  .wrap { padding-inline: 14px; padding-bottom: 24px; }
+  .top { min-height: 52px; padding-block: 8px; margin-bottom: 12px; gap: 10px; }
+  .brand { font-size: 1.45rem; }
+  .brand img, .brand .room-mascot { width: 44px; height: 32px; }
+  .room-tabs { position: sticky; top: 0; z-index: var(--z-sticky-nav); grid-template-columns: repeat(3,minmax(0,1fr)); border-radius: 16px; margin-bottom: 14px; padding: 4px; gap: 2px; }
+  .room-tabs a { min-height: 38px; font-size: .85rem; padding: 4px; gap: 5px; border-radius: 11px; }
+  .tab-icon { font-size: 1.1rem; }
+  .room-grid, .settings-stack { gap: 14px; }
+  .room-grid > .plans, .sheet, .auth-card { padding: 16px; }
+  .daily-art { aspect-ratio: 3.3; }
+  .daily-post > div:last-child { padding: 16px; }
+  .daily-post p { font-size: 1.5rem; }
+  .room .daily-post h2 { font-size: .8rem; margin-bottom: 7px; }
+  .post-links { margin-top: 10px; }
+  .room-count .big strong { font-size: 4.2rem; }
+  .settings-title { margin-bottom: 14px; }
+  .mood-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+  .mood-option { padding: 10px 5px; }
+  .game-switch { gap: 6px; }
+  .game-switch a { padding: 6px 10px; min-height: 40px; font-size: .875rem; }
+  .post-game { padding: 14px; gap: 12px; }
+  .post-scores > div { padding: 9px; font-size: .875rem; }
+  .post-board { gap: 6px; }
+  .golf-count { min-width: 0; padding: 8px 12px; }
+  .golf-count strong { font-size: 2rem; }
+  .draw-tools { gap: 8px; }
+  .chat-form { gap: 8px; }
+  .chat-form button { padding-inline: 14px; }
+  .call-box { padding: 12px; }
+  .call-streams video { max-height: 160px; width: 100%; }
+  .album-view { padding: 12px; width: calc(100vw - 20px); max-height: calc(100dvh - 20px); }
+  .album-view img { max-height: 46dvh; }
+  .album-actions { gap: 8px; }
+  .album-empty { padding: 24px 14px; }
+  .watch-netflix { padding: 12px; gap: 6px; font-size: .875rem; }
+  .auth-title { font-size: 1.8rem; }
+  .auth-lead { font-size: .925rem; }
+  .auth-art img { aspect-ratio: 4; }
+  .room input, .room select, .room textarea { max-width: 100%; }
+  .room, .room > *, .sheet > * { min-width: 0; }
+}
+html[data-compact="popup"] .room-wrap > .top { min-height: 32px; padding-block: 2px; margin-bottom: 6px; justify-content: flex-end; }
+html[data-compact="popup"] .room-wrap > .top .brand { display: none; }
+html[data-compact="popup"] .room-wrap > .top button { font: inherit; font-size: .75rem; border: 0; background: transparent; color: var(--color-ink-2); cursor: pointer; min-height: 30px; }
+.mini-call-note { font-size: .85rem; color: var(--color-ink-2); margin-bottom: 10px; }
+.mini-call-note button { margin-top: 8px; }
+.lang-form button, .settings-stack > .sheet > form > button.link, .post-game .error button {
+  min-height: 40px; padding: 8px 14px; border: 1px solid var(--color-rule); border-radius: 12px;
+  background: var(--color-paper-3); color: var(--color-accent); font: inherit; font-weight: 650; cursor: pointer;
+}
+.mini-google-hint { display: none; }
+html[data-compact="popup"] .mini-google-hint { display: block; margin-top: 6px; color: var(--color-ink-2); font-size: .8rem; }
