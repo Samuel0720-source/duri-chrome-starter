@@ -462,6 +462,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   for (const page of [pageA, pageB]) {
     await page.route("https://www.youtube.com/**", (route) => route.abort());
     await page.addInitScript(fakeYouTube);
+    // Next links keep the current document alive; install the mock there too.
+    await page.evaluate(fakeYouTube);
   }
   await pageA.getByRole("link", { name: "함께 보기", exact: true }).click();
   await pageB.getByRole("link", { name: "함께 보기", exact: true }).click();

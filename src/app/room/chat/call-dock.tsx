@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { callClient } from "../../../lib/supabase/browser";
 import { isIceList } from "../../../core/ice";
 import { CallSession, type View } from "./call-session";
+import { registerCallStop } from "./call-lifecycle";
 import { CallControls } from "./call-controls";
 
 export function CallDock({ me, roomId, mood }: { me: string; roomId: string; mood: string }) {
@@ -31,6 +32,7 @@ export function CallDock({ me, roomId, mood }: { me: string; roomId: string; moo
       return body.iceServers as RTCIceServer[];
     });
     session.current = call;
+    const unregister = registerCallStop(() => call.end());
     const leave = () => call.end();
     window.addEventListener("pagehide", leave);
     void (async () => {
@@ -52,6 +54,7 @@ export function CallDock({ me, roomId, mood }: { me: string; roomId: string; moo
     })();
     return () => {
       active = false;
+      unregister();
       window.removeEventListener("pagehide", leave);
       call.end();
       session.current = null;
