@@ -28,7 +28,7 @@ async function makeUser(label: string, password?: string) {
 async function signIn(browser: Browser, email: string, next: string): Promise<Page> {
   const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email });
   if (error) throw error;
-  const page = await (await browser.newContext({ permissions: ["microphone", "camera"] })).newPage();
+  const page = await (await browser.newContext({ permissions: ["microphone", "camera"], viewport: { width: 440, height: 600 } })).newPage();
   const q = new URLSearchParams({ token_hash: data.properties.hashed_token, type: "magiclink", next });
   await page.goto("/auth/callback?" + q);
   return page;
