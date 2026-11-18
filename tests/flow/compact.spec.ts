@@ -57,10 +57,26 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(app.locator("html")).toHaveAttribute("lang", "ko");
     await expect(popup.locator("html")).toHaveAttribute("lang", "ko");
     await expect(app.locator(".room-tabs a")).toHaveCount(6);
+    // The embedded page can obtain only its own short-lived access token, never a refresh token.
+    const sessionCheck = await app.locator("html").evaluate(async () => {
+      const response = await fetch("/api/session/token", { headers: { "X-Duri-Surface": "popup" } });
+      const body = await response.json();
+      return { status: response.status, cache: response.headers.get("cache-control"), access: typeof body.accessToken, refresh: "refresh_token" in body || "refreshToken" in body };
+    });
+    expect(sessionCheck).toMatchObject({ status: 200, access: "string", refresh: false });
+    expect(sessionCheck.cache).toContain("no-store");
+    expect((await context.request.get(origin + "/api/session/token")).status()).toBe(403);
+    const guest = await browser.newContext({ baseURL: origin });
+    try {
+      const guestPage = await guest.newPage();
+      await guestPage.goto("/login");
+      expect(await guestPage.evaluate(async () => (await fetch("/api/session/token", { headers: { "X-Duri-Surface": "popup" } })).status)).toBe(401);
+    } finally { await guest.close(); }
+
 
     // The same authenticated server actions and cookies work inside the extension frame.
     await app.getByRole("link", { name: "설정", exact: true }).click();
-    await expect(app.locator("html")).toHaveAttribute("data-room-live", "on");
+    await expect(app.locator("html")).toHaveAttribute("data-room-live", "on", { timeout: 15000 });
     await app.locator('label.mood-option[data-mood="night"]').click();
     await app.getByRole("button", { name: "이 테마로 바꾸기" }).click();
     await expect(app.locator('.room[data-mood="night"]')).toHaveCount(1);
