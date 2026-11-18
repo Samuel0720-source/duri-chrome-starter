@@ -77,16 +77,19 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     // The same authenticated server actions and cookies work inside the extension frame.
     await app.getByRole("link", { name: "설정", exact: true }).click();
     await expect(app.locator("html")).toHaveAttribute("data-room-live", "on", { timeout: 15000 });
+    roomId = await app.locator('input[name="room"]').first().inputValue();
     await app.locator('label.mood-option[data-mood="night"]').click();
     await app.getByRole("button", { name: "이 테마로 바꾸기" }).click();
     await expect(app.locator('.room[data-mood="night"]')).toHaveCount(1);
     await expect(popup.locator("body")).toHaveAttribute("data-mood", "night");
 
     await app.getByRole("link", { name: "대화", exact: true }).click();
+    await expect(app.locator(".call-actions button").first()).toBeEnabled();
     await app.locator("#chat-input").fill("A message from the Duri toolbar");
     await app.getByRole("button", { name: "보내기", exact: true }).click();
     await b.goto("/room/chat");
     await expect(b.getByText("A message from the Duri toolbar", { exact: true })).toBeVisible();
+    await expect(b.locator(".call-actions button").first()).toBeEnabled();
     await b.locator("#chat-input").fill("Your partner can reply here");
     await b.getByRole("button", { name: "보내기", exact: true }).click();
     await expect(app.getByText("Your partner can reply here", { exact: true })).toBeVisible();
@@ -101,7 +104,7 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
       pen.fillStyle = "#e886a2"; pen.fillRect(0, 0, 64, 48);
       return canvas.toDataURL("image/png").split(",")[1];
     });
-    roomId = await app.locator('.album-tools input[name="room"]').getAttribute("value");
+    await expect(app.locator("html")).toHaveAttribute("data-room-live", "on");
     await app.getByTestId("album-input").setInputFiles({ name: "compact.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") });
     await expect(app.locator(".album-tile img")).toHaveCount(1);
     await b.goto("/room/album");
