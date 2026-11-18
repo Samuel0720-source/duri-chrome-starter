@@ -1,4 +1,6 @@
 "use client";
+import { GameResult } from "./game-result";
+import { useNewGameRefresh } from "./new-game";
 
 import { useRoomChannel } from "../use-room-channel";
 
@@ -25,6 +27,8 @@ export function GuessGame({ roomId, initial, partnerName }: { roomId: string; in
     const { data } = await supabase.rpc("guess_state", { target: roomId });
     if (data) setState(data as GuessState);
   }, [roomId]);
+
+  useNewGameRefresh(refresh);
 
   useEffect(() => {
     const supabase = browserClient();
@@ -76,6 +80,7 @@ export function GuessGame({ roomId, initial, partnerName }: { roomId: string; in
       {state.finished && (
         <section className="sheet guess-score" aria-live="polite">
           <h2>{t("guess.result")}</h2>
+          <GameResult result={state.score.me === state.score.partner ? "tie" : state.score.me > state.score.partner ? "win" : "loss"} partnerName={partnerName} />
           <p className="score-line">
             <span>{t("guess.myScore")}</span> <strong>{state.score.me}</strong>
             <span>{t("guess.partnerScore", { name: partnerName })}</span> <strong>{state.score.partner}</strong>

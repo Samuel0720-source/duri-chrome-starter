@@ -1,4 +1,6 @@
 "use client";
+import { GameResult } from "./game-result";
+import { useNewGameRefresh } from "./new-game";
 
 import { useRoomChannel } from "../use-room-channel";
 
@@ -75,6 +77,8 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
     if (s.data) setStrokes(s.data as Stroke[]);
     if (g.data) setGuesses(g.data as DrawGuess[]);
   }, []);
+
+  useNewGameRefresh(refresh);
 
   useEffect(() => {
     const supabase = browserClient();
@@ -325,6 +329,7 @@ export function DrawGame({ roomId, initial, partnerName }: { roomId: string; ini
         )}
         {game.phase === "done" && (
           <div className="draw-result" aria-live="polite">
+            <GameResult result="team" partnerName={partnerName} />
             <h2>{t("draw.timeUp")}</h2>
             <p className="lead">
               <Rich
