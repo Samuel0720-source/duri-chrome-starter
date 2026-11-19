@@ -557,8 +557,8 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
       await expect(pageA.locator(`.cell[data-x="${i}"][data-y="10"][data-stone="white"]`)).toBeVisible({ timeout: 10_000 });
     }
   }
-  await expect(pageA.getByText("이겼어요!")).toBeVisible({ timeout: 10_000 });
-  await expect(pageB.getByText("졌어요.")).toBeVisible({ timeout: 10_000 });
+  await expect(pageA.locator('.gomoku .game-result[data-result="win"]')).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.locator('.gomoku .game-result[data-result="loss"]')).toBeVisible({ timeout: 10_000 });
   await expect(pageA.locator('.cell[data-win="true"]')).toHaveCount(5);
   await expect(pageA.getByText("나 1승 · 곰돌이 0승 · 무승부 0")).toBeVisible();
   await expect(pageB.getByText("나 0승 · 상대 1승 · 무승부 0")).toBeVisible({ timeout: 10_000 });
