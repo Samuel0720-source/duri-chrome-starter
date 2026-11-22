@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { isMood } from "../../../core/moods";
 import { zones } from "../../../core/preview";
 import { getT } from "../../../i18n/server";
-import { serverClient } from "../../../lib/supabase/server";
+import { roomAccess, roomDetails, roomMemberCount } from "../../../lib/room-render";
 import { roomNames } from "../../../lib/room-names";
 import { LanguageForm } from "../../language-form";
 import { leaveRoom, setBirthday, setNickname, setStart, signOut } from "../actions";
@@ -19,16 +19,14 @@ const guide = ["start", "home", "games", "golf", "watch", "album", "chat", "sett
 // Settings: language, nicknames, birthdays, room theme and first day, a short guide, and the account.
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const { t, locale } = await getT();
-  const supabase = await serverClient();
+  const { supabase, auth, seat } = await roomAccess();
   if (!supabase) return <main className="wrap auth"><p>{t("common.configMissing")}</p></main>;
-  const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect("/login?next=/room/settings");
   const { error, saved } = await searchParams;
-  const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle();
   if (!seat) redirect("/room");
-  const [{ data: room }, { count }, names] = await Promise.all([
-    supabase.from("couple_rooms").select("id, start_date, timezone, mood").eq("id", seat.room_id).maybeSingle(),
-    supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
+  const [room, count, names] = await Promise.all([
+    roomDetails(),
+    roomMemberCount(),
     roomNames(supabase, seat.room_id, auth.user.id),
   ]);
   if (!room) redirect("/room");

@@ -11,7 +11,7 @@ import type { DrawState } from "../../../core/draw";
 import type { GomokuState } from "../../../core/gomoku";
 import type { GolfState } from "../../../core/golf";
 import { getT } from "../../../i18n/server";
-import { serverClient } from "../../../lib/supabase/server";
+import { roomAccess, roomDetails, roomMemberCount } from "../../../lib/room-render";
 import { roomNames } from "../../../lib/room-names";
 import { RoomTabs } from "../room-tabs";
 import { RoomShell } from "../room-shell";
@@ -26,15 +26,13 @@ export default async function GamePage({ searchParams }: { searchParams: Promise
   const { t } = await getT();
   const g = (await searchParams).g;
   const which = g === "draw" || g === "gomoku" || g === "golf" || g === "post" || g === "poker" ? g : "guess";
-  const supabase = await serverClient();
+  const { supabase, auth, seat } = await roomAccess();
   if (!supabase) redirect("/login?error=config");
-  const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect("/login?next=/room/game");
-  const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle();
   if (!seat) redirect("/room");
-  const [{ data: room }, { count }, { data: state }, { data: drawState }, { data: gomokuState }, { data: golfState }, { data: postState }, { data: pokerState }, names] = await Promise.all([
-    supabase.from("couple_rooms").select("id, mood").eq("id", seat.room_id).maybeSingle(),
-    supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
+  const [room, count, { data: state }, { data: drawState }, { data: gomokuState }, { data: golfState }, { data: postState }, { data: pokerState }, names] = await Promise.all([
+    roomDetails(),
+    roomMemberCount(),
     which === "guess" ? supabase.rpc("guess_state", { target: seat.room_id }) : Promise.resolve({ data: null }),
     which === "draw" ? supabase.rpc("draw_state", { target: seat.room_id }) : Promise.resolve({ data: null }),
     which === "gomoku" ? supabase.rpc("gomoku_state", { target: seat.room_id }) : Promise.resolve({ data: null }),

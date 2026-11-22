@@ -7,7 +7,7 @@ import { postcardQuestion } from "../../core/postcards";
 import { isMood } from "../../core/moods";
 import { defaultZone, zones } from "../../core/preview";
 import { getT } from "../../i18n/server";
-import { serverClient } from "../../lib/supabase/server";
+import { roomAccess, roomDetails, roomMemberCount } from "../../lib/room-render";
 import { addPlan, createRoom, removePlan } from "./actions";
 import { DeleteAccount } from "./delete-account";
 import { RoomTabs } from "./room-tabs";
@@ -24,14 +24,12 @@ export default async function RoomPage({
 }) {
   const { t, locale } = await getT();
   const num = (n: number) => n.toLocaleString(locale === "ko" ? "ko-KR" : "en-CA");
-  const supabase = await serverClient();
+  const { supabase, auth, seat } = await roomAccess();
   if (!supabase) return <main className="wrap auth"><p>{t("common.configMissing")}</p></main>;
-  const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect("/login?next=/room");
   const { error, left } = await searchParams;
 
   // Row level security returns only the caller's own seat and room.
-  const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle();
 
   if (!seat) {
     // Show "partner left" only for a recent notice, so an old breakup is not shown forever.
@@ -61,9 +59,9 @@ export default async function RoomPage({
     );
   }
 
-  const [{ data: room }, { count }, { data: plans }, names] = await Promise.all([
-    supabase.from("couple_rooms").select("id, start_date, timezone, mood").eq("id", seat.room_id).maybeSingle(),
-    supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
+  const [room, count, { data: plans }, names] = await Promise.all([
+    roomDetails(),
+    roomMemberCount(),
     supabase.from("room_plans").select("id, on_date, title").eq("room_id", seat.room_id).order("on_date").order("created_at").limit(200),
     roomNames(supabase, seat.room_id, auth.user.id),
   ]);
