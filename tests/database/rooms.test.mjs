@@ -246,6 +246,7 @@ before(async () => {
   await admin.query(await readFile(new URL("../../supabase/migrations/202611170001_postcard_duel.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611180001_birthday.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/20261118145301_poker_and_rematches.sql", import.meta.url), "utf8"));
+  await admin.query(await readFile(new URL("../../supabase/migrations/202611220001_number_baseball.sql", import.meta.url), "utf8"));
 });
 after(async () => {
   admin?.release();
@@ -1663,4 +1664,125 @@ test('rematch preserves earned draw and golf records even before a final state r
  await restart('golf');
  assert.equal((await admin.query('select best from public.golf_records where room_id=$1',[id])).rows[0].best,6);
  assert.equal((await admin.query('select status from public.golf_games where id=$1',[golf])).rows[0].status,'done');
+});
+
+async function baseballFixture() {
+  const { id, token, a } = await fixture(), b = await user(), c = await user();
+  await asUser(b, "select public.accept_couple_invite($1)", [token]);
+  const rpc = async (who, fn, args = []) => (await asUser(who, `select public.${fn} as s`, args))[0].s;
+  const read = (who) => rpc(who, "baseball_state($1)", [id]);
+  const act = async (who, action, digits, revision = null) =>
+    rpc(who, "baseball_action($1,$2,$3,$4)", [id, revision ?? (await read(who)).revision, action, digits]);
+  const restart = async () => {
+    const r = await rpc(a, "request_new_game($1,$2,$3)", [id, "baseball", 50]);
+    await rpc(b, "respond_new_game($1,$2,$3,$4)", [id, "baseball", r.id, true]);
+  };
+  return { id, a, b, c, rpc, read, act, restart };
+}
+
+test("number baseball: hidden secrets, server scoring, turns, revisions, strangers refused", async () => {
+  const { id, a, b, c, read, act, restart } = await baseballFixture();
+  assert.equal((await read(a)).phase, "idle");
+  assert.equal((await act(a, "secret", "123", 0)).phase, "idle", "no game yet: nothing to change");
+  await restart();
+  let s = await read(a);
+  assert.equal(s.phase, "setup");
+  assert.equal(s.starter, 1);
+  for (const bad of ["112", "12", "1234", "abc", null]) await assert.rejects(act(a, "secret", bad), /Invalid number/, String(bad));
+  s = await act(a, "secret", "471");
+  assert.equal(s.mySecret, "471");
+  assert.equal(s.phase, "setup");
+  const bView = await read(b);
+  assert.equal(bView.partnerReady, true, "B knows A is ready");
+  assert.equal(bView.mySecret, null);
+  assert.ok(!JSON.stringify(bView).includes("471"), "A's secret never reaches B before the end");
+  await assert.rejects(act(a, "secret", "123"), /Secret already set/);
+  await assert.rejects(act(a, "guess", "123"), /Not playing/);
+  s = await act(b, "secret", "028");
+  assert.equal(s.phase, "playing");
+  assert.equal(s.turnSeat, 1, "the starter throws first");
+
+  // A stale revision (double tap) changes nothing.
+  const rev = (await read(a)).revision;
+  s = await act(a, "guess", "820", rev);
+  assert.deepEqual(s.guesses.at(-1), { seat: 1, guess: "820", s: 1, b: 2 });
+  const same = await act(a, "guess", "123", rev);
+  assert.equal(same.guesses.length, 1, "replayed revision ignored");
+  await assert.rejects(act(a, "guess", "123"), /Not your turn/);
+  s = await act(b, "guess", "174");
+  assert.deepEqual(s.guesses.at(-1), { seat: 2, guess: "174", s: 1, b: 2 });
+  const aView = await read(a);
+  assert.ok(!JSON.stringify(aView).includes("028"), "B's secret stays hidden while playing");
+  assert.equal(aView.partnerSecret, null);
+
+  // Strangers: nothing to read or do; signals carry no secrets.
+  await assert.rejects(read(c), /Room unavailable/);
+  await assert.rejects(act(c, "guess", "123", 1), /Room unavailable/);
+  await assert.rejects(asUser(a, "select * from duri_private.baseball_games"), /permission denied/);
+  const signals = (await admin.query("select payload from realtime.sent where topic=$1 and event='baseball'", ["room:" + id])).rows;
+  assert.ok(signals.length >= 4);
+  assert.ok(!JSON.stringify(signals).match(/471|028/));
+});
+
+test("number baseball: the starter's hit gives a last chance; win, draw, records and the next starter", async () => {
+  const { a, b, read, act, restart } = await baseballFixture();
+  await restart();
+  await act(a, "secret", "123");
+  await act(b, "secret", "456");
+  // A (starter) hits first: B still gets one throw, misses, A wins.
+  let s = await act(a, "guess", "456");
+  assert.equal(s.phase, "playing");
+  assert.equal(s.lastChance, true);
+  assert.equal(s.turnSeat, 2);
+  s = await act(b, "guess", "789");
+  assert.equal(s.phase, "finished");
+  assert.equal(s.winner, 1);
+  assert.equal(s.partnerSecret, "123", "secrets revealed at the end");
+  assert.deepEqual(s.wins, [1, 0]);
+  await assert.rejects(act(a, "guess", "789"), /Not playing/);
+
+  // Next game: B starts. B hits, A also hits on the last chance -> draw.
+  await restart();
+  s = await read(b);
+  assert.equal(s.starter, 2);
+  assert.equal(s.game, 2);
+  assert.deepEqual(s.guesses, []);
+  await act(a, "secret", "987");
+  await act(b, "secret", "012");
+  s = await act(b, "guess", "987");
+  assert.equal(s.lastChance, true);
+  s = await act(a, "guess", "012");
+  assert.equal(s.winner, 0);
+  assert.equal(s.draws, 1);
+  assert.deepEqual(s.wins, [1, 0], "records kept across games");
+
+  // Game 3: A starts; B (second) hits first in the round -> B wins at once.
+  await restart();
+  await act(a, "secret", "135");
+  await act(b, "secret", "246");
+  await act(a, "guess", "789");
+  s = await act(b, "guess", "135");
+  assert.equal(s.phase, "finished");
+  assert.equal(s.winner, 2);
+  assert.deepEqual(s.wins, [1, 1]);
+
+  // Game 4: 20 misses each ends in a draw.
+  await restart();
+  await act(a, "secret", "135");
+  await act(b, "secret", "246");
+  for (let i = 0; i < 20; i++) {
+    await act(b, "guess", "789");
+    s = await act(a, "guess", "789");
+  }
+  assert.equal(s.phase, "finished");
+  assert.equal(s.winner, 0);
+  assert.deepEqual(s.counts, [20, 20]);
+});
+
+test("number baseball scoring matches the app's own rules for every pair of a sample", async () => {
+  const { score } = await import("../../src/core/baseball.ts");
+  const sample = ["012", "123", "471", "174", "714", "980", "305", "698", "246", "531"];
+  const { rows } = await admin.query(
+    "select s, g, duri_private.baseball_score(s, g) r from unnest($1::text[]) s cross join unnest($1::text[]) g", [sample]);
+  for (const { s, g, r } of rows) assert.deepEqual(r, [score(s, g).s, score(s, g).b], `${s} vs ${g}`);
 });

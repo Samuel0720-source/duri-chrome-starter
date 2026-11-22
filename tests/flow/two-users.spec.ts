@@ -343,6 +343,39 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await boardB.nth(2).click();
   await expect(boardA.nth(2)).toHaveAttribute("data-open", "true", { timeout: 15_000 });
 
+  // 3c2. Number baseball. A asks for a match, B accepts; A picks with the on-screen pad, B with the keyboard.
+  // The starter hits the partner's number, the partner gets a last chance and misses; secrets only show at the end.
+  await Promise.all([pageA, pageB].map((page) => page.goto("/room/game?g=baseball")));
+  await pageA.getByRole("button", { name: "↻ 새 경기 요청", exact: true }).click();
+  await pageB.getByRole("button", { name: "수락하고 시작", exact: true }).click({ timeout: 15_000 });
+  for (const page of [pageA, pageB]) await expect(page.locator(".bb-game")).toHaveAttribute("data-phase", "setup", { timeout: 15_000 });
+  for (const d of "471") await pageA.locator(".bb-pad").getByRole("button", { name: d, exact: true }).click();
+  await pageA.getByRole("button", { name: "이 숫자로 정하기" }).click();
+  await expect(pageA.getByText("내 숫자를 정했어요")).toBeVisible();
+  await expect(pageB.getByTestId("bb-partner-pick")).toContainText("벌써 숫자를 정했어요", { timeout: 15_000 });
+  await pageB.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await pageB.keyboard.type("028");
+  await pageB.keyboard.press("Enter");
+  for (const page of [pageA, pageB]) await expect(page.locator(".bb-game")).toHaveAttribute("data-phase", "playing", { timeout: 15_000 });
+  const aStarts = (await pageA.locator(".bb-game").getAttribute("data-turn")) === "me";
+  const [first, second] = aStarts ? [pageA, pageB] : [pageB, pageA];
+  const throwAt = async (page: typeof pageA, digits: string) => {
+    for (const d of digits) await page.locator(".bb-throw .bb-pad").getByRole("button", { name: d, exact: true }).click();
+    await page.getByRole("button", { name: "⚾ 던지기" }).click();
+  };
+  await expect(first.locator(".bb-game")).toHaveAttribute("data-turn", "me");
+  await expect(second.getByTestId("bb-partner-secret")).toHaveCount(0);
+  await throwAt(first, aStarts ? "028" : "471");
+  await expect(first.getByTestId("bb-mine").locator(".bb-pill[data-kind=hit]")).toHaveText("3S", { timeout: 15_000 });
+  await expect(second.getByTestId("bb-status")).toContainText("마지막 기회", { timeout: 15_000 });
+  await expect(second.getByTestId("bb-theirs").locator(".bb-pill[data-kind=hit]")).toHaveText("3S");
+  await second.reload();
+  await expect(second.locator(".bb-game")).toHaveAttribute("data-turn", "me");
+  await throwAt(second, "135");
+  await expect(first.locator(".game-result")).toHaveAttribute("data-result", "win", { timeout: 15_000 });
+  await expect(second.locator(".game-result")).toHaveAttribute("data-result", "loss", { timeout: 15_000 });
+  await expect(second.getByTestId("bb-partner-secret")).toContainText(aStarts ? "4 7 1" : "0 2 8");
+
   // 3d. Guess game. A starts; B's page shows the rounds live.
   await pageA.getByRole("link", { name: "게임", exact: true }).click();
   await pageB.getByRole("link", { name: "게임", exact: true }).click();
