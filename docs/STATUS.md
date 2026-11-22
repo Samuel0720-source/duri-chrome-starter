@@ -262,3 +262,10 @@
 - 실제 검사: 단위 61 통과(생일 2개 추가), DB 23 통과(생일 권한·검증·알림), 타입 검사 통과. Supabase에 마이그레이션 적용 후 칸·함수·권한(anon 불가)·트리거·검사 규칙 확인. 로컬 빌드는 이 환경에서 Google 글꼴을 못 받아 CI 빌드로 확인.
 - 미확인: 상대가 생일을 저장했을 때 내 홈이 바로 바뀌지는 않음(새로 열면 보임).
 - 다음 행동 하나: Sam이 설정 → 생일에 날짜를 넣고 홈 목록에 뜨는지 확인.
+
+### 숫자야구 · 2026-11-22
+- 변경 경로: `supabase/migrations/202611220001_number_baseball.sql`(duri_private.baseball_games, baseball_state/baseball_action, 새 경기 요청에 'baseball' 추가), `src/core/baseball.ts`, `src/app/room/game/baseball-game.tsx`, `src/app/room/game/page.tsx`, `src/app/globals.css`, i18n 29개, 가이드 문구.
+- 규칙: 각자 서로 다른 숫자 3개(0~9) 비밀로 정함 → 번갈아 추리, 서버가 S/B/OUT 판정 → 먼저 시작한 사람이 3S면 상대에게 마지막 1번(둘 다 맞히면 무승부) → 각자 최대 20번. 시작 순서는 판마다 바뀜, 전적 유지.
+- 실제 검사: 단위 65 통과(숫자야구 3개), DB 32 통과(비밀 숫자 비공개·차례·리비전 중복 무시·마지막 기회·무승부·20번 한도·전적·제3자 차단, PL/pgSQL 채점과 TS 채점 100쌍 일치), 타입 검사 통과. Supabase 적용 전 respond_new_game/game_fingerprint 본문 해시가 포커 마이그레이션과 같음을 확인 후 적용, 권한·채점 확인.
+- 미확인: 휴대폰 두 대로 실제 한 판(CI live flow가 대신 확인).
+- 다음 행동 하나: Sam이 게임 → 숫자야구에서 새 경기 요청 → 상대 수락 → 한 판 끝까지 해 보기.

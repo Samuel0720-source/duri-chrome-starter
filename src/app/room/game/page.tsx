@@ -1,4 +1,6 @@
 import { PokerGame } from "./poker-game";
+import { BaseballGame } from "./baseball-game";
+import type { BaseballState } from "../../../core/baseball";
 import { NewGame } from "./new-game";
 import type { PokerState } from "../../../core/poker";
 import Link from "next/link";
@@ -25,12 +27,12 @@ export const dynamic = "force-dynamic";
 export default async function GamePage({ searchParams }: { searchParams: Promise<{ g?: string }> }) {
   const { t } = await getT();
   const g = (await searchParams).g;
-  const which = g === "draw" || g === "gomoku" || g === "golf" || g === "post" || g === "poker" ? g : "guess";
+  const which = g === "draw" || g === "gomoku" || g === "golf" || g === "post" || g === "poker" || g === "baseball" ? g : "guess";
   const { supabase, auth, seat } = await roomAccess();
   if (!supabase) redirect("/login?error=config");
   if (!auth.user) redirect("/login?next=/room/game");
   if (!seat) redirect("/room");
-  const [room, count, { data: state }, { data: drawState }, { data: gomokuState }, { data: golfState }, { data: postState }, { data: pokerState }, names] = await Promise.all([
+  const [room, count, { data: state }, { data: drawState }, { data: gomokuState }, { data: golfState }, { data: postState }, { data: pokerState }, { data: baseballState }, names] = await Promise.all([
     roomDetails(),
     roomMemberCount(),
     which === "guess" ? supabase.rpc("guess_state", { target: seat.room_id }) : Promise.resolve({ data: null }),
@@ -39,12 +41,13 @@ export default async function GamePage({ searchParams }: { searchParams: Promise
     which === "golf" ? supabase.rpc("golf_state", { target: seat.room_id }) : Promise.resolve({ data: null }),
     which === "post" ? supabase.rpc("postcard_state", { target: seat.room_id }) : Promise.resolve({ data: null }),
     which === "poker" ? supabase.rpc("poker_state", { target: seat.room_id }) : Promise.resolve({ data: null }),
+    which === "baseball" ? supabase.rpc("baseball_state", { target: seat.room_id }) : Promise.resolve({ data: null }),
     roomNames(supabase, seat.room_id, auth.user.id),
   ]);
   if (!room) redirect("/room");
   const full = (count ?? 0) >= 2;
   const partnerName = names.partnerNick ?? t("common.partner");
-  const games = [["guess", "/room/game"], ["draw", "/room/game?g=draw"], ["gomoku", "/room/game?g=gomoku"], ["golf", "/room/game?g=golf"], ["post", "/room/game?g=post"], ["poker", "/room/game?g=poker"]] as const;
+  const games = [["guess", "/room/game"], ["draw", "/room/game?g=draw"], ["gomoku", "/room/game?g=gomoku"], ["golf", "/room/game?g=golf"], ["post", "/room/game?g=post"], ["poker", "/room/game?g=poker"], ["baseball", "/room/game?g=baseball"]] as const;
 
   return (
     <RoomShell>
@@ -59,7 +62,9 @@ export default async function GamePage({ searchParams }: { searchParams: Promise
               ))}
             </nav>
             <NewGame key={which} roomId={room.id} kind={which} partnerName={partnerName} />
-            {which === "poker" ? (
+            {which === "baseball" ? (
+              <BaseballGame roomId={room.id} initial={baseballState as BaseballState | null} partnerName={partnerName} myName={names.myNick ?? t("common.me")} />
+            ) : which === "poker" ? (
               <PokerGame roomId={room.id} initial={pokerState as PokerState | null} partnerName={partnerName} myName={names.myNick ?? t("common.me")} />
             ) : which === "post" ? (
               <PostcardGame key={room.id} roomId={room.id} partnerName={partnerName} initial={postState as PostcardState | null} />
