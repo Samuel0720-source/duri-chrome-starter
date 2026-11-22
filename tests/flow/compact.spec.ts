@@ -117,8 +117,8 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(app.locator(".album-tile")).toHaveCount(0);
 
     await app.getByRole("link", { name: "게임", exact: true }).click();
-    await expect(app.locator(".game-switch a")).toHaveCount(6);
-    for (let i = 0; i < 6; i++) {
+    await expect(app.locator(".game-switch a")).toHaveCount(7);
+    for (let i = 0; i < 7; i++) {
       await app.locator(".game-switch a").nth(i).click();
       await expect(app.locator(".game-switch a").nth(i)).toHaveAttribute("aria-current", "page");
       expect(await app.locator("html").evaluate(root => root.scrollWidth <= window.innerWidth)).toBe(true);
