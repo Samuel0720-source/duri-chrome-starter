@@ -51,9 +51,11 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(a.getByText("두 사람이 모두 들어왔어요.")).toBeVisible();
 
     const popup = await context.newPage();
+    const openedAt = performance.now();
     await popup.goto("chrome-extension://" + id + "/popup.html");
     const app = popup.frameLocator("#app");
     await expect(app.getByText("두 사람이 모두 들어왔어요.")).toBeVisible();
+    console.log(`Native popup: authenticated home visible in ${Math.round(performance.now() - openedAt)} ms`);
     await expect(app.locator("html")).toHaveAttribute("lang", "ko");
     await expect(popup.locator("html")).toHaveAttribute("lang", "ko");
     await expect(app.locator(".room-tabs a")).toHaveCount(6);

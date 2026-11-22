@@ -4,7 +4,7 @@ import { roomToday } from "../../../core/dates";
 import { postcardQuestion } from "../../../core/postcards";
 import { isMood } from "../../../core/moods";
 import { getT } from "../../../i18n/server";
-import { serverClient } from "../../../lib/supabase/server";
+import { roomAccess, roomDetails, roomMemberCount } from "../../../lib/room-render";
 import { RoomTabs } from "../room-tabs";
 import { RoomShell } from "../room-shell";
 import { Chat, type Message } from "./chat";
@@ -13,15 +13,14 @@ export const dynamic = "force-dynamic";
 
 export default async function ChatPage({ searchParams }: { searchParams: Promise<{ prompt?: string }> }) {
   const { t } = await getT();
-  const supabase = await serverClient();
+  const { supabase, auth, seat } = await roomAccess();
   if (!supabase) redirect("/login?error=config");
-  const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) redirect("/login?next=/room/chat");
-  const { data: seat } = await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle();
+  const me = auth.user.id;
   if (!seat) redirect("/room");
-  const [{ data: room }, { count }, { data: recent }, { data: prefs }] = await Promise.all([
-    supabase.from("couple_rooms").select("id, timezone, mood").eq("id", seat.room_id).maybeSingle(),
-    supabase.from("couple_members").select("user_id", { count: "exact", head: true }).eq("room_id", seat.room_id),
+  const [room, count, { data: recent }, { data: prefs }] = await Promise.all([
+    roomDetails(),
+    roomMemberCount(),
     supabase.from("room_messages").select("id, sender, body, created_at").eq("room_id", seat.room_id).order("id", { ascending: false }).limit(50),
     supabase.from("member_prefs").select("user_id, partner_nickname, read_upto, read_at").eq("room_id", seat.room_id),
   ]);
@@ -29,8 +28,8 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
   const full = (count ?? 0) >= 2;
   const prompt = (await searchParams).prompt === "today" ? t(postcardQuestion(roomToday(new Date(), room.timezone))) : "";
   const initial: Message[] = (recent ?? []).reverse();
-  const mine = (prefs ?? []).find((p) => p.user_id === auth.user.id);
-  const theirs = (prefs ?? []).find((p) => p.user_id !== auth.user.id);
+  const mine = (prefs ?? []).find((p) => p.user_id === me);
+  const theirs = (prefs ?? []).find((p) => p.user_id !== me);
 
   return (
     <RoomShell>
@@ -41,7 +40,7 @@ export default async function ChatPage({ searchParams }: { searchParams: Promise
           {full ? (
             <Chat
               roomId={room.id}
-              me={auth.user.id}
+              me={me}
               prompt={prompt}
               zone={room.timezone}
               initial={initial}
