@@ -269,3 +269,11 @@
 - 실제 검사: 단위 65 통과(숫자야구 3개), DB 32 통과(비밀 숫자 비공개·차례·리비전 중복 무시·마지막 기회·무승부·20번 한도·전적·제3자 차단, PL/pgSQL 채점과 TS 채점 100쌍 일치), 타입 검사 통과. Supabase 적용 전 respond_new_game/game_fingerprint 본문 해시가 포커 마이그레이션과 같음을 확인 후 적용, 권한·채점 확인.
 - 미확인: 휴대폰 두 대로 실제 한 판(CI live flow가 대신 확인).
 - 다음 행동 하나: Sam이 게임 → 숫자야구에서 새 경기 요청 → 상대 수락 → 한 판 끝까지 해 보기.
+
+### 작은 창 속도 · 저장소 정리 · 2026-11-23
+- 원인: 툴바 팝업은 열 때마다 /room을 처음부터 다시 받음. 그때마다 proxy·페이지·토큰 API가 각각 `getUser()`로 Supabase Auth에 왕복(한 번 110~314ms).
+- 변경 경로: `src/proxy.ts`(getClaims + `Server-Timing: auth`), `src/lib/room-render.ts`(getClaims → `{ id }`), `src/app/api/session/token/route.ts`(getClaims), `tests/fixtures/room-render.mjs`, 새 측정 `tests/flow/speed.spec.ts`. 데이터를 바꾸는 서버 동작은 그대로 getUser.
+- 실제 검사(live flow, 같은 조건): 로그인 확인 110~314 → 1~2ms, 방 표시 466~647 → 238~335ms, 실시간 연결 672~1246 → 315~517ms, 토큰 API 475 → 49ms. 전체 CI 통과.
+- 정리: 영어 README(채용 검토용), 낡은 docs/PROMPT.md·SESSION.md 삭제. gitleaks로 전체 기록·모든 브랜치·PR 검사: 유출 0.
+- 미확인: 콜드 스타트(한동안 안 쓴 뒤 첫 요청)는 CI에서 안 잡힘. GitHub 브랜치 삭제·공개 전환은 세션 권한 밖이라 Sam 로그인 필요.
+- 다음 행동 하나: Sam이 툴바 아이콘을 여러 번 열어 보고 체감 속도 확인.
