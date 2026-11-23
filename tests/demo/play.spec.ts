@@ -94,7 +94,7 @@ test("demo: two people play chess, number baseball and draw together", async ({ 
   const aStarts = (await a.locator(".bb-game").getAttribute("data-turn")) === "me";
   const [first, second] = aStarts ? [a, b] : [b, a];
   const firstTarget = aStarts ? "028" : "471", secondTarget = aStarts ? "471" : "028";
-  const throws: [Page, string][] = [[first, "123"], [second, "147"], [first, "280"], [second, secondTarget], [first, firstTarget]];
+  const throws: [Page, string][] = [[first, "123"], [second, "147"], [first, "280"], [second, "359"], [first, firstTarget], [second, secondTarget]];
   for (const [p, digits] of throws) {
     const other = p === first ? second : first;
     await expect(p.locator(".bb-game")).toHaveAttribute("data-turn", "me", { timeout: 15_000 });
@@ -106,7 +106,7 @@ test("demo: two people play chess, number baseball and draw together", async ({ 
     await p.waitForTimeout(600);
   }
   for (const p of [a, b]) await expect(p.locator(".game-result")).toHaveAttribute("data-result", "tie", { timeout: 15_000 });
-  console.log("DEMO baseball: both hit 3S in the same number of throws -> draw");
+  console.log("DEMO baseball: the starter hit 3S, the other used the last chance and hit too -> draw");
   await snap(a, b, "baseball-draw");
 
   // Shared drawing: A draws in one color, B in another; both canvases show both lines.
