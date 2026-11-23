@@ -19,7 +19,8 @@ export async function proxy(request: NextRequest) {
     },
   });
   const started = performance.now();
-  await supabase.auth.getUser();
+  // Refreshes an expired session; otherwise checks the token's signature locally (ECC key), no Auth round trip.
+  await supabase.auth.getClaims();
   // Visible in the browser's network panel: how long the sign-in refresh took before the page started.
   response.headers.set("Server-Timing", `auth;desc="sign-in refresh";dur=${(performance.now() - started).toFixed(1)}`);
   return response;

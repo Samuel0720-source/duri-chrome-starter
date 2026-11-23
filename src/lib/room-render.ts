@@ -5,7 +5,9 @@ import { serverClient } from "./supabase/server";
 // persistent cache, or this snapshot to authorize a later mutation.
 export const roomAccess = cache(async () => {
   const supabase = await serverClient();
-  const auth = { user: supabase ? (await supabase.auth.getUser()).data.user : null } as const;
+  // Signature-checked claims, no Auth round trip. Mutations still call getUser() and RLS decides access.
+  const sub = supabase ? (await supabase.auth.getClaims()).data?.claims.sub : undefined;
+  const auth = { user: sub ? { id: sub } : null } as const;
   const seat = supabase && auth.user
     ? (await supabase.from("couple_members").select("room_id").eq("user_id", auth.user.id).maybeSingle()).data
     : null;
