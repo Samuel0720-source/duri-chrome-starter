@@ -58,7 +58,7 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     console.log(`Native popup: authenticated home visible in ${Math.round(performance.now() - openedAt)} ms`);
     await expect(app.locator("html")).toHaveAttribute("lang", "ko");
     await expect(popup.locator("html")).toHaveAttribute("lang", "ko");
-    await expect(app.locator(".room-tabs a")).toHaveCount(6);
+    await expect(app.locator(".room-tabs a")).toHaveCount(7);
     // The embedded page can obtain only its own short-lived access token, never a refresh token.
     const sessionCheck = await app.locator("html").evaluate(async () => {
       const response = await fetch("/api/session/token", { headers: { "X-Duri-Surface": "popup" } });
@@ -117,8 +117,8 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(app.locator(".album-tile")).toHaveCount(0);
 
     await app.getByRole("link", { name: "게임", exact: true }).click();
-    await expect(app.locator(".game-switch a")).toHaveCount(7);
-    for (let i = 0; i < 7; i++) {
+    await expect(app.locator(".game-switch a")).toHaveCount(8);
+    for (let i = 0; i < 8; i++) {
       await app.locator(".game-switch a").nth(i).click();
       await expect(app.locator(".game-switch a").nth(i)).toHaveAttribute("aria-current", "page");
       expect(await app.locator("html").evaluate(root => root.scrollWidth <= window.innerWidth)).toBe(true);
@@ -165,7 +165,7 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     const original = await media(small);
     await b.getByRole("link", { name: "앨범", exact: true }).click();
     await expect(b).toHaveURL(/\/room\/album$/);
-    for (const path of ["game", "album", "settings", "watch"]) {
+    for (const path of ["game", "draw", "album", "settings", "watch"]) {
       await small.locator(`.room-tabs a[href="/room/${path}"]`).click();
       await expect(small).toHaveURL(new RegExp("/room/" + path + "$"));
       await expect(small.getByRole("button", { name: "End call", exact: true })).toBeVisible();

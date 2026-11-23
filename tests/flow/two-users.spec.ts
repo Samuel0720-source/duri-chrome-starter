@@ -376,6 +376,40 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await expect(second.locator(".game-result")).toHaveAttribute("data-result", "loss", { timeout: 15_000 });
   await expect(second.getByTestId("bb-partner-secret")).toContainText(aStarts ? "4 7 1" : "0 2 8");
 
+  // 3c3. Chess (Thomas). New match by agreement; white plays e2-e4 and the other side sees the move live.
+  await Promise.all([pageA, pageB].map((page) => page.goto("/room/game?g=chess")));
+  await pageA.getByRole("button", { name: "↻ 새 경기 요청", exact: true }).click();
+  await pageB.getByRole("button", { name: "수락하고 시작", exact: true }).click({ timeout: 15_000 });
+  for (const page of [pageA, pageB]) await expect(page.locator(".chess")).toHaveAttribute("data-status", "open", { timeout: 15_000 });
+  const aWhite = (await pageA.locator(".chess-badge").last().getAttribute("data-color")) === "white";
+  const [white, black] = aWhite ? [pageA, pageB] : [pageB, pageA];
+  await white.locator('.chess-sq[data-name="e2"]').click();
+  await white.locator('.chess-sq[data-name="e4"]').click();
+  await expect(black.locator(".chess-move-list")).toContainText("e4", { timeout: 15_000 });
+  await expect(black.locator('.chess-sq[data-name="e4"]')).toHaveAttribute("aria-label", "e4 P");
+
+  // 3c4. Shared drawing board (Thomas). A draws a line; B sees it without reloading, and it survives a reload.
+  await Promise.all([pageA, pageB].map((page) => page.goto("/room/draw")));
+  const sketchInk = (page: Page) =>
+    page.evaluate(() => {
+      const c = document.querySelector<HTMLCanvasElement>("[data-testid=sketch-canvas]")!;
+      const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+      let n = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+      return n;
+    });
+  await expect(pageB.getByTestId("sketch-canvas")).toBeVisible();
+  const inkBefore = await sketchInk(pageB);
+  await pageA.getByTestId("sketch-canvas").scrollIntoViewIfNeeded();
+  const pad = (await pageA.getByTestId("sketch-canvas").boundingBox())!;
+  await pageA.mouse.move(pad.x + pad.width * 0.25, pad.y + pad.height * 0.3);
+  await pageA.mouse.down();
+  await pageA.mouse.move(pad.x + pad.width * 0.7, pad.y + pad.height * 0.65, { steps: 14 });
+  await pageA.mouse.up();
+  await expect.poll(() => sketchInk(pageB), { timeout: 15_000 }).toBeGreaterThan(inkBefore + 200);
+  await pageB.reload();
+  await expect.poll(() => sketchInk(pageB), { timeout: 15_000 }).toBeGreaterThan(inkBefore + 200);
+
   // 3d. Guess game. A starts; B's page shows the rounds live.
   await pageA.getByRole("link", { name: "게임", exact: true }).click();
   await pageB.getByRole("link", { name: "게임", exact: true }).click();
