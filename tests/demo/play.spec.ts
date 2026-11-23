@@ -68,7 +68,8 @@ test("demo: two people play chess, number baseball and draw together", async ({ 
     await expect(p.locator(".chess")).toHaveAttribute("data-turn", /.+/);
     await p.locator(`.chess-sq[data-name="${from}"]`).click();
     await p.locator(`.chess-sq[data-name="${to}"]`).click();
-    await expect(other.locator(".chess-move-list")).toContainText(san, { timeout: 15_000 });
+    await expect(other.locator(".chess-move-list")).toContainText(to, { timeout: 15_000 });
+    await expect(other.locator(`.chess-sq[data-name="${to}"]`)).toHaveAttribute("aria-label", new RegExp(`^${to} [A-Za-z]$`));
     console.log(`DEMO chess ${p === a ? "A" : "B"} ${from}-${to} (${san}) seen by the other side`);
     await p.waitForTimeout(700);
   }
