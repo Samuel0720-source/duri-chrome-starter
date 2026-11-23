@@ -39,7 +39,8 @@ async function launch(path) {
     try {
       const existing = await chrome.windows.get(windowId);
       if (existing.type === "popup") {
-        await chrome.windows.update(windowId, { focused: true });
+        await chrome.windows.update(windowId, { state: "normal" });
+        await chrome.windows.update(windowId, { focused: true, width: 460, height: 680 });
         return;
       }
     } catch { /* The previous small window was closed. */ }

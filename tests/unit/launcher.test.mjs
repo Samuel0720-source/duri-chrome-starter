@@ -29,7 +29,7 @@ test('toolbar opens one direct small window, reuses it without navigation, resto
     await Promise.all([click(), click(), click()]);
     assert.deepEqual(creates, [{ url: 'https://duri.example/room?mini=1', type: 'popup', width: 460, height: 680 }]);
     await click();
-    assert.deepEqual(updates, [{ id: 1, focused: true }]);
+    assert.deepEqual(updates, [{ id: 1, state: 'normal' }, { id: 1, focused: true, width: 460, height: 680 }]);
     await import(script + '?worker-restarted');
     await click();
     assert.equal(creates.length, 1);
