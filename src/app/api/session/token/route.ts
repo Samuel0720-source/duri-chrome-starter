@@ -17,9 +17,9 @@ export async function GET(request: Request) {
   }
   const supabase = await serverClient();
   if (!supabase) return new Response(null, { status: 503, headers });
-  const { data: user, error } = await supabase.auth.getUser();
-  if (error || !user.user) return new Response(null, { status: 401, headers });
+  const { data: verified, error } = await supabase.auth.getClaims();
+  if (error || !verified) return new Response(null, { status: 401, headers });
   const { data } = await supabase.auth.getSession();
-  if (!data.session || data.session.user.id !== user.user.id) return new Response(null, { status: 401, headers });
+  if (!data.session || data.session.user.id !== verified.claims.sub) return new Response(null, { status: 401, headers });
   return Response.json({ accessToken: data.session.access_token, expiresAt: data.session.expires_at }, { headers });
 }

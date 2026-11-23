@@ -9,7 +9,7 @@ const requests = new AsyncLocalStorage();
 globalThis.__roomTestClient = () => {
   const state = requests.getStore();
   return {
-    auth: { getUser: async () => { state.auth++; return { data: { user: state.user ? { id: state.user } : null } }; } },
+    auth: { getClaims: async () => { state.auth++; return { data: state.user ? { claims: { sub: state.user } } : null }; } },
     from(table) {
       let head = false;
       const result = () => {
