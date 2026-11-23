@@ -387,6 +387,9 @@ test("two people: create, invite, join, leave, delete", async ({ browser }) => {
   await white.locator('.chess-sq[data-name="e4"]').click();
   await expect(black.locator(".chess-move-list")).toContainText("e4", { timeout: 15_000 });
   await expect(black.locator('.chess-sq[data-name="e4"]')).toHaveAttribute("aria-label", "e4 P");
+  // Every square stays square, empty ranks included (rank 3 used to collapse to a thin strip).
+  const sizes = await black.locator(".chess-sq").evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => Math.round(r.height - r.width)));
+  expect(sizes.filter((d) => Math.abs(d) > 1)).toEqual([]);
 
   // 3c4. Shared drawing board (Thomas). A draws a line; B sees it without reloading, and it survives a reload.
   await Promise.all([pageA, pageB].map((page) => page.goto("/room/draw")));
