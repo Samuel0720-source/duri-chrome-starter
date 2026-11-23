@@ -24,6 +24,8 @@ export function RoomLive({ roomId }: { roomId: string }) {
         .on("broadcast", { event: "members" }, () => router.refresh())
         .on("broadcast", { event: "plans" }, () => router.refresh())
         .on("broadcast", { event: "photos" }, () => router.refresh())
+        // Nickname and birthday changes (also fires on chat read marks, which are rare off the chat screen).
+        .on("broadcast", { event: "prefs" }, () => router.refresh())
         // The data attribute lets tests (and debugging) see the channel is live.
         .subscribe((status) => {
           document.documentElement.dataset.roomLive = status === "SUBSCRIBED" ? "on" : "off";

@@ -569,6 +569,7 @@ export const ko = {
   "poker.each": "씩",
   "poker.invite": "♠ 선택한 스택으로 새 경기 요청",
   "poker.subtitle": "둘만의 노리밋 텍사스 홀덤",
+  "poker.hiddenCard": "뒤집힌 카드",
   "poker.begin": "위에서 시작 스택을 고르고 상대를 초대해 주세요. 수락하면 카드를 나눠요.",
   "poker.hand": "핸드 {n}",
   "poker.bet": "이번 라운드 베팅 {n}",

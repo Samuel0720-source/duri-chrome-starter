@@ -570,6 +570,7 @@ export const en: Record<keyof typeof ko, string> = {
   "poker.each": "each",
   "poker.invite": "♠ Invite with this stack",
   "poker.subtitle": "No-limit Texas Hold’em for two",
+  "poker.hiddenCard": "Hidden card",
   "poker.begin": "Choose a stack above and invite your partner. Cards are dealt once they accept.",
   "poker.hand": "Hand {n}",
   "poker.bet": "Bet this round: {n}",
