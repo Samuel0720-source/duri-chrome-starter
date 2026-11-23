@@ -32,13 +32,15 @@ async function measure(page: Page, path: string, label: string): Promise<Row> {
   await page.goto(path);
   await expect(page.locator(".room")).toBeVisible();
   const ready = Date.now() - t0;
-  await expect(page.locator("html[data-room-live=on]")).toHaveCount(1, { timeout: 20_000 });
-  const live = Date.now() - t0;
+  // Only the home screen marks its realtime link; elsewhere -1.
+  const live = await page.locator("html[data-room-live=on]").waitFor({ state: "attached", timeout: 20_000 }).then(() => Date.now() - t0, () => -1);
   const nav = await page.evaluate(() => {
     const n = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
     return { server: n.responseStart - n.requestStart, html: n.responseEnd - n.startTime, auth: n.serverTiming.find((x) => x.name === "auth")?.duration ?? -1 };
   });
-  return { label, auth: Math.round(nav.auth), server: Math.round(nav.server), html: Math.round(nav.html), ready, live };
+  const row = { label, auth: Math.round(nav.auth), server: Math.round(nav.server), html: Math.round(nav.html), ready, live };
+  console.log(`SPEED ${label.padEnd(12)} auth ${String(row.auth).padStart(4)}  server ${String(row.server).padStart(5)}  html ${String(row.html).padStart(5)}  ready ${String(ready).padStart(5)}  live ${String(live).padStart(5)}`);
+  return row;
 }
 
 test("speed: the small window opening a two-person room", async ({ browser }) => {
@@ -51,6 +53,7 @@ test("speed: the small window opening a two-person room", async ({ browser }) =>
   await b.getByRole("button", { name: "방에 들어가기" }).click();
   await expect(b.getByText("두 사람이 모두 들어왔어요.")).toBeVisible();
 
+  console.log("SPEED (ms) auth = sign-in refresh in proxy, server = first byte wait, html = page received, ready = room visible, live = realtime connected");
   const rows: Row[] = [];
   for (let i = 1; i <= 5; i++) rows.push(await measure(a, "/room", `/room #${i}`));
   rows.push(await measure(a, "/room/game?g=baseball", "/room/game"));
@@ -62,7 +65,5 @@ test("speed: the small window opening a two-person room", async ({ browser }) =>
       login: await time("/login", { redirect: "manual" }),
     };
   });
-  console.log("SPEED (ms) auth = sign-in refresh in proxy, server = first byte wait, html = page received, ready = room visible, live = realtime connected");
-  for (const r of rows) console.log(`SPEED ${r.label.padEnd(12)} auth ${String(r.auth).padStart(4)}  server ${String(r.server).padStart(5)}  html ${String(r.html).padStart(5)}  ready ${String(r.ready).padStart(5)}  live ${String(r.live).padStart(5)}`);
   console.log(`SPEED api /api/session/token ${api.token}  /login ${api.login}`);
 });
