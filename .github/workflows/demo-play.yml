@@ -1,0 +1,30 @@
+# On demand: two throwaway accounts play on the live site while both browsers are recorded.
+name: demo play
+
+on:
+  push:
+    branches: [demo-play]
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FLOW_URL: https://duri-chrome-starter.vercel.app
+      NEXT_PUBLIC_SUPABASE_URL: https://phzvtiymcvczepukpbfu.supabase.co
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test -c playwright.demo.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: demo-recording
+          path: demo-out/

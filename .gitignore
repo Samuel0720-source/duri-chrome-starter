@@ -10,3 +10,4 @@ playwright-report/
 .vercel/
 supabase/.temp/
 supabase/.branches/
+demo-out/
