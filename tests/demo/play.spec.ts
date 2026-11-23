@@ -131,7 +131,7 @@ test("demo: two people play chess, number baseball and draw together", async ({ 
   await expect.poll(() => ink(b), { timeout: 15_000 }).toBeGreaterThan(start + 200);
   const afterA = await ink(a);
   const swatches = b.locator(".swatches .swatch");
-  await swatches.nth((await swatches.count()) - 1).click();
+  await swatches.nth(6).click(); // blue
   await stroke(b, [[0.2, 0.8], [0.35, 0.75], [0.5, 0.82], [0.65, 0.75], [0.8, 0.8]]);
   await expect.poll(() => ink(a), { timeout: 15_000 }).toBeGreaterThan(afterA + 150);
   console.log(`DEMO drawing: A's heart and B's wave appear on both canvases (ink A ${await ink(a)}, B ${await ink(b)})`);
