@@ -6,6 +6,9 @@ on:
     branches: [demo-play]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   demo:
     runs-on: ubuntu-latest
@@ -23,6 +26,16 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test -c playwright.demo.config.ts
+      - name: Put both screens side by side and publish to the demo-recordings branch
+        if: always()
+        run: |
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+          a=$(ls demo-out/video-A/*.webm | head -1); b=$(ls demo-out/video-B/*.webm | head -1)
+          ffmpeg -loglevel error -i "$a" -i "$b" -filter_complex "[0:v][1:v]hstack=inputs=2,format=yuv420p" -c:v libx264 -preset veryfast -crf 30 -movflags +faststart demo-side-by-side.mp4
+          mkdir -p pub && cp demo-side-by-side.mp4 pub/ && cp demo-out/shots/*.png pub/
+          cd pub && git init -q && git checkout -q -b demo-recordings && git add . \
+            && git -c user.name="Samuel Koo" -c user.email="samuelkoo0720@gmail.com" commit -qm "Demo recording $GITHUB_SHA" \
+            && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" demo-recordings
       - uses: actions/upload-artifact@v4
         if: always()
         with:
