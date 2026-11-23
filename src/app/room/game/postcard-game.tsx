@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { useRoomChannel } from "../use-room-channel";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { postcardFaces, type PostcardState } from "../../../core/postcards";
 import { useT } from "../../../i18n/client";
@@ -14,6 +15,7 @@ export function PostcardGame({ roomId, initial, partnerName }: {
   roomId: string; initial: PostcardState | null; partnerName: string;
 }) {
   const { t } = useT();
+  const router = useRouter();
   const roomChannel = useRoomChannel(roomId);
   const [state, setState] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -40,8 +42,11 @@ export function PostcardGame({ roomId, initial, partnerName }: {
       if (!present) return;
       channel = roomChannel(client)
         .on("broadcast", { event: "postcards" }, refresh)
-        .on("broadcast", { event: "members" }, () => window.location.reload())
-        .subscribe(status => { if (status === "SUBSCRIBED") void refresh(); });
+        .on("broadcast", { event: "members" }, () => router.refresh())
+        .subscribe(status => {
+          document.documentElement.dataset.roomLive = status === "SUBSCRIBED" ? "on" : "off";
+          if (status === "SUBSCRIBED") void refresh();
+        });
     }).catch(() => { if (present) setFailed(true); });
     const poll = window.setInterval(() => { if (!document.hidden) void refresh(); }, 12000);
     window.addEventListener("focus", refresh);
@@ -51,7 +56,7 @@ export function PostcardGame({ roomId, initial, partnerName }: {
       window.removeEventListener("focus", refresh);
       if (channel) void client.removeChannel(channel);
     };
-  }, [roomChannel, roomId, refresh]);
+  }, [roomChannel, roomId, refresh, router]);
   useEffect(() => {
     if (!state?.revealMs) return;
     const timer = window.setTimeout(refresh, state.revealMs + 60);
