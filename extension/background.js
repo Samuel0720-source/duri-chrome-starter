@@ -25,27 +25,48 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
-// One reusable small window: it stays alive when the toolbar popup loses focus.
+// Open the SAME web app directly, without constructing a toolbar iframe first.
+// Keep one window alive across icon clicks, so reopening never reloads a live call.
 let opening;
-chrome.runtime.onMessage.addListener((message,sender,reply)=>{
-  if(sender.id!==chrome.runtime.id || message?.duri!=="open-small")return;
-  const url=sender.url || "";
-  if(!url.startsWith(chrome.runtime.getURL("")) && !url.startsWith(webOrigin+"/"))return;
-  const path=surfacePath(message.path);
-  const destination=new URL(webOrigin+path); destination.searchParams.set("mini","1");
-  const launch=async()=>{
-    const {smallWindow}=await chrome.storage.session.get("smallWindow");
-    if(smallWindow){
-      try {
-        const existing=await chrome.windows.get(smallWindow,{populate:true});
-        // Never navigate an existing call away just because the popup is opened again.
-        if(existing.type==="popup"){await chrome.windows.update(smallWindow,{focused:true});return;}
-      }catch{/* Window was closed. */}
-    }
-    const win=await chrome.windows.create({url:destination.href,type:"popup",width:460,height:680});
-    await chrome.storage.session.set({smallWindow:win.id});
-  };
-  if(!opening)opening=launch().finally(()=>{opening=null;});
-  opening.then(()=>reply({ok:true}),()=>reply({ok:false}));
+let windowId;
+const restored = chrome.storage.session.get("smallWindow").then(({ smallWindow }) => {
+  windowId = smallWindow;
+}).catch(() => {});
+async function launch(path) {
+  await restored;
+  void chrome.action.setBadgeText({ text: "" });
+  if (windowId) {
+    try {
+      const existing = await chrome.windows.get(windowId);
+      if (existing.type === "popup") {
+        await chrome.windows.update(windowId, { focused: true });
+        return;
+      }
+    } catch { /* The previous small window was closed. */ }
+    windowId = undefined;
+  }
+  const destination = new URL(webOrigin + surfacePath(path));
+  destination.searchParams.set("mini", "1");
+  const win = await chrome.windows.create({ url: destination.href, type: "popup", width: 460, height: 680 });
+  windowId = win.id;
+  await chrome.storage.session.set({ smallWindow: windowId });
+}
+function openSmall(path = "/room") {
+  if (!opening) opening = launch(path).finally(() => { opening = undefined; });
+  return opening;
+}
+chrome.action.onClicked.addListener(() => openSmall().catch(() => {
+  // A visible retry indication instead of an unhandled service-worker rejection.
+  void chrome.action.setBadgeText({ text: "!" });
+}));
+chrome.windows.onRemoved.addListener(id => {
+  if (id === windowId) windowId = undefined;
+});
+// Retain the old popup's handoff for existing links and compatibility.
+chrome.runtime.onMessage.addListener((message, sender, reply) => {
+  if (sender.id !== chrome.runtime.id || message?.duri !== "open-small") return;
+  const url = sender.url || "";
+  if (!url.startsWith(chrome.runtime.getURL("")) && !url.startsWith(webOrigin + "/")) return;
+  openSmall(message.path).then(() => reply({ ok: true }), () => reply({ ok: false }));
   return true;
 });
