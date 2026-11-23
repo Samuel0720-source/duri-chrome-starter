@@ -9,5 +9,6 @@ test("compact handoff retains room screens but never external destinations or pr
   for (const path of ["https://evil.example/room", "//evil.example/room", "/invite/private-code", "/auth/callback?code=private", "javascript:alert(1)"]) {
     assert.equal(surfacePath(path), "/room");
   }
-  for (const path of ["/room", "/room/album", "/room/watch", "/room/settings", "/login/forgot"]) assert.equal(surfacePath(path), path);
+  assert.equal(surfacePath("/room/game?g=chess&secret=hidden"), "/room/game?g=chess");
+  for (const path of ["/room", "/room/draw", "/room/album", "/room/watch", "/room/settings", "/login/forgot"]) assert.equal(surfacePath(path), path);
 });

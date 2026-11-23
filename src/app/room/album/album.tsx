@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BIG, THUMB, albumErrorKey, fitSize, photoFile, photoUrl } from "../../../core/album";
 import { useT } from "../../../i18n/client";
@@ -79,6 +79,26 @@ export function Album({ roomId, photos, wallpaper, partner }: { roomId: string; 
     dialog.current?.showModal();
   };
 
+  const openIdx = open ? photos.findIndex((p) => p.id === open.id) : -1;
+  const stepPhoto = useCallback((delta: -1 | 1) => {
+    if (openIdx < 0) return;
+    const next = photos[openIdx + delta];
+    if (next) {
+      setOpen(next);
+      setSure(false);
+    }
+  }, [openIdx, photos]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") { e.preventDefault(); stepPhoto(-1); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); stepPhoto(1); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, stepPhoto]);
+
   return (
     <div className="album">
       <div className="album-tools">
@@ -124,9 +144,22 @@ export function Album({ roomId, photos, wallpaper, partner }: { roomId: string; 
         {open && (
           <>
             <img src={photoUrl(open.id)} alt={t("album.alt", { date: open.date })} width={open.width} height={open.height} />
-            <p className="hint">
-              {open.mine ? t("album.byMe") : t("album.byPartner", { name: partner })} · {open.date}
-            </p>
+            <div className="album-meta-row">
+              <p className="hint">
+                {open.mine ? t("album.byMe") : t("album.byPartner", { name: partner })} · {open.date}
+              </p>
+              {photos.length > 1 && (
+                <div className="album-nav">
+                  <button type="button" className="secondary" disabled={openIdx <= 0} onClick={() => stepPhoto(-1)} aria-label={t("album.prev")}>
+                    ←
+                  </button>
+                  <span className="hint">{openIdx + 1} / {photos.length}</span>
+                  <button type="button" className="secondary" disabled={openIdx >= photos.length - 1} onClick={() => stepPhoto(1)} aria-label={t("album.next")}>
+                    →
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="album-actions">
               {open.id === wallpaper ? (
                 <span className="hint" data-testid="album-is-wallpaper">{t("album.isWallpaper")}</span>

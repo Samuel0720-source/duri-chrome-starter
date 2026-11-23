@@ -5,6 +5,7 @@ import { useNewGameRefresh } from "./new-game";
 import { useRoomChannel } from "../use-room-channel";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { browserClient } from "../../../lib/supabase/browser";
 import { roomErrorKey } from "../../../core/auth-paths";
 import { guessQuestionsEn } from "../../../core/guess-en";
@@ -15,6 +16,7 @@ import { guessQuestions, type GuessRound, type GuessState } from "../../../core/
 // a partner's answer for a round arrives after both have answered that round.
 export function GuessGame({ roomId, initial, partnerName }: { roomId: string; initial: GuessState; partnerName: string }) {
   const { t } = useT();
+  const router = useRouter();
   const roomChannel = useRoomChannel(roomId);
   const [state, setState] = useState<GuessState>(initial);
   const [error, setError] = useState("");
@@ -41,7 +43,7 @@ export function GuessGame({ roomId, initial, partnerName }: { roomId: string; in
       if (!active) return;
       channel = roomChannel(supabase)
         .on("broadcast", { event: "guess" }, () => refresh())
-        .on("broadcast", { event: "members" }, () => window.location.reload())
+        .on("broadcast", { event: "members" }, () => router.refresh())
         .subscribe((status) => {
           document.documentElement.dataset.roomLive = status === "SUBSCRIBED" ? "on" : "off";
           if (status === "SUBSCRIBED") refresh();
@@ -51,7 +53,7 @@ export function GuessGame({ roomId, initial, partnerName }: { roomId: string; in
       active = false;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [roomChannel, roomId, refresh]);
+  }, [roomChannel, roomId, refresh, router]);
 
   async function call(fn: string, args: Record<string, unknown>) {
     const supabase = supabaseRef.current;
