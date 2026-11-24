@@ -37,6 +37,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   const [error, setError] = useState("");
   const listRef = useRef<HTMLOListElement>(null);
   const mountedRef = useRef(false);
+  const followLatest = useRef(true);
   const supabaseRef = useRef<ReturnType<typeof browserClient>>(null);
   const lastId = useRef(initial.at(-1)?.id ?? 0);
 
@@ -130,12 +131,23 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   }, [markRead]);
 
   useEffect(() => {
-    listRef.current?.lastElementChild?.scrollIntoView({
-      block: "end",
-      behavior: mountedRef.current ? "smooth" : "auto",
+    const list = listRef.current;
+    if (list && followLatest.current) list.scrollTo({
+      top: list.scrollHeight,
+      behavior: mountedRef.current ? "smooth" : "instant",
     });
     mountedRef.current = true;
   }, [messages.length]);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const observer = new ResizeObserver(() => {
+      if (followLatest.current) list.scrollTo({ top: list.scrollHeight, behavior: "instant" });
+    });
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, []);
 
   async function deliver(request: string, body: string, tempId: number) {
     const supabase = supabaseRef.current;
@@ -157,6 +169,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   function send(event: React.FormEvent) {
     event.preventDefault();
     if (!text.trim()) return;
+    followLatest.current = true;
     const body = question ? question + "\n" + text.trim() : text.trim();
     setQuestion("");
     const request = crypto.randomUUID();
@@ -188,7 +201,10 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   return (
     <>
     <div className="chat">
-      <ol className="chat-list" ref={listRef} aria-label={t("chat.list")} aria-live="polite">
+      <ol className="chat-list" ref={listRef} tabIndex={0} onScroll={() => {
+        const list = listRef.current;
+        if (list) followLatest.current = list.scrollHeight - list.scrollTop - list.clientHeight < 64;
+      }} aria-label={t("chat.list")} aria-live="polite">
         {messages.length === 0 && <li className="chat-empty">{t("chat.empty")}</li>}
         {messages.map((m, i) => (
           <li key={m.id} className={m.sender === me ? "mine" : "theirs"} data-state={m.state}>
@@ -218,6 +234,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
           id="chat-input"
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.nativeEvent.isComposing || e.keyCode === 229)) e.preventDefault(); }}
           maxLength={1000 - (question ? question.length + 1 : 0)}
           autoComplete="off"
           placeholder={t("chat.placeholder")}
