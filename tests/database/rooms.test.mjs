@@ -250,6 +250,7 @@ before(async () => {
   await admin.query(await readFile(new URL("../../supabase/migrations/202611190002_shared_draw.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611220001_number_baseball.sql", import.meta.url), "utf8"));
   await admin.query(await readFile(new URL("../../supabase/migrations/202611230001_games_chess_and_baseball.sql", import.meta.url), "utf8"));
+  await admin.query(await readFile(new URL("../../supabase/migrations/202611240001_baseball_secret_race.sql", import.meta.url), "utf8"));
 });
 after(async () => {
   admin?.release();
@@ -1821,9 +1822,10 @@ test("number baseball: hidden secrets, server scoring, turns, revisions, strange
   assert.equal(bView.partnerReady, true, "B knows A is ready");
   assert.equal(bView.mySecret, null);
   assert.ok(!JSON.stringify(bView).includes("471"), "A's secret never reaches B before the end");
-  await assert.rejects(act(a, "secret", "123"), /Secret already set/);
+  assert.equal((await act(a, "secret", "123")).mySecret, "471", "a second secret changes nothing");
   await assert.rejects(act(a, "guess", "123"), /Not playing/);
-  s = await act(b, "secret", "028");
+  s = await act(b, "secret", "028", 1); // B's screen still shows the revision from before A's secret
+  assert.equal(s.mySecret, "028", "the partner's secret landing first does not swallow mine");
   assert.equal(s.phase, "playing");
   assert.equal(s.turnSeat, 1, "the starter throws first");
 
