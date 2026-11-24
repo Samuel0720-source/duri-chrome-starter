@@ -5,8 +5,8 @@ export type CallNote = "hint" | "ended" | "device" | "network" | "busy" | "timeo
 type Session = { id: string; mode: Mode; caller: boolean; phase: Phase; pc?: RTCPeerConnection; stream?: MediaStream; route?: Route };
 // "direct": the two browsers reached each other. "relay": the audio goes through the TURN relay server.
 export type Route = "direct" | "relay";
-export type View = { phase: Phase; mode: Mode; note: CallNote; local?: MediaStream; remote?: MediaStream; route?: Route; muted?: boolean; cameraHidden?: boolean; background?: boolean };
-export type CallController = Pick<CallSession, "start" | "accept" | "end" | "setMuted" | "setCameraHidden">;
+export type View = { phase: Phase; mode: Mode; note: CallNote; local?: MediaStream; remote?: MediaStream; route?: Route; muted?: boolean; cameraHidden?: boolean; background?: boolean; audioBlocked?: boolean };
+export type CallController = Pick<CallSession, "start" | "accept" | "end" | "setMuted" | "setCameraHidden"> & { resumeAudio?: () => void };
 
 export function deviceNote(error: unknown): CallNote {
   const name = error instanceof DOMException ? error.name : "";

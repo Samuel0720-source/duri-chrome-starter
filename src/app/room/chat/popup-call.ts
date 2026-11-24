@@ -26,7 +26,7 @@ export function createPopupCall(me: string, roomId: string, render: (view: View)
   }
   async function action(command: "start" | "accept", mode: "audio" | "video") {
     try { await authorize(mode); localError = false; send(command, { mode }); }
-    catch (error) { localError = true; view = { phase: "idle", mode, note: deviceNote(error), background: true }; show(); }
+    catch (error) { send("end"); localError = true; view = { phase: "idle", mode, note: deviceNote(error), background: true }; show(); }
   }
   const session: CallController = {
     start: mode => { void action("start", mode); }, accept: () => { void action("accept", view.mode); },
@@ -36,6 +36,7 @@ export function createPopupCall(me: string, roomId: string, render: (view: View)
       endings.set(request, () => { clearTimeout(timer); endings.delete(request); resolve(); });
       send("end", { request });
     }),
+    resumeAudio: () => send("play"),
     setMuted: value => send("mute", { value }), setCameraHidden: value => send("camera", { value }),
   };
   channel.onmessage = event => {

@@ -12,6 +12,7 @@ export function CallHost({ me, roomId }: { me: string; roomId: string }) {
   const router = useRouter();
   useEffect(() => {
     if (!location.ancestorOrigins?.[0]?.startsWith("chrome-extension://") || !audio.current) return;
+    let audioBlocked = false;
     let active = true, connected = false, lastViewer = Date.now();
     let view: View = { phase: "idle", mode: "audio", note: "hint" };
     let playback: ReturnType<typeof attachCallAudio> | undefined, audioTrack: MediaStreamTrack | undefined;
@@ -19,7 +20,7 @@ export function CallHost({ me, roomId }: { me: string; roomId: string }) {
     const viewers = new Map<string, Viewer>();
     const notify = (duri: string, extra: object = {}) => parent.postMessage({ duri, ...extra }, location.ancestorOrigins[0]);
     const state = (client: string) => channel.postMessage({ type: "state", client, ready: connected, view: {
-      phase: view.phase, mode: view.mode, note: view.note, route: view.route, muted: view.muted, cameraHidden: view.cameraHidden, background: true,
+      phase: view.phase, mode: view.mode, note: view.note, route: view.route, muted: view.muted, cameraHidden: view.cameraHidden, background: true, audioBlocked,
     } });
     async function preview(client: string, viewer: Viewer) {
       const tracks = [view.local?.getVideoTracks()[0], view.remote?.getVideoTracks()[0]];
@@ -47,9 +48,9 @@ export function CallHost({ me, roomId }: { me: string; roomId: string }) {
       view = value;
       const track = value.remote?.getAudioTracks()[0];
       if (track !== audioTrack) {
-        playback?.detach(); playback = undefined; audioTrack = track;
+        playback?.detach(); playback = undefined; audioTrack = track; audioBlocked = false;
         if (track && audio.current) playback = attachCallAudio(audio.current, track, blocked => {
-          if (blocked) notify("call-host-audio-blocked");
+          audioBlocked = blocked; publish();
         });
       }
       publish();
@@ -70,6 +71,7 @@ export function CallHost({ me, roomId }: { me: string; roomId: string }) {
         case "start": if (connected && (data.mode === "audio" || data.mode === "video")) owner.session.start(data.mode); break;
         case "accept": if (connected) owner.session.accept(); break;
         case "end": void owner.session.end().then(() => { if (active) channel.postMessage({ type: "ended", client: id, request: data.request }); }); break;
+        case "play": playback?.play(); break;
         case "mute": if (typeof data.value === "boolean") owner.session.setMuted(data.value); break;
         case "camera": if (typeof data.value === "boolean") owner.session.setCameraHidden(data.value); break;
         case "answer": if (data.generation === viewer.generation && viewer.pc?.signalingState === "have-local-offer" && typeof data.sdp === "string")

@@ -52,7 +52,7 @@ export function CallControls({ session, view, ready, compact = false }: { compac
   const remoteVideo = view.remote?.getVideoTracks()[0];
   const localVideo = view.local?.getVideoTracks()[0];
   const status = view.phase === "idle" ? (!ready && view.note === "hint" ? "preparing" : view.note) : view.phase === "incoming" ? (audioOnly ? "incomingAudio" : "incomingVideo") : view.phase;
-  return <section className="call-box" data-phase={view.phase} data-note={view.note} aria-label={t("call.title")}>
+  return <section className="call-box" data-phase={view.phase} data-note={status} aria-label={t("call.title")}>
     {popup && view.phase !== "idle" && <p className="mini-call-note">{view.background ? t("call.background") : t("call.keepOpen")}</p>}
     <div className="call-top"><div><h2>{t("call.title")}</h2><p role={view.phase === "idle" && !["hint", "ended"].includes(view.note) ? "alert" : "status"}>{t(`call.${status}`)}</p>
       {view.phase === "connected" && view.route && <p className="hint" data-route={view.route}>{t(view.route === "relay" ? "call.route.relay" : "call.route.direct")}</p>}</div>
@@ -67,6 +67,7 @@ export function CallControls({ session, view, ready, compact = false }: { compac
       </div>
     </div>
     {remoteAudio && <PartnerAudio track={remoteAudio} />}
+    {view.background && view.audioBlocked && <button type="button" onClick={() => session?.resumeAudio?.()}>{t("call.listen")}</button>}
     {compact && !audioOnly && (remoteVideo || localVideo) && <button type="button" className="call-video-toggle" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{locale === "ko" ? (expanded ? "영상 접기" : "영상 보기") : (expanded ? "Hide video" : "Show video")}</button>}
     {!audioOnly && (remoteVideo || localVideo) && <div className="call-streams" hidden={compact && !expanded}>
       {remoteVideo && <VideoPreview track={remoteVideo} label={t("call.partner")} />}

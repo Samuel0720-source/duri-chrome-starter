@@ -3,7 +3,16 @@
   const extensionOrigin = chrome.runtime.getURL("").replace(/\/$/, "");
   const embedded = window.parent !== window && location.ancestorOrigins?.[0] === extensionOrigin;
   if (!embedded || location.pathname === "/call-host") return;
-  if (document.documentElement) { document.documentElement.dataset.compact = "popup"; document.documentElement.dataset.callBackground = "1"; }
+  const markRoot = () => {
+    if (!document.documentElement) return false;
+    document.documentElement.dataset.compact = "popup";
+    document.documentElement.dataset.callBackground = "1";
+    return true;
+  };
+  if (!markRoot()) {
+    const rootObserver = new MutationObserver(() => { if (markRoot()) rootObserver.disconnect(); });
+    rootObserver.observe(document, { childList: true });
+  }
   let pending = false;
   let previous = "";
   function report() {

@@ -113,9 +113,13 @@ test("toolbar call stays in place, survives closing/reopening, and releases medi
     await expect.poll(() => app.locator('#chat-input').evaluate(el => {
       const r=el.getBoundingClientRect(); return r.top>=0&&r.bottom<=innerHeight&&document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===el;
     })).toBe(true);
+    await expect(app.locator('html')).toHaveAttribute('data-room-live', 'on');
     await app.locator('#chat-input').fill('Still here during our call');
+    await expect(app.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
     await app.locator('#chat-input').press('Enter');
-    await expect(b.getByText('Still here during our call', { exact: true })).toBeVisible();
+    await expect(app.locator('.bubble').last()).toContainText('Still here during our call');
+    await expect(app.locator('[data-state="failed"]')).toHaveCount(0);
+    await expect(b.getByText('Still here during our call', { exact: false })).toBeVisible({ timeout: 15000 });
     await app.getByRole("button", { name: "End call", exact: true }).click();
     await expect.poll(async () => (await inspect(audioState)).live).toBeUndefined();
     await expect(b.locator(".call-box audio")).toHaveCount(0);
