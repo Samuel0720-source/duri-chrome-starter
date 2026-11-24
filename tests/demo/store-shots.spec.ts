@@ -39,9 +39,21 @@ test("store screenshots", async ({ browser }) => {
     await box.press("Enter");
     await expect(p.getByText(msg).first()).toBeVisible({ timeout: 15_000 });
   }
+  // A chess game a few moves in, so the Games screen shows a live board.
+  await Promise.all([a, b].map((p) => p.goto("/room/game?g=chess")));
+  await a.getByRole("button", { name: "↻ 새 경기 요청", exact: true }).click();
+  await b.getByRole("button", { name: "수락하고 시작", exact: true }).click({ timeout: 15_000 });
+  for (const p of [a, b]) await expect(p.locator(".chess")).toHaveAttribute("data-status", "open", { timeout: 15_000 });
+  const aWhite = (await a.locator(".chess-badge").last().getAttribute("data-color")) === "white";
+  const [white, black] = aWhite ? [a, b] : [b, a];
+  for (const [p, from, to] of [[white, "e2", "e4"], [black, "e7", "e5"], [white, "g1", "f3"], [black, "b8", "c6"]] as const) {
+    await p.locator(`.chess-sq[data-name="${from}"]`).click();
+    await p.locator(`.chess-sq[data-name="${to}"]`).click();
+    await expect((p === white ? black : white).locator(".chess-move-list")).toContainText(to, { timeout: 15_000 });
+  }
   for (const lang of ["ko", "en"]) {
     await a.context().addCookies([{ name: "duri_lang", value: lang, url: process.env.FLOW_URL! }]);
-    for (const [path, name] of [["/room", "home"], ["/room/chat", "chat"], ["/room/game?g=chess", "games"]]) {
+    for (const [path, name] of [["/room", "home"], ["/room/chat", "chat"], ["/room/game?g=chess", "games"], ["/room/draw", "draw"]]) {
       await a.goto(path);
       await a.waitForLoadState("networkidle").catch(() => {});
       await a.waitForTimeout(800);
