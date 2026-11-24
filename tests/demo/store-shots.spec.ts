@@ -22,28 +22,30 @@ async function signIn(browser: Browser, next: string, lang: string): Promise<Pag
   return page;
 }
 
-for (const lang of ["en", "ko"]) {
-  test(`store screenshots (${lang})`, async ({ browser }) => {
-    const a = await signIn(browser, "/room", lang);
-    await a.locator("input[type=date]").first().fill("2026-06-23");
-    await a.locator("form button[type=submit]").first().click();
-    await a.locator("form button[type=submit]").first().click();
-    const invite = new URL(await a.locator("input[readonly]").first().inputValue()).pathname;
-    const b = await signIn(browser, invite, lang);
-    await b.locator("form button[type=submit]").first().click();
-    await b.waitForURL(/\/room/);
-    // A short chat so the Chat screen is not empty.
-    for (const [p, msg] of [[b, lang === "ko" ? "오늘 저녁에 통화할래? 🙂" : "Call tonight? 🙂"], [a, lang === "ko" ? "좋아! 9시에 걸게" : "Yes! I'll call at 9"]] as const) {
-      await p.goto("/room/chat");
-      await p.locator("textarea, input[type=text]").last().fill(msg);
-      await p.keyboard.press("Enter");
-      await expect(p.getByText(msg).first()).toBeVisible();
-    }
+test("store screenshots", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const a = await signIn(browser, "/room", "ko");
+  await a.getByLabel("함께한 첫날").fill("2026-06-23");
+  await a.getByRole("button", { name: "방 만들기" }).click();
+  await a.getByRole("button", { name: "초대 링크 만들기" }).click();
+  const invite = new URL(await a.getByLabel("초대 링크").inputValue()).pathname;
+  const b = await signIn(browser, invite, "ko");
+  await b.getByRole("button", { name: "방에 들어가기" }).click();
+  await expect(b.getByText("두 사람이 모두 들어왔어요.")).toBeVisible();
+  for (const [p, msg] of [[b, "오늘 저녁에 통화할래? 🙂"], [a, "좋아! 9시에 걸게"]] as const) {
+    await p.goto("/room/chat");
+    const box = p.getByRole("textbox").last();
+    await box.fill(msg);
+    await box.press("Enter");
+    await expect(p.getByText(msg).first()).toBeVisible({ timeout: 15_000 });
+  }
+  for (const lang of ["ko", "en"]) {
+    await a.context().addCookies([{ name: "duri_lang", value: lang, url: process.env.FLOW_URL! }]);
     for (const [path, name] of [["/room", "home"], ["/room/chat", "chat"], ["/room/game?g=chess", "games"]]) {
       await a.goto(path);
       await a.waitForLoadState("networkidle").catch(() => {});
       await a.waitForTimeout(800);
       await a.screenshot({ path: `demo-out/store/${lang}-${name}.png` });
     }
-  });
-}
+  }
+});
