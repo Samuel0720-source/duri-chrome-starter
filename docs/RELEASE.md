@@ -46,6 +46,33 @@ Sign-in cookies are per domain, so after a domain change everyone signs in once 
 
 ## 0.5.6 store submission · copy-paste text (English dashboard)
 
+- **Item name:** Duri
+- **Summary (from the manifest):** Your shared room for two in the Chrome toolbar: chat, voice and video calls, games, photos and anniversaries.
+- **Category:** Social & Communication · **Language:** English
+- **Detailed description:**
+
+```
+Duri is a private room for exactly two people, one click away in your Chrome toolbar.
+
+Open the popup and you are back in your room: how many days you have been together, the next 100-day mark, anniversaries and both birthdays, and your chat.
+
+What you can do together
+- Chat with read receipts, and start a voice or video call from the popup. Move the call into a small window that stays open while you keep browsing.
+- Play eight real-time games for two: chess, number baseball, gomoku, mini golf where you both shoot at once, a 100-second drawing quiz, "guess your partner's pick", postcard memory and heads-up poker.
+- Draw together on a shared board and save drawings to a private album.
+- Watch YouTube, Vimeo or video files in sync. On a computer, you can also keep Netflix in sync while each of you plays it on your own account.
+- Keep a shared photo album and pick one photo as the room background.
+
+Private by design
+- A room holds two people. An invite link works once and expires.
+- Every rule (whose turn it is, hidden answers, who can see a photo) is enforced on the server, not in the browser.
+- The extension stores only your last screen, language and theme on this device. It never copies messages, photos or login tokens.
+
+Sign in with Google or email on the Duri website. The same room also works as a website and an installable app on your phone.
+
+Privacy policy: https://duri-chrome-starter.vercel.app/privacy
+```
+
 Upload `dist/duri-extension-0.5.6.zip` only after the website commit with popup calls is live (the popup shows the live site).
 
 - **Single purpose:** Opens the user's private two-person Duri room (chat, calls, games, photos, anniversaries) from the Chrome toolbar, and optionally syncs Netflix playback for Duri's Watch together page.
