@@ -1,13 +1,13 @@
-# Duri compact extension 0.5.3
+# Duri compact extension 0.5.4
 
-Build: `npm run extension:release`. The output is `dist/duri-extension-0.5.3.zip` pointing at the production Duri website.
+Build: `npm run extension:release`. The output is `dist/duri-extension-0.5.4.zip` pointing at the production Duri website.
 
 1. Unzip it into a stable folder.
 2. Open `chrome://extensions`, enable Developer mode, and choose Load unpacked. Select the folder containing `manifest.json`.
 3. If updating an existing unpacked installation, replace that folder's files with this version and click Reload on its extension card. Otherwise disable/remove the old Duri extension so only the new icon is active.
 4. Pin Duri. Sign in using the same Chrome profile as the website. The popup contains the current room and all seven tabs.
 
-Toolbar controls: refresh, open/focus a small persistent window, open the full website. A 440×600 toolbar popup closes when you click outside it. For a continuing call, Netflix, or a file picker that closes the toolbar, open the small window first. The small window is 460×680 including browser framing and can be resized. Google login opens in that small window; complete login there, then reopen/refresh the toolbar. Camera and microphone permissions belong to the Duri website.
+Toolbar controls: refresh, open/focus a small persistent window, open the full website. A 440×600 toolbar popup closes when you click outside it. For a continuing call, Netflix, or a file picker that closes the toolbar, open the small window first. The small window is 440×600 including browser framing and can be resized. Google login opens in that small window; complete login there, then reopen/refresh the toolbar. Camera and microphone permissions belong to the Duri website.
 
 The website's own-origin host permission supports the authenticated embedded room. The extension does not read arbitrary browsing pages, store your conversation or copy credentials. Netflix's optional watch integration only runs on its watch pages. Future website feature/design updates appear when the room loads again; changes to packaged Chrome permissions or toolbar code require an extension update. Chrome Web Store publication and approval are separate from an unpacked installation.
 
@@ -21,4 +21,6 @@ Authenticated embedding: Chrome's same-site network exemption does not expose Sa
 
 ## Calls across room tabs
 
-The shared `/room` layout owns call signaling and media. Internal navigation uses Next links, so Games, Album, Watch, Home and Settings retain the same peer connection and audio element. A bottom dock provides mute/end controls, with collapsible video outside Chat. The dock reserves its measured height to keep game controls reachable. Incoming calls can be accepted from any room tab. A dedicated authenticated realtime client prevents page-specific channel cleanup from unsubscribing the call listener. Logging out, leaving the room, closing or reloading the document, or losing signaling ends the session and releases media. A Chrome toolbar popup still closes when it loses focus; use the persistent small window for ongoing sessions. Website layout updates appear on refresh; the startup changes require extension 0.5.3.
+The shared `/room` layout owns call signaling and media. Internal navigation uses Next links, so Games, Album, Watch, Home and Settings retain the same peer connection and audio element. A bottom dock provides mute/end controls, with collapsible video outside Chat. The dock reserves its measured height to keep game controls reachable. Incoming calls can be accepted from any room tab. A dedicated authenticated realtime client prevents page-specific channel cleanup from unsubscribing the call listener. Logging out, leaving the room, closing or reloading the document, or losing signaling ends the session and releases media. A Chrome toolbar popup still closes when it loses focus; use the persistent small window for ongoing sessions. Website layout updates appear on refresh; the startup changes require extension 0.5.4.
+
+The 0.5.4 launcher explicitly requests a normal popup, reapplies 440×600 bounds after creation, and normalizes/resizes a reused window without navigating its document. Resize errors report failure instead of opening a duplicate call window. The toolbar Call in a small window button uses this same launcher. Updating the website alone cannot replace an installed unpacked extension; install/reload the new extension package.
