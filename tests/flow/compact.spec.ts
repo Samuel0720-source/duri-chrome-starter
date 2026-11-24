@@ -15,7 +15,7 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
   const unpacked = await buildExtension(origin, testInfo.outputPath("extension"));
   const context = await playwright.chromium.launchPersistentContext(testInfo.outputPath("profile"), {
     baseURL: origin, headless: true, channel: "chromium", locale: "ko-KR",
-    viewport: { width: 440, height: 600 },
+    viewport: null,
     executablePath: process.env.CHROMIUM_PATH || undefined,
     ignoreDefaultArgs: ["--disable-extensions"], args: ["--enable-unsafe-extension-debugging", "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"],
   });
@@ -51,6 +51,7 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(a.getByText("두 사람이 모두 들어왔어요.")).toBeVisible();
 
     const popup = await context.newPage();
+    await popup.setViewportSize({ width: 440, height: 600 });
     const openedAt = performance.now();
     await popup.goto("chrome-extension://" + id + "/popup.html");
     const app = popup.frameLocator("#app");
@@ -141,7 +142,14 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await app.getByRole("link", { name: "Chat", exact: true }).click();
     await expect(app.getByText("Your partner can reply here", { exact: true })).toBeVisible();
     await expect(app.locator(".popup-call-launch")).toBeEnabled();
-    const [small] = await Promise.all([context.waitForEvent("page"), popup.locator("#detach").click()]);
+    // Exercise the user's actual call button, not just the toolbar's detach shortcut.
+    const [small] = await Promise.all([context.waitForEvent("page"), app.locator(".popup-call-launch").click()]);
+    await expect.poll(() => popup.evaluate("chrome.windows.getAll({windowTypes:['popup']})")).toEqual([
+      expect.objectContaining({ type: "popup", state: "normal", width: 440, height: 600 }),
+    ]);
+    const native = await context.newCDPSession(small);
+    const { windowId } = await native.send("Browser.getWindowForTarget");
+    await expect.poll(async () => (await native.send("Browser.getWindowBounds", { windowId })).bounds).toMatchObject({ width: 440, height: 600, windowState: "normal" });
     await expect(small).toHaveURL(url => url.pathname === "/room/chat" && url.searchParams.get("mini") === "1");
     await expect(small.getByText("Your partner can reply here", { exact: true })).toBeVisible();
     await expect(small.locator("html")).toHaveAttribute("lang", "en");
@@ -170,6 +178,16 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
       live: (audio.srcObject as MediaStream).getAudioTracks()[0].readyState,
     }));
     const original = await media(small);
+    // The call survives focus moving to another browser tab and reopening the extension.
+    await a.bringToFront();
+    const reopened = await context.newPage();
+    await reopened.goto("chrome-extension://" + id + "/popup.html");
+    expect(await reopened.evaluate("chrome.runtime.sendMessage({duri:'open-small',path:'/room'})")).toEqual({ ok: true });
+    await expect(small).toHaveURL(/\/room\/chat\?mini=1$/);
+    expect((await media(small)).id).toBe(original.id);
+    expect((await media(small)).live).toBe("live");
+    await expect.poll(async () => (await native.send("Browser.getWindowBounds", { windowId })).bounds).toMatchObject({ width: 440, height: 600, windowState: "normal" });
+    await reopened.close();
     await b.getByRole("link", { name: "앨범", exact: true }).click();
     await expect(b).toHaveURL(/\/room\/album$/);
     for (const path of ["game", "draw", "album", "settings", "watch"]) {
