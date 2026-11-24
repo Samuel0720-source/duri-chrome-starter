@@ -44,9 +44,9 @@ npm run extension:release https://내도메인.ca     # 도메인을 연결한 �
 - Provide reviewer test instructions/accounts through the store's private review fields; never commit account credentials.
 - Store approval is separate from the automated test suite. Official references: https://developer.chrome.com/docs/webstore/program-policies/mv3-requirements and https://developer.chrome.com/docs/webstore/program-policies/user-data-faq . An isolated web iframe is not blanket approval of undisclosed or unreviewable remote functionality.
 
-## 0.5.5 store submission · copy-paste text (English dashboard)
+## 0.5.6 store submission · copy-paste text (English dashboard)
 
-Upload `dist/duri-extension-0.5.5.zip` only after the website commit with popup calls is live (the popup shows the live site).
+Upload `dist/duri-extension-0.5.6.zip` only after the website commit with popup calls is live (the popup shows the live site).
 
 - **Single purpose:** Opens the user's private two-person Duri room (chat, calls, games, photos, anniversaries) from the Chrome toolbar, and optionally syncs Netflix playback for Duri's Watch together page.
 - **storage justification:** Remembers the last opened Duri screen, language and theme on this device, and the id of the optional small window for the browser session. No messages, photos or login tokens are stored.
