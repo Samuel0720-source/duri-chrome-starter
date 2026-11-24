@@ -31,8 +31,9 @@ jobs:
         run: |
           sudo apt-get install -y -qq ffmpeg > /dev/null
           a=$(ls demo-out/video-A/*.webm | head -1); b=$(ls demo-out/video-B/*.webm | head -1)
-          ffmpeg -loglevel error -i "$a" -i "$b" -filter_complex "[0:v][1:v]hstack=inputs=2,format=yuv420p" -c:v libx264 -preset veryfast -crf 30 -movflags +faststart demo-side-by-side.mp4
-          mkdir -p pub && cp demo-side-by-side.mp4 pub/ && cp demo-out/shots/*.png pub/
+          [ -n "$a" ] && ffmpeg -loglevel error -i "$a" -i "$b" -filter_complex "[0:v][1:v]hstack=inputs=2,format=yuv420p" -c:v libx264 -preset veryfast -crf 30 -movflags +faststart demo-side-by-side.mp4 || true
+          mkdir -p pub/store && cp demo-side-by-side.mp4 pub/ && cp demo-out/shots/*.png pub/ || true
+          for f in demo-out/store/*.png; do n=$(basename "$f" .png); ffmpeg -loglevel error -y -i "$f" -vf "scale=-1:720,pad=1280:800:(ow-iw)/2:(oh-ih)/2:color=0xF7E9EC" "pub/store/$n-1280x800.png"; done
           cd pub && git init -q && git checkout -q -b demo-recordings && git add . \
             && git -c user.name="Samuel Koo" -c user.email="samuelkoo0720@gmail.com" commit -qm "Demo recording $GITHUB_SHA" \
             && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" demo-recordings
