@@ -51,12 +51,30 @@ test("store screenshots", async ({ browser }) => {
     await p.locator(`.chess-sq[data-name="${to}"]`).click();
     await expect((p === white ? black : white).locator(".chess-move-list")).toContainText(to, { timeout: 15_000 });
   }
+  // A little heart on the shared board, drawn by A.
+  await a.goto("/room/draw");
+  const canvas = a.locator("canvas").first();
+  await canvas.scrollIntoViewIfNeeded();
+  const box = (await canvas.boundingBox())!;
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2, r = Math.min(box.width, box.height) / 5;
+  await a.mouse.move(cx, cy + r * 1.4);
+  await a.mouse.down();
+  for (let i = 0; i <= 60; i++) {
+    const t = (i / 60) * 2 * Math.PI;
+    const x = 16 * Math.sin(t) ** 3, y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+    await a.mouse.move(cx + (x / 16) * r * 1.3, cy - (y / 16) * r * 1.3, { steps: 2 });
+  }
+  await a.mouse.up();
+  await a.waitForTimeout(1500);
   for (const lang of ["ko", "en"]) {
     await a.context().addCookies([{ name: "duri_lang", value: lang, url: process.env.FLOW_URL! }]);
     for (const [path, name] of [["/room", "home"], ["/room/chat", "chat"], ["/room/game?g=chess", "games"], ["/room/draw", "draw"]]) {
       await a.goto(path);
       await a.waitForLoadState("networkidle").catch(() => {});
       await a.waitForTimeout(800);
+      const focus = name === "games" ? ".chess-board" : name === "draw" ? "canvas" : null;
+      if (focus) await a.locator(focus).first().evaluate((el) => window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - 70)));
+      await a.waitForTimeout(300);
       await a.screenshot({ path: `demo-out/store/${lang}-${name}.png` });
     }
   }
