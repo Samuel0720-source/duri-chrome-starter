@@ -1,15 +1,14 @@
-# 여섯 단계와 첫 사용자 테스트
+# Six phases and the first user test
 
-**첫 커플에게 줄 베타는 3단계 끝**이다. 한 사람이 초대하고 다른 사람이 들어와 서로의 선택을 맞힌 뒤 다음 날 같은 방에 돌아올 수 있으면 사용해 볼 이유가 생긴다. 단계 안의 큰 기능은 각각 프리뷰로 배포하고, 양쪽 브라우저에서 통과한 결과와 링크를 STATUS에 남긴다.
+**The beta for the first couple is the end of phase 3.** Once one person can invite, the other can join, they can guess each other's picks, and they can come back to the same room the next day, there is a reason to try it. Each large feature in a phase ships to its own preview, and the passing results from both browsers and the link go into STATUS.
 
-| 단계 | 만들 것 | 통과 기준 | 담당과 스킬 |
+| Phase | Build | Exit criteria | Owner and skills |
 |---|---|---|---|
-| 1. Chrome에서 열기 | 툴바 날짜 계산, 작은 창, 전체 웹, PWA, 기념일. 로컬 기본판 제공 | 팝업 → 소형 창 → 전체 탭에서 입력 유지. 320/390/768/1440px, 독립 설치 창, 오프라인 안내, HTTPS 프리뷰 확인 | phase-planner, qa-runner. UI 변경 시 설치된 Hallmark |
-| 2. 계정과 방 | 이메일 링크 로그인, 초대·재접속, 비공개 채널, 방 나가기·내 데이터/계정 삭제 | 두 명 중 한 명만 마지막 자리 획득. A/B/C 세 계정으로 직접 URL·API·구독 검사. 종료 뒤 옛 구독에 새 데이터 없음 | data-reviewer, qa-runner |
-| 3. 첫 커플 베타 | 공유 달력·다섯 무드, 일반 채팅, ‘상대 선택 맞히기’ 한 게임 | 두 답 전 공개 없음. 서로 다른 시각에 제출·공개. 새 기기에서 기록·무드 복원. 한 커플의 초대부터 재방문까지 확인 | qa-runner. 데이터 노출 변경 시 data-reviewer, UI 변경 시 Hallmark 또는 UI UX Pro Max |
-| 4. 함께 하는 활동 | 100초 그림 퀴즈, YouTube 함께 보기. 각각 별도 프리뷰 | 그림 복원·100초 서버 마감·비밀 단어·최단 기록. 영상은 준비 버튼·1초 초과 보정·재접속·임베드 제한 복구 | qa-runner, 비밀 단어 경로는 data-reviewer |
-| 5. AI와 장소 | 활동 추천, 기념일 계획, 동의한 대화 요약. 5km 장소 검색은 예산 설정 후 연결 | 5,000m 경계 포함. 두 사람 동의·철회, 추천 중복 클릭, 동시 호출 한도·비용 차단 검증 | data-reviewer, qa-runner. ECC 등은 설치본 설명이 맞을 때 적용 |
-| 6. 추가 게임과 출시 | 오목 → 미니골프 1홀 → 3홀. 준비된 .com 또는 .ca 연결 및 확장 배포용 빌드 | 오목 중복 수·승패 한 번. 미니골프 샷 중복·두 공 동시 진행·재접속 검증. 실제 도메인의 콜백·초대·확장 연결 주소 확인 | phase-planner, qa-runner. DB 쓰기 변경은 data-reviewer |
+| 1. Open from Chrome | Toolbar date calculator, small window, full web app, PWA, anniversaries. A local baseline | Input carries over popup → small window → full tab. 320/390/768/1440 px, standalone install window, offline notice, HTTPS preview checked | phase-planner, qa-runner. Installed Hallmark for UI changes |
+| 2. Accounts and rooms | Email-link sign-in, invites and returning, private channel, leaving the room, deleting my data and account | Of two people, only one gets the last seat. Direct URL, API and subscription checks with three accounts A/B/C. After a room closes, old subscriptions receive no new data | data-reviewer, qa-runner |
+| 3. First couple beta | Shared calendar and five moods, plain chat, one game: "guess your partner's pick" | Nothing revealed before both answers. Submit and reveal at different times. History and mood restored on a new device. One couple checked from invite to return visit | qa-runner. data-reviewer for data-exposure changes, Hallmark or UI UX Pro Max for UI changes |
+| 4. Doing things together | 100-second drawing quiz, YouTube watch together, each on its own preview | Drawing restore, 100 s server deadline, secret word, best times. Video: ready button, correction above 1 s, reconnect, recovery from embed restrictions | qa-runner, data-reviewer for the secret-word path |
+| 5. AI and places | Activity suggestions, anniversary plans, summaries of consented chat. 5 km place search connected after a budget is set | 5,000 m boundary included. Consent and withdrawal by both, duplicate clicks on a suggestion, concurrent-call limits and spending block verified | data-reviewer, qa-runner. ECC and similar when the installed description fits |
+| 6. More games and release | Gomoku → mini golf 1 hole → 3 holes. Connect a .com or .ca domain and build the extension for distribution | Gomoku duplicate moves and win/loss counted once. Mini golf duplicate shots, two balls in play at once, reconnects. Callbacks, invites and extension address checked on the real domain | phase-planner, qa-runner. data-reviewer for DB write changes |
 
-P1은 외부 계정 없이 로컬에서 시작한다. 프리뷰부터 테스트용 계정과 테스트 전용 Supabase를 사용한다. 한 단계의 배포 링크, 커밋, 통과한 검사, 직접 보지 못한 동작을 `docs/STATUS.md`에 남긴다. 게임이 늘어날수록 추천 목록도 실제 배포된 게임 목록을 기준으로 갱신한다.
-
+P1 starts locally without external accounts. From the first preview on, test accounts and a test-only Supabase project are used. Each phase records its deploy link, commit, passing checks and behaviour not directly observed in `docs/STATUS.md`. As games are added, the recommendation list follows the games actually deployed.

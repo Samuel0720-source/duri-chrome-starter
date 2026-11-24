@@ -1,48 +1,47 @@
-# 제품 규칙과 단계별 검증
+# Product rules and checks per phase
 
-## 달력과 영상
+## Calendar and video
 
-- 시작일은 1일째. 미래 시작일도 저장할 수 있고 그 전에는 ‘첫날까지 D−n’을 표시한다. 방의 IANA 시간대로 오늘의 달력 날짜를 구한다. 기기 간 시차와 DST 변화는 경과 일수에서 시각 차이로 나누지 않는다.
-- 2월 29일 시작이면 평년의 연 기념일은 2월 28일. 100의 배수 당일은 오늘의 기념일과 **다음** 백 단위를 함께 표시한다. 예시 시작일 2026-08-13, 100일 2026-11-20, 200일 2027-02-28.
-- 영상 상태는 videoId, position, 서버 기준 시각, 재생 여부, 증가하는 revision으로 저장한다. 재생 중 목표 위치는 기준 위치 + 서버 경과 시간이다. 일시정지면 기준 위치 그대로다. 오래된 revision과 자기 이벤트는 무시한다.
-- 정기 점검은 양쪽이 준비됐고 버퍼링·광고 상태가 아닐 때만 한다. 위치 차이가 **1.0초 초과**이며 마지막 자동 보정 이후 3초 이상 지났을 때만 재조정한다. 정확히 1초면 유지한다. 사용자가 직접 누른 재생·일시정지·탐색과 재접속은 이 쿨다운과 별개로 즉시 적용한다.
+- The start date is day 1. A future start date can be saved; until then the screen shows "D−n until day one". Today's calendar date comes from the room's IANA time zone. Time differences between devices and DST changes are never used to divide elapsed days by hours.
+- If the start date is February 29, the yearly anniversary in a common year is February 28. On a multiple of 100 days, the screen shows today's mark together with the **next** hundred. Example: start 2026-08-13, 100 days 2026-11-20, 200 days 2027-02-28.
+- Video state is stored as videoId, position, server reference time, playing flag and an increasing revision. While playing, the target position is the reference position plus server elapsed time; while paused, it is the reference position. Stale revisions and your own events are ignored.
+- The periodic check runs only when both sides are ready and neither is buffering or showing an ad. It re-syncs only when the gap is **more than 1.0 s** and at least 3 s have passed since the last automatic correction; exactly 1 s is left alone. Play, pause and seek pressed by a person, and reconnects, apply immediately regardless of this cooldown.
+- Watch together accepts only YouTube, Vimeo and https video files (.mp4 .webm .ogg .ogv .mov .m4v). While playing, that site can see both people's IP addresses (stated in the privacy policy). DRM services such as Netflix are not embedded (see the Netflix section).
 
-- 같이 보기 링크는 YouTube·Vimeo·https 영상 파일(.mp4 .webm .ogg .ogv .mov .m4v)만 받는다. 재생할 때 그 사이트가 두 사람의 IP 주소를 볼 수 있다(개인정보처리방침에 고지). DRM 서비스(Netflix 등)는 지원하지 않는다.
+## Album and room background
 
-## 앨범과 방 배경
+- Photos live only in a private bucket; only the two people in the room can upload, view and delete them (Storage policies). The list (`room_photos`) changes only through functions. Only the uploader can remove a photo from the album. The room background is one album photo, the same for both people. 200 photos per room, 5 MB per file, JPEG/WebP only (the browser re-encodes to JPEG and strips camera data). Leaving the room or deleting the account deletes the files first, and stops if file deletion fails. Photos already downloaded may stay in that browser's cache (up to 7 days, private).
 
-- 사진은 비공개 버킷에만, 방의 두 사람만 올리기·보기·지우기 가능(Storage 정책). 목록(room_photos)은 함수로만 바꿈. 앨범에서 빼기는 올린 사람만. 방 배경은 앨범 사진 하나이고 두 사람 같은 배경. 방당 200장, 파일당 5MB, JPEG/WebP만(브라우저가 JPEG로 다시 만들며 카메라 정보 제거). 방 나가기·계정 삭제는 파일을 먼저 지운 뒤 진행하고, 파일 삭제가 실패하면 진행하지 않음. 이미 받은 사진은 그 브라우저 캐시(최대 7일, 비공개)에 남을 수 있음.
+## Sign-in
 
-## 로그인
+- Google, or email and password (at least 8 characters; first sign-in after confirming the email). Password reset: mail link → set a new password in the same browser. No Apple sign-in until there is a (paid) Apple developer account.
 
-- Google 또는 이메일+비밀번호(8자 이상, 이메일 확인 후 첫 로그인). 비밀번호 찾기는 메일 링크 → 같은 브라우저에서 새 비밀번호. Apple 로그인은 Apple 개발자 등록(유료) 전까지 없음.
+## Netflix watch together
 
-## 넷플릭스 같이 보기
+- No account sharing and no screen relaying (DRM and Netflix's terms). Each person watches on their own Netflix; the extension passes only play state, seconds and the title number to the Watch together page on the same computer. Desktop Chrome only.
 
-- 계정 공유·화면 중계는 하지 않음(DRM·넷플릭스 약관). 각자 자기 넷플릭스로 보고, 확장은 재생 상태·초·작품 번호만 같은 컴퓨터의 함께 보기 페이지로 전달. 컴퓨터 Chrome에서만 가능.
+## Nicknames and read receipts
 
-## 애칭과 읽음 표시
+- Nicknames are 1 to 20 characters with no control characters; clearing one removes it. The nickname I choose is used only on my screen (my partner can see it, but their screen uses the name they chose). Read receipts store only "the last message number read and when", updated only while the screen is visible and focused. They are deleted with the room when it closes.
 
-- 애칭은 1–20자, 제어문자 금지, 비우면 지움. 내가 정한 애칭은 내 화면에만 쓰인다(상대도 볼 수 있지만 상대 화면 이름은 상대가 정함). 읽음 표시는 “마지막으로 읽은 메시지 번호와 시각”만 저장하고, 화면이 보이고 포커스가 있을 때만 갱신한다. 방이 닫히면 방과 함께 지워진다.
+## Data lifetime and permissions
 
-## 데이터 수명과 권한
-
-| 행동 | 결과 |
+| Action | Result |
 |---|---|
-| 탭 닫기 또는 로그아웃 | 계정·방·기록은 서버에 남는다. 로그인하면 복원한다. |
-| 방 나가기 | ‘방이 닫히고 두 사람 모두 공유 기록에 접근할 수 없어요’를 확인한 뒤 종료한다. 즉시 두 좌석·초대를 회수하고 상대 개인 알림함에 ‘파트너가 방을 나갔어요’를 남긴다. 방을 새 파트너로 다시 채우지 않는다. 본인 작성 데이터의 삭제는 별도 개인 메뉴로 지원한다. |
-| 내 데이터 삭제 | 활성·종료 방 모두 본인이 작성한 메시지·저장 취향을 계정 메뉴에서 선택 삭제할 수 있다. 연결된 요약·인용·메모리와 저장된 첨부물까지 없애거나 근거를 다시 계산한다. 다른 사람 단독 자료에는 삭제 권한을 주지 않는다. 종료 방의 공동 데이터는 사전 안내한 기간 뒤 정리한다. 제안 기본값은 30일이며 P2에서 보존 안내와 정리 작업을 함께 구현한다. |
-| 계정 삭제 | 최근 인증과 명시적 확인 후 본인 방 종료 → 본인 개인 데이터·객체·파생 데이터 정리 → 서버에서 Auth 계정을 삭제한다. 실패 시 재시도할 삭제 작업 ID를 기록한다. 다른 멤버의 계정은 유지한다. 백업 잔존 기한은 운영 환경 정책을 확인해 고지한다. |
+| Close the tab or sign out | Account, room and history stay on the server and come back on the next sign-in. |
+| Leave the room | After confirming "The room closes and neither of you can access the shared history", the room ends. Both seats and any invite are revoked at once, and the partner's personal inbox gets "Your partner left the room". The room is never refilled with a new partner. Deleting your own data is a separate personal menu. |
+| Delete my data | In both active and closed rooms, you can choose to delete messages and saved preferences you wrote from the account menu. Linked summaries, quotes, memories and stored attachments are removed or recomputed. You get no delete rights over material that belongs only to someone else. Shared data in closed rooms is cleaned up after a period announced in advance (proposed default 30 days), with the retention notice and cleanup job built together. |
+| Delete account | After recent authentication and explicit confirmation: close your rooms → clean up your personal data, objects and derived data → delete the Auth account on the server. On failure, a deletion job id is recorded for retry. The other member's account stays. How long backups keep data is checked against the hosting policy and disclosed. |
 
-테이블 RLS뿐 아니라 Storage 경로, Realtime 비공개 채널의 `realtime.messages` 정책, RPC와 REST 직접 호출도 테스트한다. 채널은 방마다 고유한 세대 ID를 사용하고 종료 시 그 채널에 새 이벤트 발행을 중단한다. Realtime 권한은 연결 동안 캐시될 수 있으므로 기존 연결로도 새 메시지가 새지 않는지 확인한다. 토큰·원문 대화·정확한 좌표·비공개 게임 답은 로그나 공개 분석 이벤트에 싣지 않는다. [Supabase Realtime 권한](https://supabase.com/docs/guides/realtime/authorization) · [행 단위 권한](https://supabase.com/docs/guides/database/postgres/row-level-security)
+Tests cover not just table RLS but also Storage paths, the `realtime.messages` policy for private Realtime channels, and direct RPC and REST calls. Each room's channel uses a unique generation id, and no new events are published on it after the room closes. Realtime permissions can be cached for the life of a connection, so tests check that an existing connection does not receive new messages either. Tokens, raw chat, exact coordinates and private game answers never go into logs or public analytics events. [Supabase Realtime authorization](https://supabase.com/docs/guides/realtime/authorization) · [Row-level security](https://supabase.com/docs/guides/database/postgres/row-level-security)
 
-## 비용과 외부 서비스 (P5)
+## Cost and external services (P5)
 
-- 초기값은 PAID_API_ENABLED=false, 외부 API 월 예산 CAD 0. 파일럿용 제안은 **프로젝트 전체 CAD 15/UTC월**, **방마다 AI 10회, 장소 API 3회/UTC일**. 도메인·호스팅·Claude Code 자체 이용료는 별도 항목이다. 이 숫자는 운영자가 결정하는 예산이며 서비스의 실제 가격이 아니다.
-- 키는 서버 전용이다. 무료 구간이 끝나도 호출이 무한히 나가지 않도록 모든 유료 요청(재시도·장소 세부 조회 포함)을 서버 한 경로에서 계수한다. 여러 인스턴스가 같은 PostgreSQL 원장을 사용한다. room/day와 project/month를 한 트랜잭션에서 잠그고 idempotency key로 최악 예상 금액을 예약한다. 한도 초과, 가격/환율표 누락, 결제 사용 꺼짐이면 **상위 API 호출 전에** 차단한다. 응답 후 실사용량 정산, 타임아웃으로 과금 여부 불명 시 보수적으로 예약을 유지한다.
-- 서버별 토큰·결과 필드·최대 출력·재시도 제한을 둔다. 80% 알림, 앱 차단, 공급자 쿼터를 함께 사용한다. 예상 비용 상한과 실제 청구서 차이를 검토한다. Google Cloud의 알림형 예산만으로 청구가 차단되지는 않는다. [Google Cloud 예산](https://docs.cloud.google.com/billing/docs/how-to/budgets) · [Places 과금](https://developers.google.com/maps/documentation/places/web-service/usage-and-billing)
-- 반경 5,000m는 사용자가 고른 한 중심점에서의 직선거리이며 경계를 포함한다. 허용한 결과만 화면에 표시하고 장소 ID·사용자 약속 메모처럼 장기 저장 가능한 필드만 저장한다. AI 요약은 두 사람이 허용한 범위와 근거 메시지로 제한한다. 동의를 철회하면 이후 사용을 중단하고 파생 요약을 정리한다.
+- Defaults: `PAID_API_ENABLED=false`, external API budget CAD 0 per month. Proposed pilot limits: **CAD 15 per UTC month for the whole project**, **10 AI calls and 3 place-API calls per room per UTC day**. Domain, hosting and developer-tool costs are separate. These numbers are an operator's budget, not the services' actual prices.
+- Keys are server-only. So that calls never run unbounded after a free tier ends, every paid request (retries and place-detail lookups included) is counted on one server path. All instances share the same PostgreSQL ledger. Room/day and project/month are locked in one transaction and the worst-case amount is reserved with an idempotency key. Over the limit, a missing price or exchange-rate entry, or billing turned off blocks the call **before** the upstream API is called. Actual usage is settled after the response; if a timeout leaves billing unknown, the reservation is kept, conservatively.
+- Per-server limits on tokens, result fields, maximum output and retries. An 80% alert, the in-app block and provider quotas are used together. The estimated cost ceiling is compared with the real bill. A Google Cloud budget alert alone does not stop charges. [Google Cloud budgets](https://docs.cloud.google.com/billing/docs/how-to/budgets) · [Places billing](https://developers.google.com/maps/documentation/places/web-service/usage-and-billing)
+- The 5,000 m radius is straight-line distance from one centre point the user picks, boundary included. Only allowed results are shown, and only fields that may be stored long-term (place id, the user's own plan notes) are saved. AI summaries are limited to the range and source messages both people allowed. Withdrawing consent stops further use and cleans up derived summaries.
 
-## 프리뷰와 출시
+## Previews and release
 
-프리뷰와 운영은 DB/인증 리디렉션/키를 분리한다. 초대와 로그인 복귀의 origin은 확인된 HTTPS 호스트를 사용한다. URL 토큰은 로그/분석에서 삭제한다. HTTPS 프리뷰와 .com/.ca 운영 도메인을 구별하고 DNS·인증서·두 기기의 로그인을 검증한 뒤 실제 링크를 STATUS에 남긴다.
+Preview and production use separate databases, auth redirects and keys. Invites and sign-in returns use a verified HTTPS origin. URL tokens are stripped from logs and analytics. HTTPS previews are kept distinct from the .com/.ca production domain, and the real link is recorded in STATUS only after DNS, certificates and sign-in on two devices are verified.

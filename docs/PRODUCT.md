@@ -1,26 +1,30 @@
-# 둘이 · 단계별 제품 명세
+# Duri · product spec by phase
 
-대상은 서로 다른 기기에서 5~15분 함께 보내고 싶은 두 사람이다. 모바일/태블릿/데스크톱 Chrome에서 같은 주소로 사용하고 필요하면 PWA로 설치한다. 이 문서는 기존 커플방 명세를 작은 작업 단위로 정리한 버전이다. 구현 진행 순서와 종료 기준은 PHASES, 동작 정책은 POLICIES가 기준이다.
+Duri is for two people on different devices who want to spend 5 to 15 minutes together. It runs at the same address in Chrome on phone, tablet and desktop, and can be installed as a PWA. This document breaks the couple-room spec into small units of work. PHASES is the source of truth for build order and exit criteria; POLICIES is the source of truth for behaviour rules.
 
-## 접속과 홈 (P1–P3)
-- Chrome 데스크톱의 툴바에서는 첫날·시간대를 선택해 기념일을 계산하고, 버튼으로 작은 독립 창이나 전체 웹을 연다. 작은 창에서 날짜를 바꾼 뒤 전체 웹으로 이어져야 한다. 확장 설치, 웹의 PWA 설치, 보통 URL 접속은 각각 따로 사용할 수 있다. P1의 기념일 계산기는 공개 미리보기이고, 실제 방의 날짜 동기화는 P2–P3에서 붙인다.
-- 공개 홈의 주요 동작은 로그인 또는 초대 수락이다. 한 사람당 독립 계정, 방마다 정원 두 명. 이메일 인증 링크를 기본으로 하고 로그인 후 원래 초대로 복귀한다. 처음 링크 발급·복사, 대기, 두 번째 사람 입장, 만료/사용 완료/정원 초과, 재방문을 설계한다.
-- 홈에는 함께한 일수, 다음 백 단위 기념일, 연간 기념일과 다음 만남 D-day를 표시한다. 시작일·약속·공유 기준 시간대는 수정·저장 가능하다. 홈의 주 버튼은 상황에 맞게 ‘상대 초대하기’, ‘이어서 하기’, ‘같이 할 게임 고르기’ 중 하나다.
-- ‘홈 / 게임 / 함께 보기 / 대화’가 주 메뉴다. 설정의 ‘방 무드’에서 베리 크림·숲속 산책·비 오는 카페·노을 피크닉·심야 영화관을 미리 보고 적용한다. 같은 방의 상대와 다음 로그인에 반영한다. 320/390px 휴대폰, 768px 태블릿, 1440px 데스크톱·창 크기 변경·독립 창까지 확인한다. 키보드 포커스와 차례 표시가 각 무드에서 분명해야 한다.
-- 약속·채팅·공유 무드·진행 중인 게임·점수는 서버에 저장한다. 새로고침, 탭 닫기, 로그아웃 후 다른 기기 로그인으로 마지막 확정 상태를 복원한다. 방 나가기 및 명시적 삭제는 POLICIES의 별도 동작이다.
+## Access and home (P1–P3)
 
-## 두 사람이 노는 네 가지 게임 (P3, P4, P6)
-1. **상대 선택 맞히기**. 3라운드. 각자 자신의 답과 상대 예상 답을 제출한다. 둘 다 제출할 때까지 상대용 API와 채널에서 실제 선택을 숨긴다. 다른 시간에 제출하거나 재로그인해도 이어진다.
-2. **100초 그림 퀴즈**. 음식·동물·사물·장소·데이트 활동 중 고른 뒤 두 사람 준비가 끝나면 서버에서 마감 시각을 정한다. 한 명은 펜·굵기·획 되돌리기로 단어를 그리고, 다른 한 명은 텍스트로 맞힌다. 제시어는 그리는 사람에게만 전달하고, 서버에서 정규화한 정답/허용 표기와 비교한다. 오답은 재시도, 정답·시간 만료는 한 번만 확정. 카테고리별 커플 최단 정답 시간과 이번 기록을 표시한다. 다음 판 역할 교대, 새로고침 후 그림과 남은 시간 복원이 가능해야 한다.
-3. **동시 미니골프**. 서로의 턴을 기다리지 않고 같은 코스에서 구분되는 공을 드래그로 친다. 서버가 한 샷을 계산한 뒤 두 기기가 경로를 재생한다. 공끼리는 통과하고 벽과 장애물에는 충돌한다. 둘 다 들어가면 다음 홀. 1홀과 3홀 코스의 최저 합계 타수는 분리한다. 샷 재전송, 동시 완료, 새 기기에서 공 위치·타수 복구를 검사한다.
-4. **1대1 오목(P6)**. 15×15 자유 규칙. 각자 턴에 빈칸에 돌을 놓고 가로/세로/대각선 5개 이상이면 승리, 보드가 다 차면 무승부. 모바일은 위치 미리보기, 마지막 수·승리선 강조, 재대결 때 선공 교대, 누적 전적·보드 복원.
+- In desktop Chrome, the toolbar lets you pick a first day and time zone to compute anniversaries, then open a small standalone window or the full web app with a button. A date changed in the small window must carry over to the full web app. Installing the extension, installing the web app as a PWA, and visiting the URL each work on their own. The P1 anniversary calculator is a public preview; syncing the real room's date comes in P2–P3.
+- The main actions on the public home page are sign in and accept an invite. One account per person, two people per room. Email confirmation links are the default, and after sign-in you return to the original invite. Designed flows: issuing and copying the first link, waiting, the second person joining, expired / already used / room full, and returning visits.
+- Home shows days together, the next hundred-day mark, yearly anniversaries and a D-day to the next meeting. The start date, plans and shared time zone can be edited and saved. Home's main button adapts: "Invite your partner", "Continue", or "Pick a game to play together".
+- The main menu is Home / Games / Watch together / Chat. In Settings, "Room mood" previews and applies Berry Cream, Forest Walk, Rainy Café, Sunset Picnic and Midnight Cinema, and the partner sees it on their next load. Checked at 320/390 px phones, 768 px tablet, 1440 px desktop, window resizing and the standalone window. Keyboard focus and whose-turn indicators must stay clear in every mood.
+- Plans, chat, shared mood, games in progress and scores are stored on the server. A reload, closing the tab, or signing out and back in on another device restores the last confirmed state. Leaving the room and explicit deletion are separate actions described in POLICIES.
 
-## YouTube 함께 보기 (P4)
-한 사람이 한 영상 링크 입력 → 양쪽 준비 완료 → 공식 플레이어로 함께 재생. 서버에서 revision이 있는 재생·일시정지·탐색 상태를 확정한다. 돌아온 사용자는 현재 시점으로 복귀하고 둘이 떠나면 마지막 함께 본 시점을 저장한다. 잘못된 주소, 삽입 제한, 자동재생 차단, 버퍼링에는 해당 기기에서 할 수 있는 다음 행동을 제공한다. 1초 보정 규칙은 POLICIES를 따른다. [YouTube IFrame Player](https://developers.google.com/youtube/iframe_api_reference)
+## Four games for two (P3, P4, P6)
 
-## 공유 AI 도우미 (P5) — 2026-11-14 Sam 요청으로 화면에서 잠시 뺌(나중에 다시 추가, 이전 코드는 git 기록에 있음)
-- 발화자 두 명과 AI를 표시하고 ‘우리 대화’와 ‘AI에게 묻기’를 구분한다. ‘10분, 경쟁은 싫어’, ‘말 안 해도 되는 걸로’처럼 후속 조건을 유지해 현재 제공 가능한 활동을 추천한다. 같은 추천을 양쪽이 눌러도 같은 게임 1개를 연다.
-- 기념일까지 날짜는 앱의 달력 함수에서 가져온다. 시간·예산에 맞는 계획 2개, ‘기념일에 저장’, 후속 수정·삭제를 제공한다.
-- 기준 장소를 확인하고 반경 5,000m 이내 실제 장소만 추천한다. 예를 들어 리치먼드–브리그하우스역 중심의 실내 데이트, 예산 CAD 40. 장소명·거리·근거·지도 열기·저장을 표시하고 확인된 범위에서만 영업시간/가격을 표시한다. 위치가 모호하거나 API가 없거나 결과가 없으면 그대로 안내한다.
-- 두 사람이 허용한 대화 기간/메시지에서 관심사를 요약한다. 함께 말한 것과 한 사람만 말한 것을 구분하고 근거 메시지로 연결한다. 검토 후 저장한 공유 취향만 이후 추천에 사용하고, 수정·삭제·동의 철회와 해당 요약 갱신을 지원한다.
-- 추천을 본 뒤 실제 게임이 시작되거나 약속이 저장된 비율을 커플·추천 ID 단위로 센다. 실패·재시도·예산 도달을 UI에 표시하고, AI 없이도 기본 게임과 달력을 쓸 수 있어야 한다.
+1. **Guess your partner's pick.** Three rounds. Each person submits their own answer and their guess of the partner's. Until both have submitted, the real choice is hidden from the partner's API responses and channel. Submitting at different times or after signing in again continues the game.
+2. **100-second drawing quiz.** Pick a category (food, animals, objects, places, date activities); once both are ready, the server sets the deadline. One person draws the word with pen, stroke width and undo; the other types guesses. The word goes only to the drawer and guesses are compared on the server against normalized accepted spellings. Wrong guesses can retry; a correct guess or the timeout is settled exactly once. Shows the couple's fastest correct time per category and this round's time. Roles swap next round, and the drawing and remaining time are restored after a reload.
+3. **Simultaneous mini golf.** Both people hit distinct balls on the same course by dragging, without waiting for turns. The server computes each shot and both devices replay the path. Balls pass through each other and collide with walls and obstacles. When both are in, the next hole starts. Best totals for 1-hole and 3-hole courses are kept separately. Tested: resent shots, simultaneous finishes, restoring ball positions and strokes on a new device.
+4. **One-on-one gomoku (P6).** 15×15 freestyle. On your turn, place a stone on an empty cell; five or more in a row horizontally, vertically or diagonally wins, and a full board is a draw. Placement preview on mobile, last move and winning line highlighted, first move alternates on rematch, running record and board restore.
+
+## YouTube watch together (P4)
+
+One person pastes a video link → both mark ready → playback starts together in the official player. The server confirms play, pause and seek state with a revision. A returning user jumps to the current moment, and when both leave the last shared position is saved. Invalid links, embed restrictions, blocked autoplay and buffering each show the next step that device can take. The 1-second correction rule follows POLICIES. [YouTube IFrame Player](https://developers.google.com/youtube/iframe_api_reference)
+
+## Shared AI helper (P5) · hidden from the app on 2026-11-14 at Sam's request (to return later; the earlier code is in git history)
+
+- Shows the two speakers and the AI, separating "our chat" from "ask the AI". Keeps follow-up conditions such as "10 minutes, nothing competitive" or "something we don't have to talk during" and recommends activities the app can actually offer now. If both press the same recommendation, one game opens.
+- Days until an anniversary come from the app's calendar functions. Offers two plans that fit the time and budget, "save to anniversary", and later edits or deletion.
+- Confirms a reference location and recommends only real places within 5,000 m, for example an indoor date centred on Richmond–Brighouse Station with a CAD 40 budget. Shows the place name, distance, reason, open-in-maps and save, and shows hours or prices only where confirmed. If the location is ambiguous, the API is unavailable or there are no results, it says so plainly.
+- Summarizes interests from the chat period or messages both people allowed, separating what both said from what only one said and linking to the source messages. Only shared preferences reviewed and saved are used for later recommendations, with edit, delete, consent withdrawal and refreshed summaries supported.
+- Counts, per couple and recommendation id, how often a recommendation leads to a game actually starting or a plan being saved. Failures, retries and budget limits are shown in the UI, and the basic games and calendar keep working without AI.
