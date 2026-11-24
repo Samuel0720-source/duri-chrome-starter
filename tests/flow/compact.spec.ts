@@ -231,7 +231,15 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await small.getByRole("button", { name: "Voice call", exact: true }).click();
     await expect(b.getByRole("button", { name: "받기", exact: true })).toBeVisible();
     await b.getByRole("button", { name: "받기", exact: true }).click();
-    await expect.poll(async () => (await media(small)).live).toBe("live");
+    // Non-trickle ICE may gather for 4.5 seconds on each peer, plus signaling.
+    // The default 5-second assertion can expire before the answer is sent.
+    for (const peer of [small, b]) {
+      await expect.poll(() => peer.evaluate(() => {
+        const audio = document.querySelector<HTMLAudioElement>(".call-box audio");
+        const track = (audio?.srcObject as MediaStream | null)?.getAudioTracks()[0];
+        return Boolean(track?.readyState === "live" && audio && !audio.paused && !audio.muted && audio.currentTime > 0.5);
+      }), { timeout: 30_000 }).toBe(true);
+    }
     await small.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(small).toHaveURL(/\/login/);
     await expect(small.locator(".call-box")).toHaveCount(0);
