@@ -118,7 +118,9 @@ test("toolbar call stays in place, survives closing/reopening, and releases medi
     await expect(app.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
     await app.locator('#chat-input').press('Enter');
     await expect(app.locator('.bubble').last()).toContainText('Still here during our call');
-    await expect(app.locator('[data-state="failed"]')).toHaveCount(0);
+    await expect(app.locator('[data-state="sending"]')).toHaveCount(0, { timeout: 15000 });
+    console.log('Chat delivery errors:', await app.locator('.chat .error').allTextContents());
+    await expect(app.locator('[data-state="failed"]')).toHaveCount(0); 
     await expect(b.getByText('Still here during our call', { exact: false })).toBeVisible({ timeout: 15000 });
     await app.getByRole("button", { name: "End call", exact: true }).click();
     await expect.poll(async () => (await inspect(audioState)).live).toBeUndefined();
