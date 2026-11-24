@@ -317,3 +317,9 @@
 - 다음 행동 하나: 0.5.5를 `npm run extension:release`로 만들어 맥 Chrome에서 다시 불러오기(새로고침) → 팝업 대화 탭에서 음성 통화 → 필요하면 ‘허용하기’ 한 번 → 상대와 소리 확인.
 - **출시 준비 확인(8c9a570, main):** 배포 주소 `/api/version`이 8c9a570과 일치. Check starter https://github.com/Samuel0720-source/duri-chrome-starter/actions/runs/45322257123 통과, live flow https://github.com/Samuel0720-source/duri-chrome-starter/actions/runs/45322257297 통과(팝업 안 음성 통화 → 상대 수락 → 소리 재생 → 끊기 포함, 가짜 장치). 스토어 설명 문구를 현재 기능으로, 개인정보처리방침에 권한 탭 설명 추가, `docs/RELEASE.md`에 0.5.5 제출용 영어 문구. ZIP `dist/duri-extension-0.5.5.zip` 27개 파일, 165322 bytes, sha256 9dd6963c2814938900f304fce48e511be2aaa3d067aa8490a2ed4d79028ea26f.
 - 다음 행동 하나: Sam이 스토어 대시보드에 ZIP 업로드 → RELEASE.md 0.5.5 문구 붙여 넣기 → 1280×800 스크린샷 → 처음엔 비공개로 올려 실제 맥에서 팝업 통화 확인 후 공개.
+
+### 출시 전 마지막 점검 · 2026-11-24
+- **추가:** `src/app/error.tsx`(화면 오류 시 흰 "Application error" 대신 ‘다시 시도 / 우리 방으로’), `src/app/global-error.tsx`(최상위 레이아웃 실패 시 두 언어 안내), `src/app/not-found.tsx`(404 안내 + 방으로), i18n 6개 키, `globals.css` 스타일.
+- **실제 사이트 점검(로그인 없이):** 공개 페이지 200, 방 화면은 로그인으로 리디렉션, 없는 주소 404, 잘못된 초대·OAuth 코드·사진 ID·`next=//evil.com` 모두 5xx 없음.
+- **검사:** typecheck, 빌드, 단위 77, DB 34, 브라우저 11/12(실패 1개는 이 맥 화면 크기로 창 bounds가 거부되는 테스트 단계, 앱 코드 무관). 로컬 프로덕션 서버에서 404 페이지 렌더 확인.
+- **알려진 작은 불편:** 팝업을 닫아 통화가 끊기면 상대 쪽은 최대 12초 뒤 "시간 초과"로 끝남(종료 신호가 닫히는 팝업에서 못 나갈 수 있음).

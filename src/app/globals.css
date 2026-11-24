@@ -787,3 +787,9 @@ small { display: block; margin-top: var(--space-3xs); font-weight: 400; color: v
 @keyframes bb-pop{from{transform:scale(.6)}to{transform:scale(1)}}
 @keyframes bb-dot{0%,100%{opacity:.3}50%{opacity:1}}
 @media(max-width:560px){.bb-game{padding:12px}.bb-boards{grid-template-columns:minmax(0,1fr)}.bb-board ol{max-height:220px}.bb-ball{width:46px;height:46px;font-size:1.35rem}.bb-digits i{width:25px;height:25px}}
+
+/* Error and not-found screens (src/app/error.tsx, not-found.tsx). */
+.error-page { max-width: 440px; margin: 15vh auto; padding: 0 16px; text-align: center; }
+.error-page h1 { margin-bottom: 8px; }
+.error-page p { color: var(--color-ink-2); line-height: 1.5; }
+.error-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
