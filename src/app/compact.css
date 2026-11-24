@@ -62,6 +62,8 @@ body { padding-bottom: var(--call-dock-height, 0px); }
 .call-dock .call-streams video { max-height: 120px; }
 .call-video-toggle { margin-block: 6px; font: inherit; color: var(--color-accent); }
 
+.chat-list { scroll-behavior: auto; overflow-anchor: none; }
+
 /* Idle calls should not consume half of a chat window. Keep error/status messages. */
 .call-box[data-phase="idle"] h2 { font-size: 1rem; margin: 0; }
 .call-box[data-phase="idle"][data-note="hint"] .call-top p { display: none; }
@@ -73,7 +75,7 @@ body { padding-bottom: var(--call-dock-height, 0px); }
   body:has(.chat) { padding-bottom: 0; }
   .room-wrap:has(.chat) {
     height: calc(100dvh - var(--call-dock-height, 0px));
-    min-height: 300px; display: flex; flex-direction: column; padding-bottom: 8px;
+    min-height: 0; display: flex; flex-direction: column; padding-bottom: 8px;
   }
   .room-wrap:has(.chat) > .top { flex-shrink: 0; }
   .room:has(> .chat-wrap .chat) { display: flex; flex-direction: column; flex: 1; min-height: 0; }

@@ -67,5 +67,10 @@ for (const config of [
   await expect(page.locator('[role="alert"]')).toBeVisible();
   expect(await usable()).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  // Simulate the measured height of an expanded media dock. It must not cover typing.
+  await page.locator('.call-dock').evaluate(el => (el as HTMLElement).style.height = '48dvh');
+  await expect.poll(usable).toBe(true);
+  await input.fill('Typing with the call dock expanded');
+  await expect(input).toHaveValue('Typing with the call dock expanded');
   await page.screenshot({path:test.info().outputPath('chat.png')});
 });
