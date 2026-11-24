@@ -20,7 +20,7 @@ test.beforeAll(async ({}, info) => {
     if (error || stats.hasErrors()) reject(error || new Error(stats.toString())); else done();
   }));
   bundle = await readFile(output + '/fixture.js');
-  css = (await Promise.all(['tokens','globals','garden','compact'].map(name => readFile(`src/app/${name}.css`, 'utf8')))).join('\n').replace(/@import[^;]+;/g, '');
+  css = (await Promise.all(['tokens','base','globals','garden','compact'].map(name => readFile(`src/app/${name}.css`, 'utf8')))).join('\n').replace(/@import[^;]+;/g, '');
 });
 for (const config of [
   { width:440, height:554, surface:'popup', lang:'en' },
@@ -29,7 +29,7 @@ for (const config of [
   { width:320, height:500, surface:'popup', lang:'en' },
 ]) test(`chat input stays usable and history scrolls: ${JSON.stringify(config)}`, async ({ page, baseURL }) => {
   await page.setViewportSize(config);
-  await page.route('**/__chat_fixture*', route => route.fulfill({ contentType:'text/html', body:`<html><head><style>${css}</style></head><body><div id="root"></div><script src="/__chat_bundle.js"></script></body></html>` }));
+  await page.route('**/__chat_fixture*', route => route.fulfill({ contentType:'text/html', body:`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script src="/__chat_bundle.js"></script></body></html>` }));
   await page.route('**/__chat_bundle.js', route => route.fulfill({ contentType:'text/javascript', body:bundle }));
   await page.goto(baseURL + '/__chat_fixture?' + new URLSearchParams({surface:config.surface,lang:config.lang,prompt:'What made you smile today?'}));
   const input = page.locator('#chat-input');
@@ -67,10 +67,11 @@ for (const config of [
   await expect(page.locator('[role="alert"]')).toBeVisible();
   expect(await usable()).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({path:test.info().outputPath('chat.png')});
   // Simulate the measured height of an expanded media dock. It must not cover typing.
   await page.locator('.call-dock').evaluate(el => (el as HTMLElement).style.height = '48dvh');
   await expect.poll(usable).toBe(true);
   await input.fill('Typing with the call dock expanded');
   await expect(input).toHaveValue('Typing with the call dock expanded');
-  await page.screenshot({path:test.info().outputPath('chat.png')});
+  await page.screenshot({path:test.info().outputPath('chat-expanded.png')});
 });
