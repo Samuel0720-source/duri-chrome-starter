@@ -43,3 +43,18 @@ npm run extension:release https://내도메인.ca     # 도메인을 연결한 �
 - Confirm the public privacy page and store disclosures describe the current authenticated app, including Limited Use. The old date-only extension description is insufficient.
 - Provide reviewer test instructions/accounts through the store's private review fields; never commit account credentials.
 - Store approval is separate from the automated test suite. Official references: https://developer.chrome.com/docs/webstore/program-policies/mv3-requirements and https://developer.chrome.com/docs/webstore/program-policies/user-data-faq . An isolated web iframe is not blanket approval of undisclosed or unreviewable remote functionality.
+
+## 0.5.5 store submission · copy-paste text (English dashboard)
+
+Upload `dist/duri-extension-0.5.5.zip` only after the website commit with popup calls is live (the popup shows the live site).
+
+- **Single purpose:** Opens the user's private two-person Duri room (chat, calls, games, photos, anniversaries) from the Chrome toolbar, and optionally syncs Netflix playback for Duri's Watch together page.
+- **storage justification:** Remembers the last opened Duri screen, language and theme on this device, and the id of the optional small window for the browser session. No messages, photos or login tokens are stored.
+- **Host permission (Duri site) justification:** The popup embeds the signed-in Duri website in an iframe and needs site access so the room, its cookies and its language/theme work inside the popup.
+- **Content scripts (netflix.com/watch) justification:** For Watch together only: reads play/pause state, current time and the title number on Netflix watch pages and relays them to the Duri tab on the same computer. No account, password or history is read.
+- **Microphone/camera:** No manifest permission. Calls run in the Duri website frame. Chrome cannot prompt inside a popup, so `permission.html` asks once in a normal tab; it stops the devices immediately and records nothing.
+- **Remote code:** No. All extension JavaScript is in the package; the Duri website runs in its own origin inside an iframe without extension APIs.
+- **Privacy policy URL:** https://duri-chrome-starter.vercel.app/privacy
+- **Data disclosure:** Personally identifiable info (email/name for the account), personal communications (chat, calls), user-generated content (photos, drawings). Not sold, not used for unrelated purposes, not used for creditworthiness. Tick the Limited Use certifications.
+- **Screenshots:** at least one 1280×800 (popup Chat tab with the call buttons, popup Home). **Icon:** `extension/icons/128.png`.
+- **Reviewer notes:** provide two test accounts already in one room (private review field only) and the steps: pin Duri → open popup → Chat → Voice call; second account accepts on the website.

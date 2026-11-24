@@ -29,7 +29,7 @@ function Ko() {
         <li><strong>알림:</strong> 상대가 방을 나갔을 때 보여 줄 안내 한 줄.</li>
         <li><strong>쿠키:</strong> 로그인 상태를 기억하는 쿠키와, 고른 언어를 기억하는 쿠키만 써요. 광고나 방문 분석용 쿠키는 쓰지 않아요.</li>
       </ul>
-      <p>로그인하지 않고 첫 화면에서 날짜를 바꿔 보는 미리보기는 서버에 저장되지 않아요. Chrome 확장 팝업은 웹사이트의 로그인된 방을 그대로 열어요. 확장에는 마지막으로 연 화면, 언어와 테마만 기기에 저장하고, 작은 창의 번호는 브라우저 세션 동안 기억해요. 확장이 대화·사진·로그인 토큰을 따로 복사해 저장하지 않아요. 이전 버전에서 기억한 날짜와 시간대는 기기에 남아 있을 수 있어요. 확장을 제거하면 확장의 로컬 정보도 지워져요.</p>
+      <p>로그인하지 않고 첫 화면에서 날짜를 바꿔 보는 미리보기는 서버에 저장되지 않아요. Chrome 확장 팝업은 웹사이트의 로그인된 방을 그대로 열어요. 확장에는 마지막으로 연 화면, 언어와 테마만 기기에 저장하고, 작은 창의 번호는 브라우저 세션 동안 기억해요. 확장이 대화·사진·로그인 토큰을 따로 복사해 저장하지 않아요. 이전 버전에서 기억한 날짜와 시간대는 기기에 남아 있을 수 있어요. 확장을 제거하면 확장의 로컬 정보도 지워져요. 팝업 안에서 통화하려면 Chrome이 확장에 마이크·카메라 권한을 한 번 물어볼 수 있어요. 이 권한 탭은 허용 여부만 확인하고 바로 장치를 끄며, 아무것도 녹음하거나 저장하지 않아요.</p>
       <p>넷플릭스 같이 보기를 쓰면, 확장 프로그램이 <strong>netflix.com/watch 페이지에서만</strong> 재생 중인지, 몇 초 지점인지, 작품 번호를 읽어 같은 컴퓨터의 둘이 함께 보기 페이지에 전해요. 넷플릭스 계정·비밀번호·시청 기록은 읽지 않고, 확장 프로그램이 따로 어디에 보내거나 저장하지 않아요. 두 사람의 재생 위치는 함께 보기와 똑같이 둘이 데이터베이스로 맞춰요.</p>
 
       <h2>쓰는 곳</h2>
@@ -70,7 +70,7 @@ function En() {
         <li><strong>Notices:</strong> one line telling you when your partner left the room.</li>
         <li><strong>Cookies:</strong> only one that keeps you signed in and one that remembers your language. No advertising or analytics cookies.</li>
       </ul>
-      <p>The signed-out date preview is not saved on the server. The Chrome popup opens the same authenticated room as the website. The extension stores only the last screen, language and theme locally, plus a small-window identifier for the browser session. It does not separately copy messages, photos or login tokens into extension storage. Dates and time zones remembered by older versions may remain locally. Removing the extension clears its local data.</p>
+      <p>The signed-out date preview is not saved on the server. The Chrome popup opens the same authenticated room as the website. The extension stores only the last screen, language and theme locally, plus a small-window identifier for the browser session. It does not separately copy messages, photos or login tokens into extension storage. Dates and time zones remembered by older versions may remain locally. Removing the extension clears its local data. To call inside the popup, Chrome may ask once to allow the extension to use the microphone and camera. That permission tab only checks the permission, turns the devices off immediately, and records or stores nothing.</p>
       <p>For Netflix together, the extension reads <strong>only on netflix.com/watch pages</strong> whether the video is playing, its position in seconds, and the title number, and passes them to the Watch together page on the same computer. It does not read your Netflix account, password or viewing history, and the extension itself sends or stores nothing elsewhere. The two of you stay in step through the Duri database, as with any other video.</p>
 
       <h2>How we use it</h2>
