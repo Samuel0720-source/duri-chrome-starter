@@ -62,7 +62,7 @@ export function checkManifest(manifest, files, origin = "https://duri.example") 
   const problems = [];
   if (manifest.manifest_version !== 3) problems.push("manifest_version must be 3");
   if (!/^\d+(\.\d+){0,3}$/.test(manifest.version ?? "")) problems.push("version must be 1-4 numbers");
-  const allowed = new Set(["storage"]);
+  const allowed = new Set(["storage", "offscreen"]);
   for (const p of manifest.permissions ?? []) if (!allowed.has(p)) problems.push("unexpected permission: " + p);
   if (JSON.stringify(manifest.host_permissions) !== JSON.stringify([origin + "/*"])) problems.push("host_permissions must be only the Duri origin");
   const pages = allowedScriptPages(origin);
