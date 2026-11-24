@@ -329,5 +329,6 @@
 - **변경:** `src/app/privacy/page.tsx`(Chrome 웹 스토어 사용자 데이터 정책·제한적 사용 문장, 한·영), `supabase/migrations/202611240001_baseball_secret_race.sql`(두 사람이 거의 동시에 비밀 숫자를 정하면 두 번째 숫자가 버려지던 문제: 비밀 숫자는 리비전 대신 "내 자리가 비었는지"로 판단, 이미 정했으면 아무것도 바꾸지 않음), `tests/database/rooms.test.mjs`(같은 상황 회귀 검사), `src/app/globals.css`(방 상단 로그아웃 버튼이 브라우저 기본 모양으로 보이던 것 수정). `demo-play` 브랜치에 스토어 스크린샷 생성 `tests/demo/store-shots.spec.ts` → `demo-recordings/store/*-1280x800.png`.
 - **실제 검사:** 업로드한 zip은 main 빌드와 sha256 동일(`8bd35e28…`). 단위 77 통과, DB 34 통과(pgtest), 새 검사는 수정 마이그레이션을 빼면 `Secret already set`로 실패하는 것 확인. CI Check starter·demo play 통과.
 - **운영 반영:** 2026-11-24 Supabase SQL 편집기에서 `202611240001_baseball_secret_race.sql` 실행 → `Success`. 확인 쿼리: 새 함수 본문 있음(true), 로그인 사용자 실행 권한 있음(true). 직후 live flow(두 계정 실제 사이트) 4개 통과.
-- **미확인:** 공개 이메일 가입용 Gmail SMTP 미설정.
+- **이메일:** 2026-11-24 Supabase 사용자 지정 SMTP 연결(Gmail `duri.app.official@gmail.com`, smtp.gmail.com:465, 보내는 이름 "둘이 Duri", 앱 비밀번호는 Sam이 직접 입력). 첫 시도는 535 BadCredentials(일반 비밀번호), 앱 비밀번호로 바꾼 뒤 재설정 메일 발송 200. 발송 한도 2/h → 30/h.
+- **미확인:** 받은편지함 도착·스팸함 여부는 Sam이 확인.
 - **다음 행동:** 스토어 개발자 등록 후 0.5.6 zip 제출.
