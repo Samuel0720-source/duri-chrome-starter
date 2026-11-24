@@ -14,8 +14,20 @@ function labels() {
   state.textContent = failed ? (ko ? "연결을 확인한 뒤 새로고침하거나 작은 창으로 열어 주세요." : "Check your connection, refresh, or open in a small window.") : (ko ? "우리 방을 여는 중…" : "Opening your room…");
 }
 labels();
-const saved = await chrome.storage.local.get("surface");
-if (saved.surface) { path=surfacePath(saved.surface.path); if (["ko","en"].includes(saved.surface.locale)) locale=saved.surface.locale; if (["berry","forest","cafe","sunset","night"].includes(saved.surface.mood)) document.documentElement.dataset.mood=saved.surface.mood; labels(); }
+// Only navigation/presentation preferences are cached here, never chat or credentials.
+function restore(surface) {
+  if (!surface) return;
+  path = surfacePath(surface.path);
+  if (["ko", "en"].includes(surface.locale)) locale = surface.locale;
+  if (["berry", "forest", "cafe", "sunset", "night"].includes(surface.mood)) {
+    document.documentElement.dataset.mood = surface.mood;
+    document.body.dataset.mood = surface.mood;
+  }
+  labels();
+}
+let cached;
+try { cached = JSON.parse(localStorage.getItem("duri-surface") || "null"); } catch { /* Optional cache. */ }
+restore(cached);
 let timer;
 function open() { failed=false; state.hidden=false; labels(); app.src=webOrigin+path; clearTimeout(timer); timer=setTimeout(()=>{failed=true;labels();},15000); }
 window.addEventListener("message", e => {
@@ -24,10 +36,25 @@ window.addEventListener("message", e => {
   if (["ko","en"].includes(e.data.locale)) locale=e.data.locale;
   const mood=["berry","forest","cafe","sunset","night"].includes(e.data.mood) ? e.data.mood : "berry";
   document.documentElement.dataset.mood=mood; document.body.dataset.mood=mood; labels(); state.hidden=true; clearTimeout(timer);
-  chrome.storage.local.set({surface:{path,locale,mood}});
+  const surface = {path,locale,mood};
+  try { localStorage.setItem("duri-surface", JSON.stringify(surface)); } catch { /* Optional cache. */ }
+  void chrome.storage.local.set({surface}).catch(() => {});
 });
 app.addEventListener("load",()=>app.contentWindow.postMessage({duri:"surface-request"},webOrigin));
 document.querySelector("#reload").addEventListener("click",open);
 document.querySelector("#full").addEventListener("click",()=>chrome.tabs.create({url:webOrigin+path}));
-document.querySelector("#detach").addEventListener("click",()=>chrome.runtime.sendMessage({duri:"open-small",path}).catch(()=>{failed=true;state.hidden=false;labels();}));
-open();
+document.querySelector("#detach").addEventListener("click", async () => {
+  try {
+    const reply = await chrome.runtime.sendMessage({duri:"open-small",path});
+    if (!reply?.ok) throw new Error("Window did not open");
+  } catch { failed=true;state.hidden=false;labels(); }
+});
+// First install can migrate the old settings, but never wait indefinitely for storage.
+// A late storage result must not replace the screen the user has already opened.
+if (cached) open();
+else {
+  let started = false;
+  function start(surface) { if (started) return; started = true; restore(surface); open(); }
+  const deadline = setTimeout(() => start(), 100);
+  chrome.storage.local.get("surface").then(saved => { clearTimeout(deadline); start(saved.surface); }, () => { clearTimeout(deadline); start(); });
+}
