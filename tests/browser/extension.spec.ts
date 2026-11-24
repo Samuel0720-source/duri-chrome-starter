@@ -41,7 +41,7 @@ test("packaged popup hosts the actual room and opens that screen outside the pop
   });
   await context.addInitScript(({ origin }) => {
     if (!location.pathname.startsWith("/__extension_test__/")) return;
-    const openSmall = (path: string) => window.open(origin + path + (path.includes("?") ? "&" : "?") + "mini=1", "duri-small", "popup,width=460,height=680");
+    const openSmall = (path: string) => window.open(origin + path + (path.includes("?") ? "&" : "?") + "mini=1", "duri-small", "popup,width=440,height=600");
     const apis = {
       i18n: { getUILanguage: () => "ko" },
       storage: { local: {
@@ -73,6 +73,7 @@ test("native extension embeds the website with its chosen language and opens one
   const unpacked = await buildExtension(baseURL, testInfo.outputPath("unpacked"));
   const context = await playwright.chromium.launchPersistentContext(testInfo.outputPath("profile"), {
     headless: true, channel: "chromium", locale: "en-CA", executablePath: process.env.CHROMIUM_PATH || undefined,
+    viewport: null,
     ignoreDefaultArgs: ["--disable-extensions"], args: ["--enable-unsafe-extension-debugging"],
   });
   try {
@@ -91,9 +92,17 @@ test("native extension embeds the website with its chosen language and opens one
     const [small] = await Promise.all([context.waitForEvent("page"), popup.locator("#detach").click()]);
     await expect(small.locator("main")).toBeVisible();
     await expect(small.locator("html")).toHaveAttribute("lang", "ko");
+    const smallWindows = () => popup.evaluate("chrome.windows.getAll({windowTypes:['popup']})");
+    await expect.poll(smallWindows).toEqual([expect.objectContaining({ type: "popup", state: "normal", width: 440, height: 600 })]);
+    const [nativeWindow] = await smallWindows();
+    // Reopening a manually enlarged window restores compact bounds without reloading it.
+    await small.evaluate("window.__duriWindowMarker = 'keep-the-call'");
+    await popup.evaluate(`chrome.windows.update(${nativeWindow.id}, {width: 1100, height: 850})`);
     const count = context.pages().length;
-    await popup.locator("#detach").click();
+    expect(await popup.evaluate("chrome.runtime.sendMessage({duri:'open-small',path:'/room/chat'})")).toEqual({ ok: true });
     await expect.poll(() => context.pages().length).toBe(count);
+    await expect.poll(smallWindows).toEqual([expect.objectContaining({ id: nativeWindow.id, state: "normal", width: 440, height: 600 })]);
+    expect(await small.evaluate("window.__duriWindowMarker")).toBe("keep-the-call");
     await expect(small).not.toHaveURL(/^about:/);
     await context.addCookies([{ name: "duri_lang", value: "en", url: baseURL! }]);
     await popup.locator("#reload").click();

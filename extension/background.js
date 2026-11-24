@@ -29,6 +29,12 @@ chrome.runtime.onConnect.addListener((port) => {
 // Keep one window alive across icon clicks, so reopening never reloads a live call.
 let opening;
 let windowId;
+const smallBounds = { width: 440, height: 600 };
+async function fitSmall(id) {
+  // Normalize separately: Chrome rejects dimensions on a maximized/fullscreen update.
+  await chrome.windows.update(id, { state: "normal" });
+  await chrome.windows.update(id, { ...smallBounds, focused: true });
+}
 const restored = chrome.storage.session.get("smallWindow").then(({ smallWindow }) => {
   windowId = smallWindow;
 }).catch(() => {});
@@ -36,21 +42,26 @@ async function launch(path) {
   await restored;
   void chrome.action.setBadgeText({ text: "" });
   if (windowId) {
+    let existing;
     try {
-      const existing = await chrome.windows.get(windowId);
-      if (existing.type === "popup") {
-        await chrome.windows.update(windowId, { state: "normal" });
-        await chrome.windows.update(windowId, { focused: true, width: 460, height: 680 });
-        return;
-      }
+      existing = await chrome.windows.get(windowId);
     } catch { /* The previous small window was closed. */ }
+    if (existing?.type === "popup") {
+      // Do not navigate/reload the page or spawn a duplicate if resizing fails:
+      // this window may already own the microphone and an active peer connection.
+      await fitSmall(windowId);
+      return;
+    }
     windowId = undefined;
   }
   const destination = new URL(webOrigin + surfacePath(path));
   destination.searchParams.set("mini", "1");
-  const win = await chrome.windows.create({ url: destination.href, type: "popup", width: 460, height: 680 });
+  const win = await chrome.windows.create({ url: destination.href, type: "popup", state: "normal", ...smallBounds, focused: true });
+  if (!win?.id) throw new Error("Chrome did not create the small window");
   windowId = win.id;
   await chrome.storage.session.set({ smallWindow: windowId });
+  // Apply bounds after creation as well; never inherit a restored large window.
+  await fitSmall(windowId);
 }
 function openSmall(path = "/room") {
   if (!opening) opening = launch(path).finally(() => { opening = undefined; });
