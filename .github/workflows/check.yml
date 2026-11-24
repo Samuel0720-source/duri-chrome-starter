@@ -19,6 +19,6 @@ jobs:
         if: always()
         with:
           name: chat-layout-screenshots
-          path: test-results/**/chat.png
+          path: test-results/**/chat*.png
           if-no-files-found: ignore
           retention-days: 7
