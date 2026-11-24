@@ -42,6 +42,10 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
 
   const merge = useCallback((rows: Message[]) => {
     if (rows.length === 0) return;
+    // Read the current position before changing the list. A scroll event can still
+    // be queued when a realtime reply arrives in the same animation frame.
+    const list = listRef.current;
+    if (list) followLatest.current = list.scrollHeight - list.scrollTop - list.clientHeight < 64;
     lastId.current = Math.max(lastId.current, ...rows.map((r) => r.id));
     setMessages((old) => {
       const known = new Set(old.filter((m) => m.id > 0).map((m) => m.id));
