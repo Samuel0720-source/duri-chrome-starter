@@ -57,7 +57,7 @@ test("store screenshots", async ({ browser }) => {
   await canvas.scrollIntoViewIfNeeded();
   const box = (await canvas.boundingBox())!;
   const cx = box.x + box.width / 2, cy = box.y + box.height / 2, r = Math.min(box.width, box.height) / 5;
-  await a.mouse.move(cx, cy + r * 1.4);
+  await a.mouse.move(cx, cy - (5 / 16) * r * 1.3);
   await a.mouse.down();
   for (let i = 0; i <= 60; i++) {
     const t = (i / 60) * 2 * Math.PI;
@@ -73,7 +73,7 @@ test("store screenshots", async ({ browser }) => {
       await a.waitForLoadState("networkidle").catch(() => {});
       await a.waitForTimeout(800);
       const focus = name === "games" ? ".chess-board" : name === "draw" ? "canvas" : null;
-      if (focus) await a.locator(focus).first().evaluate((el) => window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - 70)));
+      if (focus) await a.locator(focus).first().evaluate((el) => window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.scrollY - 118)));
       await a.waitForTimeout(300);
       await a.screenshot({ path: `demo-out/store/${lang}-${name}.png` });
     }
