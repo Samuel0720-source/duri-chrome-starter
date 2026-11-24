@@ -36,7 +36,6 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   const [question, setQuestion] = useState(prompt);
   const [error, setError] = useState("");
   const listRef = useRef<HTMLOListElement>(null);
-  const mountedRef = useRef(false);
   const followLatest = useRef(true);
   const supabaseRef = useRef<ReturnType<typeof browserClient>>(null);
   const lastId = useRef(initial.at(-1)?.id ?? 0);
@@ -134,9 +133,8 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
     const list = listRef.current;
     if (list && followLatest.current) list.scrollTo({
       top: list.scrollHeight,
-      behavior: mountedRef.current ? "smooth" : "instant",
+      behavior: "instant",
     });
-    mountedRef.current = true;
   }, [messages.length]);
 
   useEffect(() => {
