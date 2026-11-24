@@ -22,7 +22,7 @@
 
 ## Where code goes
 
-See CLAUDE.md for the actual file map. When a feature grows, group its UI and commands under `src/features/<feature>/`, keep domain rules in `src/core/`, and put adapters that use secret keys in `src/server/`. Keep external API handlers in `src/app/api/` thin. New tables and permission changes go into versioned migrations. Only create folders a phase actually needs.
+The README lists where things live today. When a feature grows, group its UI and commands under `src/features/<feature>/`, keep domain rules in `src/core/`, and put adapters that use secret keys in `src/server/`. Keep external API handlers in `src/app/api/` thin. New tables and permission changes go into versioned migrations. Only create folders a phase actually needs.
 
 ## Notes for explaining the project in an interview
 
@@ -138,7 +138,7 @@ Each received audio track is attached to its own audio element. The video previe
 
 - **Problem:** Calls used only STUN, so if either side was on a strict network (mobile data, school Wi-Fi, symmetric NAT), the two devices could not find each other and the call hung at "connecting" or had no sound. Tests on one computer or one Wi-Fi always passed, so it stayed hidden.
 - **Fix:** For each call, `/api/call/ice` fetches one-hour relay credentials from Cloudflare TURN (keys only in server environment variables: `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN`). When a direct path works the browser uses it on its own; the relay is used only when it does not. If the keys are missing or Cloudflare fails, it falls back to STUN only.
-- **External paid call record (CLAUDE.md rule):** Reason: connecting calls across different networks. Scope: only signed-in people in a two-person room, one request per call, credentials valid one hour. Cost: Cloudflare TURN is free up to 1,000 GB a month, then USD 0.05 per GB (an hour of voice ≈ 0.03 GB, video ≈ 0.5 to 1 GB). Checks: `tests/unit/ice.test.mjs` (port 53 removed, credentials required) and a real voice call in the live flow (audio playback confirmed, connection path shown).
+- **External paid call record (every paid external call is recorded here):** Reason: connecting calls across different networks. Scope: only signed-in people in a two-person room, one request per call, credentials valid one hour. Cost: Cloudflare TURN is free up to 1,000 GB a month, then USD 0.05 per GB (an hour of voice ≈ 0.03 GB, video ≈ 0.5 to 1 GB). Checks: `tests/unit/ice.test.mjs` (port 53 removed, credentials required) and a real voice call in the live flow (audio playback confirmed, connection path shown).
 - **Interview answer draft:** "Tests passed, so why did real users' calls fail?" The two test browsers were on the same machine, so address exchange (STUN) was enough. Two real people can sit behind different NATs with no direct path, and then a TURN server must relay the media. The screen now shows the type of the connected candidate pair (host/srflx vs relay) so the next failure is easy to tell apart.
 
 ## P9 · Number baseball

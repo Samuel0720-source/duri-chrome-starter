@@ -10,3 +10,5 @@ playwright-report/
 .vercel/
 supabase/.temp/
 supabase/.branches/
+
+# Local AI assistant instructions (kept on the developer machine only)
