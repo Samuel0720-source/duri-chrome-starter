@@ -142,10 +142,10 @@ small { display: block; margin-top: var(--space-3xs); font-weight: 400; color: v
 .auth h1 { margin-bottom: var(--space-md); font-size: var(--text-3xl); }
 .auth .sheet p + p, .auth .sheet p + form, .auth .sheet h1 + p { margin-top: var(--space-sm); }
 .stack { display: grid; gap: var(--space-sm); margin-top: var(--space-md); }
-.auth .link { min-height: 40px; padding: 0 var(--space-md); border: 2px solid var(--color-accent); border-radius: var(--radius-pill); background: var(--color-paper-3); color: var(--color-accent); font-weight: 700; cursor: pointer; }
-.auth .link:hover { background: var(--color-accent-wash); }
-.auth .link:active { transform: translateY(1px); }
-.auth .link:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.auth .link, .top .link { min-height: 40px; padding: 0 var(--space-md); border: 2px solid var(--color-accent); border-radius: var(--radius-pill); background: var(--color-paper-3); color: var(--color-accent); font-weight: 700; cursor: pointer; }
+.auth .link:hover, .top .link:hover { background: var(--color-accent-wash); }
+.auth .link:active, .top .link:active { transform: translateY(1px); }
+.auth .link:focus-visible, .top .link:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 .error { color: var(--color-error); margin-top: var(--space-md); }
 .notice { margin: 0 0 var(--space-md); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-field); background: var(--color-paper-2); color: var(--color-ink); }
 .divider { display: flex; align-items: center; gap: var(--space-sm); margin: var(--space-lg) 0 var(--space-xs); color: var(--color-ink-2); font-size: var(--text-sm); }
