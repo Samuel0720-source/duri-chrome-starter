@@ -21,5 +21,5 @@ export async function GET(request: Request) {
   if (error || !verified) return new Response(null, { status: 401, headers });
   const { data } = await supabase.auth.getSession();
   if (!data.session || data.session.user.id !== verified.claims.sub) return new Response(null, { status: 401, headers });
-  return Response.json({ accessToken: data.session.access_token, expiresAt: data.session.expires_at }, { headers });
+  return Response.json({ userId: verified.claims.sub, accessToken: data.session.access_token, expiresAt: data.session.expires_at }, { headers });
 }

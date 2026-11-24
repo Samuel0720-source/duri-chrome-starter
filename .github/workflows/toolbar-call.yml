@@ -1,0 +1,39 @@
+name: Toolbar call integration
+on:
+  push:
+    branches: [main, 'fix/toolbar-background-calls']
+    paths:
+      - 'extension/**'
+      - 'src/**'
+      - 'tests/flow/toolbar-call.spec.ts'
+      - '.github/workflows/toolbar-call.yml'
+jobs:
+  toolbar-call:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      FLOW_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_SUPABASE_URL: https://phzvtiymcvczepukpbfu.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_szT1FPj50izFS9P2VbB_Eg_tpSbGFYS
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Start test web server
+        run: |
+          npm start > /tmp/duri-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:3000/login > /dev/null && exit 0
+            sleep 1
+          done
+          exit 1
+      - name: Test real toolbar background calls
+        run: npx playwright test -c playwright.flow.config.ts tests/flow/toolbar-call.spec.ts
+

@@ -26,12 +26,12 @@ function unzip(buf) {
 test("store build: production https address, scoped Duri access, both languages, a valid zip", async () => {
   const out = await mkdtemp(join(tmpdir(), "duri-release-"));
   const r = await releaseExtension("https://duri.example", out);
-  assert.match(r.file, /duri-extension-0\.5\.4\.zip$/);
+  assert.match(r.file, /duri-extension-0\.6\.0\.zip$/);
   const files = unzip(await readFile(r.file));
   assert.equal(files["origin.js"].toString(), 'export const webOrigin = "https://duri.example";\n');
   const manifest = JSON.parse(files["manifest.json"].toString());
   assert.equal(manifest.action.default_popup, "popup.html");
-  assert.deepEqual(manifest.permissions, ["storage"]);
+  assert.deepEqual(manifest.permissions, ["storage", "offscreen"]);
   assert.equal(JSON.parse(files["_locales/en/messages.json"]).name.message, "Duri");
   assert.equal(JSON.parse(files["_locales/ko/messages.json"]).name.message, "둘이");
   for (const f of ["popup.html", "popup.js", "icons/postbirds.webp", "core/dates.js", "core/preview.js", "icons/128.png", "background.js", "netflix-player.js", "netflix-bridge.js", "duri-bridge.js"]) assert.ok(files[f], f);
