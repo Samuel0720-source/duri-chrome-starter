@@ -36,12 +36,16 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   const [question, setQuestion] = useState(prompt);
   const [error, setError] = useState("");
   const listRef = useRef<HTMLOListElement>(null);
-  const mountedRef = useRef(false);
+  const followLatest = useRef(true);
   const supabaseRef = useRef<ReturnType<typeof browserClient>>(null);
   const lastId = useRef(initial.at(-1)?.id ?? 0);
 
   const merge = useCallback((rows: Message[]) => {
     if (rows.length === 0) return;
+    // Read the current position before changing the list. A scroll event can still
+    // be queued when a realtime reply arrives in the same animation frame.
+    const list = listRef.current;
+    if (list) followLatest.current = list.scrollHeight - list.scrollTop - list.clientHeight < 64;
     lastId.current = Math.max(lastId.current, ...rows.map((r) => r.id));
     setMessages((old) => {
       const known = new Set(old.filter((m) => m.id > 0).map((m) => m.id));
@@ -130,12 +134,22 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   }, [markRead]);
 
   useEffect(() => {
-    listRef.current?.lastElementChild?.scrollIntoView({
-      block: "end",
-      behavior: mountedRef.current ? "smooth" : "auto",
+    const list = listRef.current;
+    if (list && followLatest.current) list.scrollTo({
+      top: list.scrollHeight,
+      behavior: "instant",
     });
-    mountedRef.current = true;
   }, [messages.length]);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const observer = new ResizeObserver(() => {
+      if (followLatest.current) list.scrollTo({ top: list.scrollHeight, behavior: "instant" });
+    });
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, []);
 
   async function deliver(request: string, body: string, tempId: number) {
     const supabase = supabaseRef.current;
@@ -157,6 +171,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   function send(event: React.FormEvent) {
     event.preventDefault();
     if (!text.trim()) return;
+    followLatest.current = true;
     const body = question ? question + "\n" + text.trim() : text.trim();
     setQuestion("");
     const request = crypto.randomUUID();
@@ -188,7 +203,10 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
   return (
     <>
     <div className="chat">
-      <ol className="chat-list" ref={listRef} aria-label={t("chat.list")} aria-live="polite">
+      <ol className="chat-list" ref={listRef} tabIndex={0} onScroll={() => {
+        const list = listRef.current;
+        if (list) followLatest.current = list.scrollHeight - list.scrollTop - list.clientHeight < 64;
+      }} aria-label={t("chat.list")} aria-live="polite">
         {messages.length === 0 && <li className="chat-empty">{t("chat.empty")}</li>}
         {messages.map((m, i) => (
           <li key={m.id} className={m.sender === me ? "mine" : "theirs"} data-state={m.state}>
@@ -218,6 +236,7 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
           id="chat-input"
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.nativeEvent.isComposing || e.keyCode === 229)) e.preventDefault(); }}
           maxLength={1000 - (question ? question.length + 1 : 0)}
           autoComplete="off"
           placeholder={t("chat.placeholder")}
