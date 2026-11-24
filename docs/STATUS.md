@@ -323,3 +323,10 @@
 - **실제 사이트 점검(로그인 없이):** 공개 페이지 200, 방 화면은 로그인으로 리디렉션, 없는 주소 404, 잘못된 초대·OAuth 코드·사진 ID·`next=//evil.com` 모두 5xx 없음.
 - **검사:** typecheck, 빌드, 단위 77, DB 34, 브라우저 11/12(실패 1개는 이 맥 화면 크기로 창 bounds가 거부되는 테스트 단계, 앱 코드 무관). 로컬 프로덕션 서버에서 404 페이지 렌더 확인.
 - **알려진 작은 불편:** 팝업을 닫아 통화가 끊기면 상대 쪽은 최대 12초 뒤 "시간 초과"로 끝남(종료 신호가 닫히는 팝업에서 못 나갈 수 있음).
+
+### 인계 기록 · 2026-11-24 · 스토어 제출 전 마지막 점검 (0.5.6)
+
+- **변경:** `src/app/privacy/page.tsx`(Chrome 웹 스토어 사용자 데이터 정책·제한적 사용 문장, 한·영), `supabase/migrations/202611240001_baseball_secret_race.sql`(두 사람이 거의 동시에 비밀 숫자를 정하면 두 번째 숫자가 버려지던 문제: 비밀 숫자는 리비전 대신 "내 자리가 비었는지"로 판단, 이미 정했으면 아무것도 바꾸지 않음), `tests/database/rooms.test.mjs`(같은 상황 회귀 검사), `src/app/globals.css`(방 상단 로그아웃 버튼이 브라우저 기본 모양으로 보이던 것 수정). `demo-play` 브랜치에 스토어 스크린샷 생성 `tests/demo/store-shots.spec.ts` → `demo-recordings/store/*-1280x800.png`.
+- **실제 검사:** 업로드한 zip은 main 빌드와 sha256 동일(`8bd35e28…`). 단위 77 통과, DB 34 통과(pgtest), 새 검사는 수정 마이그레이션을 빼면 `Secret already set`로 실패하는 것 확인. CI Check starter·demo play 통과.
+- **미확인:** 새 숫자야구 마이그레이션은 **운영 Supabase에 아직 실행 안 함**(이 세션에서 브라우저 연결이 끊김). 공개 이메일 가입용 Gmail SMTP 미설정.
+- **다음 행동:** Supabase SQL 편집기에서 `202611240001_baseball_secret_race.sql` 실행 → 스토어 개발자 등록 후 0.5.6 zip 제출.
