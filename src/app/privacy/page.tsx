@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function PrivacyPage() {
   const { t, locale } = await getT();
   return (
-    <LegalPage title={t("legal.privacy")} updated={locale === "ko" ? "2026년 11월 23일" : "November 23, 2026"}>
+    <LegalPage title={t("legal.privacy")} updated={locale === "ko" ? "2026년 11월 24일" : "November 24, 2026"}>
       {locale === "ko" ? <Ko /> : <En />}
     </LegalPage>
   );
@@ -31,6 +31,7 @@ function Ko() {
       </ul>
       <p>로그인하지 않고 첫 화면에서 날짜를 바꿔 보는 미리보기는 서버에 저장되지 않아요. Chrome 확장 팝업은 웹사이트의 로그인된 방을 그대로 열어요. 확장에는 마지막으로 연 화면, 언어와 테마만 기기에 저장하고, 작은 창의 번호는 브라우저 세션 동안 기억해요. 확장이 대화·사진·로그인 토큰을 따로 복사해 저장하지 않아요. 이전 버전에서 기억한 날짜와 시간대는 기기에 남아 있을 수 있어요. 확장을 제거하면 확장의 로컬 정보도 지워져요. 팝업 안에서 통화하려면 Chrome이 확장에 마이크·카메라 권한을 한 번 물어볼 수 있어요. 이 권한 탭은 허용 여부만 확인하고 바로 장치를 끄며, 아무것도 녹음하거나 저장하지 않아요.</p>
       <p>넷플릭스 같이 보기를 쓰면, 확장 프로그램이 <strong>netflix.com/watch 페이지에서만</strong> 재생 중인지, 몇 초 지점인지, 작품 번호를 읽어 같은 컴퓨터의 둘이 함께 보기 페이지에 전해요. 넷플릭스 계정·비밀번호·시청 기록은 읽지 않고, 확장 프로그램이 따로 어디에 보내거나 저장하지 않아요. 두 사람의 재생 위치는 함께 보기와 똑같이 둘이 데이터베이스로 맞춰요.</p>
+      <p>확장 프로그램을 통해 다루는 정보는 Chrome 웹 스토어 사용자 데이터 정책(제한적 사용 요구 사항 포함)을 따라요. 둘이 기능을 제공하는 데만 쓰고, 팔거나 광고·신용 평가에 쓰지 않으며, 사람이 직접 읽는 일은 사용자가 요청했거나 보안·법적 이유가 있을 때로 한정해요.</p>
 
       <h2>쓰는 곳</h2>
       <p>로그인, 두 사람의 방 연결, 기념일 계산, 대화와 게임, 함께 보기, 그리고 상대 화면을 바로 바꾸는 데만 써요. 정보를 팔거나 광고에 쓰지 않아요.</p>
@@ -72,6 +73,7 @@ function En() {
       </ul>
       <p>The signed-out date preview is not saved on the server. The Chrome popup opens the same authenticated room as the website. The extension stores only the last screen, language and theme locally, plus a small-window identifier for the browser session. It does not separately copy messages, photos or login tokens into extension storage. Dates and time zones remembered by older versions may remain locally. Removing the extension clears its local data. To call inside the popup, Chrome may ask once to allow the extension to use the microphone and camera. That permission tab only checks the permission, turns the devices off immediately, and records or stores nothing.</p>
       <p>For Netflix together, the extension reads <strong>only on netflix.com/watch pages</strong> whether the video is playing, its position in seconds, and the title number, and passes them to the Watch together page on the same computer. It does not read your Netflix account, password or viewing history, and the extension itself sends or stores nothing elsewhere. The two of you stay in step through the Duri database, as with any other video.</p>
+      <p>The use of information received through the extension adheres to the Chrome Web Store User Data Policy, including the Limited Use requirements. It is used only to provide Duri's features, is never sold or used for advertising or creditworthiness, and is read by a person only with your consent or for security or legal reasons.</p>
 
       <h2>How we use it</h2>
       <p>Only to sign you in, connect the two of you, count anniversaries, run chat, games and Watch together, and update your partner's screen right away. We never sell it or use it for advertising.</p>
