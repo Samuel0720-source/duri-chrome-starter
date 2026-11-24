@@ -165,7 +165,8 @@ export function Chat({ roomId, me, zone, initial, prompt, partnerName, initialPa
       const without = old.filter((m) => m.id !== tempId && m.id !== data);
       return order([...without, { id: data, sender: me, body, created_at: new Date().toISOString() }]);
     });
-    lastId.current = Math.max(lastId.current, data);
+    // Fetch from the cursor instead of jumping it to my id, so a partner message sent just before mine is not skipped.
+    void pull();
   }
 
   function send(event: React.FormEvent) {

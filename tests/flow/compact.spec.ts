@@ -87,7 +87,9 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(popup.locator("body")).toHaveAttribute("data-mood", "night");
 
     await app.getByRole("link", { name: "대화", exact: true }).click();
-    await expect(app.locator(".popup-call-launch")).toBeEnabled();
+    // Calls start inside the toolbar popup itself; the small window stays an optional header button.
+    await expect(app.getByRole("button", { name: "음성 통화", exact: true })).toBeEnabled({ timeout: 10000 });
+    await expect(app.getByRole("button", { name: "영상 통화", exact: true })).toBeEnabled();
     // toBeVisible/fill alone can auto-scroll a broken composer into view.
     const input = app.locator("#chat-input");
     await expect.poll(() => input.evaluate(el => {
@@ -103,6 +105,18 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await b.locator("#chat-input").fill("Your partner can reply here");
     await b.getByRole("button", { name: "보내기", exact: true }).click();
     await expect(app.getByText("Your partner can reply here", { exact: true })).toBeVisible();
+
+    // A voice call placed and heard inside the toolbar popup frame, then ended there.
+    await app.getByRole("button", { name: "음성 통화", exact: true }).click();
+    await expect(app.locator(".mini-call-note")).toBeVisible();
+    await expect(b.getByRole("button", { name: "받기", exact: true })).toBeVisible({ timeout: 15000 });
+    await b.getByRole("button", { name: "받기", exact: true }).click();
+    await expect.poll(() => app.locator("html").evaluate(() => {
+      const audio = document.querySelector<HTMLAudioElement>(".call-box audio");
+      return Boolean(audio && !audio.paused && audio.currentTime > 0.5);
+    }), { timeout: 30000 }).toBe(true);
+    await app.getByRole("button", { name: "끊기", exact: true }).click();
+    await expect(b.getByRole("button", { name: "음성 통화", exact: true })).toBeEnabled({ timeout: 15000 });
 
     // Upload through the actual embedded input, verify the partner sees it, then delete it.
     await app.getByRole("link", { name: "앨범", exact: true }).click();
@@ -141,9 +155,9 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(popup.locator("html")).toHaveAttribute("lang", "en");
     await app.getByRole("link", { name: "Chat", exact: true }).click();
     await expect(app.getByText("Your partner can reply here", { exact: true })).toBeVisible();
-    await expect(app.locator(".popup-call-launch")).toBeEnabled();
-    // Exercise the user's actual call button, not just the toolbar's detach shortcut.
-    const [small] = await Promise.all([context.waitForEvent("page"), app.locator(".popup-call-launch").click()]);
+    await expect(app.getByRole("button", { name: "Voice call", exact: true })).toBeEnabled();
+    // The header's small-window button still hands the room to a persistent window.
+    const [small] = await Promise.all([context.waitForEvent("page"), popup.locator("#detach").click()]);
     await expect.poll(() => popup.evaluate("chrome.windows.getAll({windowTypes:['popup']})")).toEqual([
       expect.objectContaining({ type: "popup", state: "normal", width: 440, height: 600 }),
     ]);

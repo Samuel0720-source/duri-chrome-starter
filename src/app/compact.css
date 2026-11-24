@@ -67,7 +67,6 @@ body { padding-bottom: var(--call-dock-height, 0px); }
 /* Idle calls should not consume half of a chat window. Keep error/status messages. */
 .call-box[data-phase="idle"] h2 { font-size: 1rem; margin: 0; }
 .call-box[data-phase="idle"][data-note="hint"] .call-top p { display: none; }
-.call-box .popup-call-launch { width: 100%; min-height: 40px; padding: 8px 12px; font-size: .875rem; }
 
 @media (max-width: 560px) {
   /* Fit the frame's viewport, not a fixed fraction of the full browser window.

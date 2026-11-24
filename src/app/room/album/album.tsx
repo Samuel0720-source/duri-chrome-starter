@@ -53,7 +53,10 @@ export function Album({ roomId, photos, wallpaper, partner }: { roomId: string; 
         const bucket = supabase.storage.from("room-photos");
         const up1 = await bucket.upload(photoFile(roomId, id), big.blob, { contentType: "image/jpeg", upsert: false });
         const up2 = up1.error ? up1 : await bucket.upload(photoFile(roomId, id, true), small.blob, { contentType: "image/jpeg", upsert: false });
-        if (up2.error) throw up2.error;
+        if (up2.error) {
+          if (!up1.error) await bucket.remove([photoFile(roomId, id)]); // thumbnail failed: drop the orphaned original
+          throw up2.error;
+        }
         const { error } = await supabase.rpc("add_room_photo", { target: roomId, photo: id, w: big.width, h: big.height });
         if (error) {
           // Not in the album, so do not leave the files behind.

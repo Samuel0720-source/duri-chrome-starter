@@ -74,11 +74,16 @@ chrome.action.onClicked.addListener(() => openSmall().catch(() => {
 chrome.windows.onRemoved.addListener(id => {
   if (id === windowId) windowId = undefined;
 });
-// Retain the old popup's handoff for existing links and compatibility.
+// Messages from the popup and the embedded Duri frames (relayed by app-bridge.js).
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
-  if (sender.id !== chrome.runtime.id || message?.duri !== "open-small") return;
+  if (sender.id !== chrome.runtime.id || !["open-small", "allow-media"].includes(message?.duri)) return;
   const url = sender.url || "";
   if (!url.startsWith(chrome.runtime.getURL("")) && !url.startsWith(webOrigin + "/")) return;
-  openSmall(message.path).then(() => reply({ ok: true }), () => reply({ ok: false }));
+  const done = message.duri === "open-small"
+    ? openSmall(message.path)
+    // The toolbar popup cannot show Chrome's permission prompt; a normal extension tab can,
+    // and the grant then also covers calls inside the popup.
+    : chrome.tabs.create({ url: chrome.runtime.getURL("permission.html") });
+  done.then(() => reply({ ok: true }), () => reply({ ok: false }));
   return true;
 });

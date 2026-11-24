@@ -7,12 +7,13 @@ import { useRoomChannel } from "../use-room-channel";
 import { useNewGameRefresh } from "./new-game";
 import { GameResult } from "./game-result";
 function Card({ card }: { card?: number }) {
+  const { t } = useT();
   return (
     <span
       className="poker-card"
       data-red={card !== undefined && [1, 2].includes(Math.floor(card / 13))}
       data-hidden={card === undefined}
-      aria-label={card === undefined ? "Hidden card" : cardLabel(card)}
+      aria-label={card === undefined ? t("poker.hiddenCard") : cardLabel(card)}
     >
       {card === undefined ? "♥" : cardLabel(card)}
     </span>

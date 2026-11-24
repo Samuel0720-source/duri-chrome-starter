@@ -34,7 +34,7 @@ function VideoPreview({ track, label }: { track: MediaStreamTrack; label: string
 }
 
 export function CallControls({ session, view, ready, compact = false }: { compact?: boolean; session: CallSession | null; view: View; ready: boolean }) {
-  const { t, locale } = useT();
+  const { t } = useT();
   const [popup, setPopup] = useState(false);
   useEffect(() => {
     const root = document.documentElement;
@@ -53,11 +53,11 @@ export function CallControls({ session, view, ready, compact = false }: { compac
   const remoteVideo = view.remote?.getVideoTracks()[0];
   const localVideo = view.local?.getVideoTracks()[0];
   const status = view.phase === "idle" ? view.note : view.phase === "incoming" ? (audioOnly ? "incomingAudio" : "incomingVideo") : view.phase;
-  if (popup && view.phase === "idle") return <section className="call-box" data-phase="idle" aria-label={t("call.title")}>
-    <button type="button" className="button popup-call-launch" onClick={() => window.postMessage({ duri: "open-small" }, location.origin)}>{locale === "ko" ? "📞 작은 창에서 통화하기" : "📞 Call in a small window"}</button>
-  </section>;
   return <section className="call-box" data-phase={view.phase} data-note={view.note} aria-label={t("call.title")}>
-    {popup && <p className="mini-call-note">{locale === "ko" ? "통화하는 동안 이 팝업을 열어 두세요." : "Keep this popup open during the call."}</p>}
+    {popup && view.phase !== "idle" && <p className="mini-call-note">{t("call.keepPopupOpen")}</p>}
+    {/* The toolbar popup cannot show Chrome's permission prompt; the extension grants it once in a tab. */}
+    {popup && view.phase === "idle" && view.note === "device" && <p className="mini-call-note">{t("call.allowMediaHint")}<br />
+      <button type="button" className="button" onClick={() => window.postMessage({ duri: "allow-media" }, location.origin)}>{t("call.allowMedia")}</button></p>}
     <div className="call-top"><div><h2>{t("call.title")}</h2><p role="status">{t(`call.${status}`)}</p>
       {view.phase === "connected" && view.route && <p className="hint" data-route={view.route}>{t(view.route === "relay" ? "call.route.relay" : "call.route.direct")}</p>}</div>
       <div className="call-actions">
@@ -71,7 +71,7 @@ export function CallControls({ session, view, ready, compact = false }: { compac
       </div>
     </div>
     {remoteAudio && <PartnerAudio track={remoteAudio} />}
-    {compact && !audioOnly && (remoteVideo || localVideo) && <button type="button" className="call-video-toggle" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{locale === "ko" ? (expanded ? "영상 접기" : "영상 보기") : (expanded ? "Hide video" : "Show video")}</button>}
+    {compact && !audioOnly && (remoteVideo || localVideo) && <button type="button" className="call-video-toggle" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{t(expanded ? "call.hideVideo" : "call.showVideo")}</button>}
     {!audioOnly && (remoteVideo || localVideo) && <div className="call-streams" hidden={compact && !expanded}>
       {remoteVideo && <VideoPreview track={remoteVideo} label={t("call.partner")} />}
       {localVideo && <VideoPreview track={localVideo} label={t("call.self")} />}

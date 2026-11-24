@@ -1,13 +1,15 @@
-# Duri compact extension 0.5.4
+# Duri compact extension 0.5.5
 
-Build: `npm run extension:release`. The output is `dist/duri-extension-0.5.4.zip` pointing at the production Duri website.
+Build: `npm run extension:release`. The output is `dist/duri-extension-0.5.5.zip` pointing at the production Duri website.
 
 1. Unzip it into a stable folder.
 2. Open `chrome://extensions`, enable Developer mode, and choose Load unpacked. Select the folder containing `manifest.json`.
 3. If updating an existing unpacked installation, replace that folder's files with this version and click Reload on its extension card. Otherwise disable/remove the old Duri extension so only the new icon is active.
 4. Pin Duri. Sign in using the same Chrome profile as the website. The popup contains the current room and all seven tabs.
 
-Toolbar controls: refresh, open/focus a small persistent window, open the full website. A 440×600 toolbar popup closes when you click outside it. For a continuing call, Netflix, or a file picker that closes the toolbar, open the small window first. The small window is 440×600 including browser framing and can be resized. Google login opens in that small window; complete login there, then reopen/refresh the toolbar. Camera and microphone permissions belong to the Duri website.
+Toolbar controls: refresh, open/focus a small persistent window, open the full website. Voice and video calls start directly in the popup's Chat tab (0.5.5). A 440×600 toolbar popup closes when you click outside it, which ends a call placed there, so the popup shows "Keep this popup open during the call." For a call that must survive switching apps, Netflix, or a file picker, open the small window (▣) first.
+
+Chrome cannot show its microphone/camera prompt inside a toolbar popup. If a popup call cannot open the devices, the call box offers "Allow microphone & camera", which opens the packaged `permission.html` in a normal tab. Granting there allows the extension origin once. Delegated through the iframe's `allow="camera; microphone"`, the grant then covers calls in the popup. The page stops the tracks immediately and records nothing. The small window is 440×600 including browser framing and can be resized. Google login opens in that small window; complete login there, then reopen/refresh the toolbar. Camera and microphone permissions belong to the Duri website.
 
 The website's own-origin host permission supports the authenticated embedded room. The extension does not read arbitrary browsing pages, store your conversation or copy credentials. Netflix's optional watch integration only runs on its watch pages. Future website feature/design updates appear when the room loads again; changes to packaged Chrome permissions or toolbar code require an extension update. Chrome Web Store publication and approval are separate from an unpacked installation.
 

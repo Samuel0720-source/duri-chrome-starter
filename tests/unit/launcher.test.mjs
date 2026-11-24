@@ -8,12 +8,13 @@ import { buildExtension } from '../../scripts/build-extension.mjs';
 
 test('toolbar opens one direct small window, reuses it without navigation, restores after worker restart', async () => {
   const out = await mkdtemp(join(tmpdir(), 'duri-launch-'));
-  let click, message, removed, id = 0, creates = [], updates = [], saved = {}, failResize = false;
+  let click, message, removed, id = 0, creates = [], updates = [], tabs = [], saved = {}, failResize = false;
   const windows = new Map();
   globalThis.chrome = {
     action: { onClicked: { addListener: fn => { click = fn; } }, setBadgeText: async () => {} },
     runtime: { id: 'test', getURL: p => 'chrome-extension://test/' + p,
       onConnect: { addListener() {} }, onMessage: { addListener: fn => { message = fn; } } },
+    tabs: { create: async opts => { tabs.push(opts); return { id: 99 }; } },
     storage: { session: { get: async () => saved, set: async data => { saved = data; } } },
     windows: {
       onRemoved: { addListener: fn => { removed = fn; } },
@@ -47,6 +48,13 @@ test('toolbar opens one direct small window, reuses it without navigation, resto
     assert.equal(creates.length, 2);
     // Foreign messages may not open a window.
     assert.equal(message({ duri: 'open-small' }, { id: 'other', url: 'https://duri.example/' }, () => assert.fail()), undefined);
+    assert.equal(creates.length, 2);
+    // The popup frame asks for a one-time permission tab; it never opens a call window.
+    const allowed = await new Promise(resolve => message({ duri: 'allow-media' }, { id: 'test', url: 'https://duri.example/room/chat' }, resolve));
+    assert.deepEqual(allowed, { ok: true });
+    assert.deepEqual(tabs, [{ url: 'chrome-extension://test/permission.html' }]);
+    assert.equal(message({ duri: 'allow-media' }, { id: 'test', url: 'https://evil.example/' }, () => assert.fail()), undefined);
+    assert.equal(tabs.length, 1);
     assert.equal(creates.length, 2);
   } finally { delete globalThis.chrome; await rm(out, { recursive: true, force: true }); }
 });

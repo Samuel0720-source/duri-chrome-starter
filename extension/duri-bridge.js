@@ -5,7 +5,11 @@
 (() => {
   const COMMANDS = new Set(["play", "pause", "seek"]);
   const toPage = (m) => window.postMessage({ duri: "from-ext", ...m }, location.origin);
-  const hello = () => toPage({ type: "hello", version: chrome.runtime.getManifest().version });
+  const hello = () => {
+    try {
+      toPage({ type: "hello", version: chrome.runtime.getManifest().version });
+    } catch { /* the extension was reloaded; this old copy stays silent */ }
+  };
   let port = null;
 
   function connect() {
