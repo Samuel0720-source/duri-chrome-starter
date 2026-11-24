@@ -315,3 +315,5 @@
 - **실제 검사(맥 로컬):** typecheck 통과, 단위 77 통과, 프로덕션 빌드 통과, 브라우저 12개 중 11개 통과. 실패 1개는 테스트가 직접 창을 1100×850으로 바꾸는 단계에서 이 맥 화면 범위 때문에 Chrome이 거부한 것(앱 코드 이전 단계, CI Linux에서는 통과해 왔음). live flow(팝업 안 통화 포함)는 배포 후 CI.
 - **미확인:** 실제 맥 툴바 팝업에서 권한 프롬프트 동작. 테스트는 가짜 장치·자동 허용이라 확인 못 함. 이미 둘이 사이트에 마이크를 허용했어도 팝업은 확장 주소 기준이라 처음 한 번 ‘마이크·카메라 허용하기’가 필요할 수 있음.
 - 다음 행동 하나: 0.5.5를 `npm run extension:release`로 만들어 맥 Chrome에서 다시 불러오기(새로고침) → 팝업 대화 탭에서 음성 통화 → 필요하면 ‘허용하기’ 한 번 → 상대와 소리 확인.
+- **출시 준비 확인(8c9a570, main):** 배포 주소 `/api/version`이 8c9a570과 일치. Check starter https://github.com/Samuel0720-source/duri-chrome-starter/actions/runs/45322257123 통과, live flow https://github.com/Samuel0720-source/duri-chrome-starter/actions/runs/45322257297 통과(팝업 안 음성 통화 → 상대 수락 → 소리 재생 → 끊기 포함, 가짜 장치). 스토어 설명 문구를 현재 기능으로, 개인정보처리방침에 권한 탭 설명 추가, `docs/RELEASE.md`에 0.5.5 제출용 영어 문구. ZIP `dist/duri-extension-0.5.5.zip` 27개 파일, 165322 bytes, sha256 9dd6963c2814938900f304fce48e511be2aaa3d067aa8490a2ed4d79028ea26f.
+- 다음 행동 하나: Sam이 스토어 대시보드에 ZIP 업로드 → RELEASE.md 0.5.5 문구 붙여 넣기 → 1280×800 스크린샷 → 처음엔 비공개로 올려 실제 맥에서 팝업 통화 확인 후 공개.
