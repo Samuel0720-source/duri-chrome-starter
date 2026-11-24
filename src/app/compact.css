@@ -5,7 +5,7 @@
   .top { min-height: 52px; padding-block: 8px; margin-bottom: 12px; gap: 10px; }
   .brand { font-size: 1.45rem; }
   .brand img, .brand .room-mascot { width: 44px; height: 32px; }
-  .room-tabs { position: sticky; top: 0; z-index: var(--z-sticky-nav); grid-template-columns: repeat(3,minmax(0,1fr)); border-radius: 16px; margin-bottom: 14px; padding: 4px; gap: 2px; }
+  .room-tabs { position: sticky; top: 0; z-index: var(--z-sticky-nav); grid-template-columns: repeat(4,minmax(0,1fr)); border-radius: 16px; margin-bottom: 10px; padding: 4px; gap: 2px; }
   .room-tabs a { min-height: 38px; font-size: .85rem; padding: 4px; gap: 5px; border-radius: 11px; }
   .tab-icon { font-size: 1.1rem; }
   .room-grid, .settings-stack { gap: 14px; }
@@ -61,3 +61,31 @@ body { padding-bottom: var(--call-dock-height, 0px); }
 .call-dock .call-box { margin: 0; padding: 12px; }
 .call-dock .call-streams video { max-height: 120px; }
 .call-video-toggle { margin-block: 6px; font: inherit; color: var(--color-accent); }
+
+/* Idle calls should not consume half of a chat window. Keep error/status messages. */
+.call-box[data-phase="idle"] h2 { font-size: 1rem; margin: 0; }
+.call-box[data-phase="idle"][data-note="hint"] .call-top p { display: none; }
+.call-box .popup-call-launch { width: 100%; min-height: 40px; padding: 8px 12px; font-size: .875rem; }
+
+@media (max-width: 560px) {
+  /* Fit the frame's viewport, not a fixed fraction of the full browser window.
+     Only the history scrolls; the composer and optional draft/error stay in reach. */
+  body:has(.chat) { padding-bottom: 0; }
+  .room-wrap:has(.chat) {
+    height: calc(100dvh - var(--call-dock-height, 0px));
+    min-height: 300px; display: flex; flex-direction: column; padding-bottom: 8px;
+  }
+  .room-wrap:has(.chat) > .top { flex-shrink: 0; }
+  .room:has(> .chat-wrap .chat) { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .room:has(> .chat-wrap .chat) > .room-tabs { flex-shrink: 0; position: static; }
+  .chat-wrap:has(.chat) { display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; }
+  .chat { display: flex; flex-direction: column; height: auto; flex: 1; min-height: 0; gap: 8px; }
+  .chat-list { flex: 1; min-height: 0; padding: 12px; overflow-y: auto; }
+  .chat > :not(.chat-list) { flex-shrink: 0; }
+  .chat .draft-question { max-height: 70px; overflow-y: auto; }
+  .chat-form input { min-width: 0; }
+  .chat .error { max-height: 60px; overflow-y: auto; }
+  .call-dock .call-top h2 { font-size: 1rem; margin-bottom: 0; }
+  .call-dock .call-top { gap: 6px; }
+  .call-dock .call-actions button { min-height: 36px; padding: 6px 10px; font-size: .85rem; }
+}

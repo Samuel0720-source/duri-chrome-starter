@@ -86,8 +86,15 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(popup.locator("body")).toHaveAttribute("data-mood", "night");
 
     await app.getByRole("link", { name: "대화", exact: true }).click();
-    await expect(app.locator(".call-actions button").first()).toBeEnabled();
-    await app.locator("#chat-input").fill("A message from the Duri toolbar");
+    await expect(app.locator(".popup-call-launch")).toBeEnabled();
+    // toBeVisible/fill alone can auto-scroll a broken composer into view.
+    const input = app.locator("#chat-input");
+    await expect.poll(() => input.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      return box.top >= 0 && box.bottom <= innerHeight && document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2) === el;
+    })).toBe(true);
+    await input.click();
+    await popup.keyboard.type("A message from the Duri toolbar");
     await app.getByRole("button", { name: "보내기", exact: true }).click();
     await b.goto("/room/chat");
     await expect(b.getByText("A message from the Duri toolbar", { exact: true })).toBeVisible();
@@ -133,7 +140,7 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(popup.locator("html")).toHaveAttribute("lang", "en");
     await app.getByRole("link", { name: "Chat", exact: true }).click();
     await expect(app.getByText("Your partner can reply here", { exact: true })).toBeVisible();
-    await expect(app.getByRole("button", { name: "Video call", exact: true })).toBeEnabled();
+    await expect(app.locator(".popup-call-launch")).toBeEnabled();
     const [small] = await Promise.all([context.waitForEvent("page"), popup.locator("#detach").click()]);
     await expect(small).toHaveURL(url => url.pathname === "/room/chat" && url.searchParams.get("mini") === "1");
     await expect(small.getByText("Your partner can reply here", { exact: true })).toBeVisible();

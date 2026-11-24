@@ -36,7 +36,14 @@ function VideoPreview({ track, label }: { track: MediaStreamTrack; label: string
 export function CallControls({ session, view, ready, compact = false }: { compact?: boolean; session: CallSession | null; view: View; ready: boolean }) {
   const { t, locale } = useT();
   const [popup, setPopup] = useState(false);
-  useEffect(() => { setPopup(document.documentElement.dataset.compact === "popup"); }, []);
+  useEffect(() => {
+    const root = document.documentElement;
+    const update = () => setPopup(root.dataset.compact === "popup");
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(root, { attributes: true, attributeFilter: ["data-compact"] });
+    return () => observer.disconnect();
+  }, []);
   const [expanded, setExpanded] = useState(false);
   const [muted, setMuted] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -46,11 +53,11 @@ export function CallControls({ session, view, ready, compact = false }: { compac
   const remoteVideo = view.remote?.getVideoTracks()[0];
   const localVideo = view.local?.getVideoTracks()[0];
   const status = view.phase === "idle" ? view.note : view.phase === "incoming" ? (audioOnly ? "incomingAudio" : "incomingVideo") : view.phase;
-  return <section className="call-box" aria-label={t("call.title")}>
-    {popup && <div className="mini-call-note">
-      <p>{locale === "ko" ? "팝업 바깥을 누르면 통화도 종료돼요. 통화 전에 작은 창을 열어 주세요." : "Clicking outside this popup ends a call. Open the small window before calling."}</p>
-      {view.phase === "idle" && <button type="button" className="button" onClick={() => window.postMessage({ duri: "open-small" }, location.origin)}>{locale === "ko" ? "작은 창에서 통화하기" : "Call in a small window"}</button>}
-    </div>}
+  if (popup && view.phase === "idle") return <section className="call-box" data-phase="idle" aria-label={t("call.title")}>
+    <button type="button" className="button popup-call-launch" onClick={() => window.postMessage({ duri: "open-small" }, location.origin)}>{locale === "ko" ? "📞 작은 창에서 통화하기" : "📞 Call in a small window"}</button>
+  </section>;
+  return <section className="call-box" data-phase={view.phase} data-note={view.note} aria-label={t("call.title")}>
+    {popup && <p className="mini-call-note">{locale === "ko" ? "통화하는 동안 이 팝업을 열어 두세요." : "Keep this popup open during the call."}</p>}
     <div className="call-top"><div><h2>{t("call.title")}</h2><p role="status">{t(`call.${status}`)}</p>
       {view.phase === "connected" && view.route && <p className="hint" data-route={view.route}>{t(view.route === "relay" ? "call.route.relay" : "call.route.direct")}</p>}</div>
       <div className="call-actions">

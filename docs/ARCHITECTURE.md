@@ -146,3 +146,10 @@
 - 데이터 흐름: 화면 → `baseball_action(방, 본 리비전, 'secret'|'guess', 숫자)` → 서버가 비밀 숫자로 채점하고 리비전 +1 → 트리거가 방 채널에 `baseball` 알림(내용 없음) → 두 화면이 `baseball_state`를 다시 읽음. 상태는 사람마다 다르게 만들어짐: 내 비밀 숫자만 오고, 상대 숫자는 게임이 끝난 뒤에만 옴.
 - 설계 이유: 채점을 브라우저에서 하면 상대 비밀 숫자를 브라우저에 보내야 해서 개발자 도구로 볼 수 있음. 그래서 판정은 서버, 화면은 보낸 숫자를 먼저 띄우고(낙관적 표시) 결과만 기다림. 리비전이 다르면 아무것도 바꾸지 않아 두 번 누르기도 안전함.
 - 면접 질문: "상대에게 비밀인 정보가 있는 실시간 2인 게임에서, 클라이언트를 믿지 않으면서도 화면이 즉시 반응하게 하려면 어떻게 나누겠는가?"
+
+### Popup chat sizing and startup · 2026-11-23
+At widths up to 560px, Chat uses the available viewport minus the measured persistent call dock. The room shell and history can shrink; the composer, question draft and error stay outside the history scroller. History scrolling never scrolls the surrounding document. Incoming messages follow the bottom only when the reader was already near it. Idle toolbar calls use one handoff button; calls still live in the persistent room layout in the separate small window.
+
+The toolbar caches only sanitized route, language and theme in extension-local localStorage, with chrome.storage.local retained for migration. A missing cache gives storage at most 100ms before starting the iframe. Late preferences cannot reload a screen the user is interacting with. Surface messages are deduplicated, avoiding writes on each chat/render mutation. No permissions or credential storage were added. This removes a local startup dependency, not server/network cold-start time.
+
+Review question: why must message scrolling and call-dock resizing never move the composer underneath the dock?
