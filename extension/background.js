@@ -1,3 +1,4 @@
+import { callMessage } from "./call-background.js";
 import { webOrigin } from "./origin.js";
 import { surfacePath } from "./surface-path.js";
 // Netflix together: a tiny switchboard. The 둘이 함께 보기 tab ("duri") and a Netflix watch tab ("netflix")
@@ -76,7 +77,9 @@ chrome.windows.onRemoved.addListener(id => {
 });
 // Retain the old popup's handoff for existing links and compatibility.
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
-  if (sender.id !== chrome.runtime.id || message?.duri !== "open-small") return;
+  if (sender.id !== chrome.runtime.id || !message) return;
+  if (message.duri?.startsWith("call-host-")) return callMessage(message, sender, reply, webOrigin);
+  if (message.duri !== "open-small") return;
   const url = sender.url || "";
   if (!url.startsWith(chrome.runtime.getURL("")) && !url.startsWith(webOrigin + "/")) return;
   openSmall(message.path).then(() => reply({ ok: true }), () => reply({ ok: false }));

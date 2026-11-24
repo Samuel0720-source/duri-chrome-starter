@@ -87,7 +87,7 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(popup.locator("body")).toHaveAttribute("data-mood", "night");
 
     await app.getByRole("link", { name: "대화", exact: true }).click();
-    await expect(app.locator(".popup-call-launch")).toBeEnabled();
+    await expect(app.locator(".call-actions button").first()).toBeEnabled();
     // toBeVisible/fill alone can auto-scroll a broken composer into view.
     const input = app.locator("#chat-input");
     await expect.poll(() => input.evaluate(el => {
@@ -141,9 +141,9 @@ test("a signed-in couple can use chat, albums and settings in the native extensi
     await expect(popup.locator("html")).toHaveAttribute("lang", "en");
     await app.getByRole("link", { name: "Chat", exact: true }).click();
     await expect(app.getByText("Your partner can reply here", { exact: true })).toBeVisible();
-    await expect(app.locator(".popup-call-launch")).toBeEnabled();
-    // Exercise the user's actual call button, not just the toolbar's detach shortcut.
-    const [small] = await Promise.all([context.waitForEvent("page"), app.locator(".popup-call-launch").click()]);
+    await expect(app.locator(".call-actions button").first()).toBeEnabled();
+    // Optional detached window remains available, but is no longer required for calling.
+    const [small] = await Promise.all([context.waitForEvent("page"), popup.locator("#detach").click()]);
     await expect.poll(() => popup.evaluate("chrome.windows.getAll({windowTypes:['popup']})")).toEqual([
       expect.objectContaining({ type: "popup", state: "normal", width: 440, height: 600 }),
     ]);

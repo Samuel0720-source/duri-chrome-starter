@@ -2,13 +2,15 @@
 (() => {
   const extensionOrigin = chrome.runtime.getURL("").replace(/\/$/, "");
   const embedded = window.parent !== window && location.ancestorOrigins?.[0] === extensionOrigin;
-  if (!embedded) return;
-  if (document.documentElement) document.documentElement.dataset.compact = "popup";
+  if (!embedded || location.pathname === "/call-host") return;
+  if (document.documentElement) { document.documentElement.dataset.compact = "popup"; document.documentElement.dataset.callBackground = "1"; }
   let pending = false;
   let previous = "";
   function report() {
     pending=false;
     document.documentElement.dataset.compact="popup";
+    document.documentElement.dataset.callBackground="1";
+    if (location.pathname === "/login") void chrome.runtime.sendMessage({duri:"call-host-close"}).catch(()=>{});
     const mood=document.querySelector(".room[data-mood]")?.getAttribute("data-mood") || "berry";
     const surface = {duri:"surface",path:location.pathname+location.search,locale:document.documentElement.lang,mood};
     const key = JSON.stringify(surface);
@@ -19,6 +21,11 @@
   function schedule() { if (!pending) {pending=true;requestAnimationFrame(report);} }
   function small() { chrome.runtime.sendMessage({duri:"open-small",path:location.pathname+location.search}); }
   window.addEventListener("message",e=>{
+    if (e.source===window && e.origin===location.origin && e.data?.duri==="call-host-ensure") {
+      chrome.runtime.sendMessage({duri:"call-host-ensure"}).then(reply=>{
+        if(!reply?.ok) window.postMessage({duri:"call-host-error"},location.origin);
+      }).catch(()=>window.postMessage({duri:"call-host-error"},location.origin));
+    }
     if (e.source===parent && e.origin===extensionOrigin && e.data?.duri==="surface-request") { previous=""; schedule(); }
     if (e.source===window && e.origin===location.origin && e.data?.duri==="open-small") small();
   });

@@ -1,11 +1,18 @@
 import { isSignal, type Kind, type Mode } from "../../../core/room-call";
 
 export type Phase = "idle" | "ringing" | "incoming" | "connecting" | "connected";
-export type CallNote = "hint" | "ended" | "device" | "network" | "busy" | "timeout" | "offline";
+export type CallNote = "hint" | "ended" | "device" | "network" | "busy" | "timeout" | "offline" | "permission" | "missingDevice" | "deviceBusy";
 type Session = { id: string; mode: Mode; caller: boolean; phase: Phase; pc?: RTCPeerConnection; stream?: MediaStream; route?: Route };
 // "direct": the two browsers reached each other. "relay": the audio goes through the TURN relay server.
 export type Route = "direct" | "relay";
-export type View = { phase: Phase; mode: Mode; note: CallNote; local?: MediaStream; remote?: MediaStream; route?: Route };
+export type View = { phase: Phase; mode: Mode; note: CallNote; local?: MediaStream; remote?: MediaStream; route?: Route; muted?: boolean; cameraHidden?: boolean; background?: boolean };
+export type CallController = Pick<CallSession, "start" | "accept" | "end" | "setMuted" | "setCameraHidden">;
+
+export function deviceNote(error: unknown): CallNote {
+  const name = error instanceof DOMException ? error.name : "";
+  return name === "NotAllowedError" || name === "SecurityError" ? "permission"
+    : name === "NotFoundError" ? "missingDevice" : name === "NotReadableError" ? "deviceBusy" : "device";
+}
 
 // Without a relay (TURN) server, two devices behind strict networks (mobile data, campus Wi-Fi) never connect.
 const STUN: RTCIceServer[] = [{ urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"] }];
@@ -20,7 +27,16 @@ export class CallSession {
     private iceServers: () => Promise<RTCIceServer[]> = async () => STUN) {}
 
   private show(s: Session) {
-    this.render({ phase: s.phase, mode: s.mode, note: "hint", local: s.stream, remote: this.remote, route: s.route });
+    this.render({ phase: s.phase, mode: s.mode, note: "hint", local: s.stream, remote: this.remote, route: s.route,
+      muted: !!s.stream?.getAudioTracks().some(t => !t.enabled), cameraHidden: !!s.stream?.getVideoTracks().some(t => !t.enabled) });
+  }
+  setMuted(muted: boolean) {
+    const s = this.current;
+    if (s) { s.stream?.getAudioTracks().forEach(t => { t.enabled = !muted; }); this.show(s); }
+  }
+  setCameraHidden(hidden: boolean) {
+    const s = this.current;
+    if (s) { s.stream?.getVideoTracks().forEach(t => { t.enabled = !hidden; }); this.show(s); }
   }
   private timeout(s: Session, ms: number) {
     clearTimeout(this.timer);
@@ -59,7 +75,14 @@ export class CallSession {
     return sent;
   }
   async receive(value: unknown) {
-    if (!isSignal(value) || value.sender === this.me) return;
+    if (!isSignal(value)) return;
+    if (value.sender === this.me) {
+      // Another surface for this same person answered or ended this invitation.
+      // Stop the stale ringing UI without sending a bye that would kill their call.
+      if (this.current?.id === value.id && (value.kind === "bye" ||
+        (value.kind === "accept" && this.current.phase === "incoming"))) void this.end("ended", false);
+      return;
+    }
     const { kind, id, detail } = value;
     if (kind === "ring") {
       if (this.current?.id === id) return;
@@ -120,7 +143,7 @@ export class CallSession {
     };
     let stream: MediaStream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: s.mode === "video" }); }
-    catch { if (s === this.current) this.end("device"); return; }
+    catch (error) { if (s === this.current) this.end(deviceNote(error)); return; }
     if (s !== this.current) { stream.getTracks().forEach(track => track.stop()); return; }
     s.stream = stream;
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
