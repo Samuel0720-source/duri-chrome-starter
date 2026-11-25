@@ -793,3 +793,8 @@ small { display: block; margin-top: var(--space-3xs); font-weight: 400; color: v
 .error-page h1 { margin-bottom: 8px; }
 .error-page p { color: var(--color-ink-2); line-height: 1.5; }
 .error-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+
+/* Time zone that already matches this computer: one quiet line with a "Change" button. */
+.zone-auto { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2xs) var(--space-xs); margin: 0; color: var(--color-ink-2, inherit); }
+.zone-auto button.link { min-height: 40px; padding: 0 var(--space-2xs); border: 0; background: transparent; color: var(--color-accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.zone-auto button.link:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; border-radius: 4px; }

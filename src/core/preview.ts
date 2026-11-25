@@ -2,11 +2,12 @@ import { isCalendarDate } from "./dates.ts";
 
 export const exampleStart = "2026-08-13";
 export const defaultZone = "America/Vancouver";
-export const zones = [
-  { value: defaultZone, label: "밴쿠버" },
-  { value: "America/Toronto", label: "토론토" },
-  { value: "Asia/Seoul", label: "서울" },
-];
+
+// Any real IANA zone ("America/Toronto", "Asia/Seoul"); the database checks it again.
+export function isZone(zone: string): boolean {
+  if (!/^[A-Za-z][A-Za-z0-9_+\-]*(\/[A-Za-z0-9_+\-]+)*$/.test(zone)) return false;
+  try { new Intl.DateTimeFormat("en", { timeZone: zone }); return true; } catch { return false; }
+}
 
 export type Selection = { start: string; zone: string };
 
@@ -18,7 +19,7 @@ export function readSelection(hash: string): Selection | null {
   const params = new URLSearchParams(hash.replace(/^#/, ""));
   const start = params.get("start") ?? "";
   const zone = params.get("zone") ?? "";
-  if (!isPreviewStart(start) || !zones.some((item) => item.value === zone)) return null;
+  if (!isPreviewStart(start) || !isZone(zone)) return null;
   return { start, zone };
 }
 

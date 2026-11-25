@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { isMood } from "../../../core/moods";
-import { zones } from "../../../core/preview";
+import { ZoneField } from "../../zone-field";
 import { getT } from "../../../i18n/server";
 import { roomAccess, roomDetails, roomMemberCount } from "../../../lib/room-render";
 import { roomNames } from "../../../lib/room-names";
@@ -115,10 +115,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                   <input id="room-start" name="start" type="date" min="1900-01-01" max="9998-12-31" defaultValue={room.start_date} required />
                 </div>
                 <div className="field">
-                  <label htmlFor="room-zone">{t("settings.room.zone")}</label>
-                  <select id="room-zone" name="zone" defaultValue={room.timezone}>
-                    {zones.map(({ value }) => <option key={value} value={value}>{t(`zone.${value}` as "zone.Asia/Seoul")}</option>)}
-                  </select>
+                  <ZoneField id="room-zone" name="zone" defaultValue={room.timezone} />
                 </div>
               </div>
               <button type="submit" className="secondary">{t("settings.room.saveDate")}</button>

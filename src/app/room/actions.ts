@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { invitePath, isInviteToken, roomErrorKey } from "../../core/auth-paths";
-import { isPreviewStart, zones } from "../../core/preview";
+import { isPreviewStart, isZone } from "../../core/preview";
 import { isMonthDay } from "../../core/dates";
 import { isMood } from "../../core/moods";
 import { isUuid } from "../../core/album";
@@ -35,7 +35,7 @@ async function signedIn() {
 export async function createRoom(formData: FormData) {
   const start = String(formData.get("start") ?? "");
   const zone = String(formData.get("zone") ?? "");
-  if (!isPreviewStart(start) || !zones.some((item) => item.value === zone)) redirect("/room?error=input");
+  if (!isPreviewStart(start) || !isZone(zone)) redirect("/room?error=input");
   const { supabase, user } = await signedIn();
   if (!user) redirect("/login?next=/room");
   const { error } = await supabase.rpc("create_couple_room", { first_day: start, zone });
@@ -111,7 +111,7 @@ export async function setStart(formData: FormData) {
   const room = String(formData.get("room") ?? "");
   const start = String(formData.get("start") ?? "");
   const zone = String(formData.get("zone") ?? "");
-  if (!isPreviewStart(start) || !zones.some((item) => item.value === zone)) redirect("/room/settings?error=room#room");
+  if (!isPreviewStart(start) || !isZone(zone)) redirect("/room/settings?error=room#room");
   const { supabase, user } = await signedIn();
   if (!user) redirect("/login?next=/room");
   const { error } = await supabase.rpc("set_room_start", { target: room, first_day: start, zone });

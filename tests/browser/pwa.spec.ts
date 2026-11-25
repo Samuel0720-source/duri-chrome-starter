@@ -6,11 +6,13 @@ test("small and large windows have independent preview state and usable controls
 }) => {
   const large = await browser.newContext({
     viewport: { width: 1440, height: 900 },
+    timezoneId: "America/Vancouver",
   });
   const small = await browser.newContext({
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true,
+    timezoneId: "America/Vancouver",
   });
   try {
     const [a, b] = await Promise.all([large.newPage(), small.newPage()]);
@@ -21,6 +23,9 @@ test("small and large windows have independent preview state and usable controls
     await a.getByLabel("함께한 첫날").fill("2099-01-02");
     await expect(a.getByText("첫날까지")).toBeVisible();
     await expect(b.getByLabel("함께한 첫날")).toHaveValue("2026-08-13");
+    // The computer's own zone is shown as one line; the full list opens on "바꾸기".
+    await expect(b.getByText("이 컴퓨터 시간과 같아요")).toBeVisible();
+    await b.getByRole("button", { name: "바꾸기" }).click();
     await b.getByLabel("기준 시간대").selectOption("Asia/Seoul");
     await expect(a.getByLabel("기준 시간대")).toHaveValue("America/Vancouver");
     for (const width of [320, 390, 768, 1440]) {

@@ -5,7 +5,7 @@ import { MilestoneRail } from "../milestone-rail";
 import { birthdaysOf, roomNames } from "../../lib/room-names";
 import { postcardQuestion } from "../../core/postcards";
 import { isMood } from "../../core/moods";
-import { defaultZone, zones } from "../../core/preview";
+import { ZoneField } from "../zone-field";
 import { getT } from "../../i18n/server";
 import { roomAccess, roomDetails, roomMemberCount } from "../../lib/room-render";
 import { addPlan, createRoom, removePlan } from "./actions";
@@ -46,10 +46,7 @@ export default async function RoomPage({
           <form action={createRoom} className="stack">
             <label htmlFor="start">{t("settings.room.start")}</label>
             <input id="start" name="start" type="date" min="1900-01-01" max="9998-12-31" required />
-            <label htmlFor="zone">{t("settings.room.zone")}</label>
-            <select id="zone" name="zone" defaultValue={defaultZone}>
-              {zones.map(({ value }) => <option key={value} value={value}>{t(`zone.${value}` as "zone.Asia/Seoul")}</option>)}
-            </select>
+            <ZoneField id="zone" name="zone" />
             <button type="submit">{t("home.create.button")}</button>
           </form>
           {(error === "create" || error === "input") && <p role="alert" className="error">{t("home.create.failed")}</p>}

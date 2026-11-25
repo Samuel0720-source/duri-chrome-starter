@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect, type ReactNode } from "react";
 import { coupleCalendar, roomToday, upcomingMilestones } from "../core/dates";
-import { defaultZone, exampleStart, previewPath, readSelection, zones } from "../core/preview";
+import { defaultZone, exampleStart, previewPath, readSelection } from "../core/preview";
+import { computerZone } from "../core/zones";
+import { ZoneField } from "./zone-field";
 import { MilestoneRail } from "./milestone-rail";
 import { useT } from "../i18n/client";
 
@@ -13,7 +15,7 @@ function usePreview(initialToday: string) {
   useEffect(() => {
     const restore = () => {
       const selection = readSelection(window.location.hash);
-      if (!selection) return;
+      if (!selection) return setZone((zone) => (zone === defaultZone ? computerZone() ?? zone : zone));
       setStart(selection.start);
       setZone(selection.zone);
     };
@@ -97,10 +99,7 @@ function Fields({ start, setStart, zone, setZone }: Pick<Preview, "start" | "set
         <input id="start" type="date" min="1900-01-01" max="9998-12-31" value={start} onChange={(e) => setStart(e.target.value)} />
       </div>
       <div className="field">
-        <label htmlFor="zone">{t("settings.room.zone")}</label>
-        <select id="zone" value={zone} onChange={(e) => setZone(e.target.value)}>
-          {zones.map(({ value }) => <option key={value} value={value}>{t(`zone.${value}` as "zone.Asia/Seoul")}</option>)}
-        </select>
+        <ZoneField id="zone" value={zone} onChange={setZone} />
       </div>
     </div>
   );
