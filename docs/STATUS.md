@@ -348,3 +348,4 @@
 - **변경:** `extension/manifest.json` 버전 0.5.6 → 0.5.7. Sam의 시간대 변경(`src/core/preview.ts`의 `isZone`)이 확장의 `core/preview.js`에 복사되므로 패키지 내용이 바뀌었고, 스토어는 내용이 다른 같은 버전을 다시 받지 않기 때문. `tests/unit/release.test.mjs` 버전 갱신. `tests/database/rooms.test.mjs` 그림 퀴즈 영어 단어 검사가 가끔 실패하던 원인 수정: 문자열 전체를 부분 일치로 찾아서 `cat`이 키 `category` 안에서, `bee`가 무작위 id 안에서 잡혔음 → 값 단위·단어 경계로 비교(누출은 여전히 잡히는 것을 따로 확인).
 - **실제 검사:** 단위 78 통과, DB 34 통과(pgtest, 2회). Sam이 올린 zip(`da87f0d9…`)은 main 빌드와 같았고 버전만 0.5.6이었음. 새 zip sha256 `2b1eaba1…`, 27개 파일, 권한 `storage`만.
 - **다음 행동:** 대시보드 Package 탭에서 0.5.7 zip으로 교체 후 제출.
+- **제출:** 2026-11-24 Chrome 웹 스토어에 0.5.7 제출(아이템 ID `dllhkafaljfljgmepejpbkinkcifccak`, 발행자 duri.app.official@gmail.com, Public·전 지역·무료, 통과 시 자동 공개). 심사용 계정 `duri.app.official+reviewa/reviewb@gmail.com`이 같은 방에 있는 것을 DB에서 확인. 심사 중에는 두 계정의 비밀번호·방을 바꾸지 않는다.
