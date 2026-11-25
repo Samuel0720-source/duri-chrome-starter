@@ -73,7 +73,7 @@ Sign in with Google or email on the Duri website. The same room also works as a 
 Privacy policy: https://duri-chrome-starter.vercel.app/privacy
 ```
 
-Upload `dist/duri-extension-0.5.6.zip` only after the website commit with popup calls is live (the popup shows the live site).
+Upload the newest `dist/duri-extension-<version>.zip` (0.5.7 as of 2026-11-24) only after the website commit with popup calls is live (the popup shows the live site).
 
 - **Single purpose:** Opens the user's private two-person Duri room (chat, calls, games, photos, anniversaries) from the Chrome toolbar, and optionally syncs Netflix playback for Duri's Watch together page.
 - **storage justification:** Remembers the last opened Duri screen, language and theme on this device, and the id of the optional small window for the browser session. No messages, photos or login tokens are stored.

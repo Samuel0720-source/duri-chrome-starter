@@ -1363,7 +1363,11 @@ test("draw quiz in English: every word has an English name, the guesser may answ
   assert.equal(sa.wordEn, w1.word_en, "the drawer gets both, the screen shows its own language");
   const sb = (await asUser(b, "select public.draw_state($1) as s", [id]))[0].s;
   assert.equal(sb.wordEn, null);
-  assert.ok(!JSON.stringify(sb).toLowerCase().includes(w1.word_en.toLowerCase()), "the guesser gets no English word either");
+  // Compare whole string values: "cat" sits inside the key "category" and "bee" can sit inside a random id.
+  const values = [];
+  JSON.parse(JSON.stringify(sb), (_k, v) => (typeof v === "string" && values.push(v.toLowerCase()), v));
+  const hit = new RegExp(`\\b${w1.word_en.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+  assert.ok(!values.some((v) => !/^[0-9a-f-]{36}$/.test(v) && hit.test(v)), "the guesser gets no English word either");
   // English answer, any case and spacing.
   assert.equal(await guess("  " + w1.word_en.toUpperCase() + " "), "correct");
   const w2 = await cur();
