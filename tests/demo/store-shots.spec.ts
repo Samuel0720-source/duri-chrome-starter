@@ -22,7 +22,7 @@ async function signIn(browser: Browser, next: string, lang: string): Promise<Pag
   return page;
 }
 
-test("store screenshots", async ({ browser }) => {
+for (const lang of ["en", "ko"]) test(`store screenshots (${lang})`, async ({ browser }) => {
   test.setTimeout(180_000);
   const a = await signIn(browser, "/room", "ko");
   await a.getByLabel("함께한 첫날").fill("2026-06-23");
@@ -32,7 +32,8 @@ test("store screenshots", async ({ browser }) => {
   const b = await signIn(browser, invite, "ko");
   await b.getByRole("button", { name: "방에 들어가기" }).click();
   await expect(b.getByText("두 사람이 모두 들어왔어요.")).toBeVisible();
-  for (const [p, msg] of [[b, "오늘 저녁에 통화할래? 🙂"], [a, "좋아! 9시에 걸게"]] as const) {
+  const chat = lang === "ko" ? ["오늘 저녁에 통화할래? 🙂", "좋아! 9시에 걸게"] : ["Call tonight? 🙂", "Yes! I'll call you at 9"];
+  for (const [p, msg] of [[b, chat[0]], [a, chat[1]]] as const) {
     await p.goto("/room/chat");
     const box = p.getByRole("textbox").last();
     await box.fill(msg);
@@ -66,7 +67,7 @@ test("store screenshots", async ({ browser }) => {
   }
   await a.mouse.up();
   await a.waitForTimeout(1500);
-  for (const lang of ["ko", "en"]) {
+  {
     await a.context().addCookies([{ name: "duri_lang", value: lang, url: process.env.FLOW_URL! }]);
     for (const [path, name] of [["/room", "home"], ["/room/chat", "chat"], ["/room/game?g=chess", "games"], ["/room/draw", "draw"]]) {
       await a.goto(path);
