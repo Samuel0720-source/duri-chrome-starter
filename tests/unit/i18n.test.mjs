@@ -23,7 +23,9 @@ test("language choice: cookie first, then the browser, Korean only for Korean br
   assert.equal(pickLocale(undefined, "ko-KR,ko;q=0.9"), "ko");
   assert.equal(pickLocale(undefined, "en-CA,en;q=0.9,ko;q=0.8"), "en");
   assert.equal(pickLocale(undefined, "fr-FR"), "en", "no French yet: English");
-  assert.equal(pickLocale("xx", ""), "ko", "no information: the app's home language");
+  assert.equal(pickLocale(undefined, "ja-JP,ko;q=0.8"), "en", "only the main language counts");
+  assert.equal(pickLocale(undefined, " ko ;q=1"), "ko");
+  assert.equal(pickLocale("xx", ""), "en", "no information: English");
 });
 
 test("every Korean sentence has an English one, with the same placeholders", () => {

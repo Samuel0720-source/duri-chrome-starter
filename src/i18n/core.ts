@@ -12,15 +12,12 @@ export function isLocale(value: unknown): value is Locale {
   return locales.some((l) => l.value === value);
 }
 
-// Accept-Language "en-CA,en;q=0.9,ko;q=0.8" -> the first language we have, else English for non-Korean browsers.
+// The browser's main language decides: Korean first -> Korean, anything else (or nothing) -> English.
+// A saved choice (cookie) always wins.
 export function pickLocale(cookie: string | undefined, acceptLanguage: string | null | undefined): Locale {
   if (isLocale(cookie)) return cookie;
-  const tags = (acceptLanguage ?? "")
-    .split(",")
-    .map((part) => part.trim().split(";")[0].toLowerCase().split("-")[0])
-    .filter(Boolean);
-  for (const tag of tags) if (isLocale(tag)) return tag;
-  return tags.length ? "en" : defaultLocale;
+  const first = (acceptLanguage ?? "").split(",")[0].split(";")[0].trim().toLowerCase().split("-")[0];
+  return first === "ko" ? "ko" : "en";
 }
 
 // Does the last Hangul syllable have a final consonant (받침)? null when the last letter is not Hangul.
